@@ -65,11 +65,24 @@ function render() {
     const r = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/HEAD?recursive=1`);
     if (!r.ok) throw new Error(r.status);
     const data = await r.json();
-    apps = data.tree
-      .filter(t => /^[^/]+\/index\.html$/.test(t.path) && !/^[._]/.test(t.path))
-      .map(t => { const d = t.path.split("/")[0];
-                  return { label: pretty(d), href: encodeURIComponent(d) + "/" }; })
-      .sort((a, b) => a.label.localeCompare(b.label));
+    // Group HTML files by top-level folder (any file name, case-insensitive)
+    const byFolder = {};
+    data.tree.forEach(t => {
+      const m = t.path.match(/^([^/]+)\/([^/]+\.html?)$/i);
+      if (!m || /^[._]/.test(m[1])) return;
+      (byFolder[m[1]] = byFolder[m[1]] || []).push(m[2]);
+    });
+    apps = [];
+    Object.entries(byFolder).forEach(([folder, files]) => {
+      const idx = files.find(f => /^index\.html?$/i.test(f));
+      const use = idx ? [idx] : files;   // prefer index.html if present
+      use.forEach(f => {
+        const label = use.length === 1 ? pretty(folder)
+          : pretty(folder) + " – " + pretty(f.replace(/\.html?$/i, ""));
+        apps.push({ label, href: encodeURIComponent(folder) + "/" + encodeURIComponent(f) });
+      });
+    });
+    apps.sort((a, b) => a.label.localeCompare(b.label));
     render();
   } catch (e) {
     msg.textContent = "Couldn't load the app list (" + e.message + "). Is the repo public and hosted on GitHub Pages?";
