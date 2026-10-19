@@ -25,6 +25,11 @@
            box-shadow:0 1px 3px #0003; }
   a.card:active { outline:2px solid var(--accent); }
   .msg { opacity:.7; }
+  .card { overflow-wrap:anywhere; }
+  .tile details { margin-top:6px; font-size:14px; }
+  .tile summary { opacity:.6; padding:6px 4px; cursor:pointer; }
+  .tile details a { display:block; padding:8px 4px; color:var(--accent);
+                    text-decoration:none; overflow-wrap:anywhere; }
 </style>
 </head>
 <body>
@@ -53,9 +58,23 @@ function render() {
   const shown = apps.filter(a => a.label.toLowerCase().includes(q));
   grid.innerHTML = "";
   shown.forEach(a => {
+    const wrap = document.createElement("div");
+    wrap.className = "tile";
     const el = document.createElement("a");
     el.className = "card"; el.href = a.href; el.textContent = a.label;
-    grid.appendChild(el);
+    wrap.appendChild(el);
+    if (a.others && a.others.length) {
+      const d = document.createElement("details");
+      const s = document.createElement("summary");
+      s.textContent = a.others.length + " more file" + (a.others.length > 1 ? "s" : "");
+      d.appendChild(s);
+      a.others.forEach(o => {
+        const l = document.createElement("a");
+        l.href = o.href; l.textContent = o.label; d.appendChild(l);
+      });
+      wrap.appendChild(d);
+    }
+    grid.appendChild(wrap);
   });
   msg.textContent = shown.length ? "" : "No apps found.";
 }
@@ -73,14 +92,17 @@ function render() {
       (byFolder[m[1]] = byFolder[m[1]] || []).push(m[2]);
     });
     apps = [];
+    const link = (folder, f) => encodeURIComponent(folder) + "/" + encodeURIComponent(f);
     Object.entries(byFolder).forEach(([folder, files]) => {
-      const idx = files.find(f => /^index\.html?$/i.test(f));
-      const use = idx ? [idx] : files;   // prefer index.html if present
-      use.forEach(f => {
-        const label = use.length === 1 ? pretty(folder)
-          : pretty(folder) + " – " + pretty(f.replace(/\.html?$/i, ""));
-        apps.push({ label, href: encodeURIComponent(folder) + "/" + encodeURIComponent(f) });
-      });
+      files.sort((a, b) => a.length - b.length);
+      // main file: index.html, else one with "main", else one with "index", else shortest
+      const main = files.find(f => /^index\.html?$/i.test(f))
+        || files.find(f => /main/i.test(f))
+        || files.find(f => /index/i.test(f))
+        || files[0];
+      const others = files.filter(f => f !== main).map(f =>
+        ({ label: pretty(f.replace(/\.html?$/i, "")), href: link(folder, f) }));
+      apps.push({ label: pretty(folder), href: link(folder, main), others });
     });
     apps.sort((a, b) => a.label.localeCompare(b.label));
     render();
