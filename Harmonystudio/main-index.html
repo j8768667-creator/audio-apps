@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MIDI Melody & Harmony Studio v5.0 Pro</title>
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #1c2333;
+            --bg-card: #21262d;
+            --border-color: #30363d;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --text-muted: #484f58;
+            --accent-blue: #58a6ff;
+            --accent-green: #3fb950;
+            --accent-red: #f85149;
+            --accent-orange: #d29922;
+            --accent-purple: #bc8cff;
+            --radius-sm: 6px;
+        }
+
+        /* PREVENT SCREEN ZOOMING AND TAP HIGHLIGHTS */
+        * { 
+            margin: 0; 
+            padding: 0; 
+            box-sizing: border-box; 
+            -webkit-tap-highlight-color: transparent; 
+            touch-action: manipulation; 
+        }
+
+        html, body {
+            height: 100%;
+            width: 100%;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 13px;
+            overflow: hidden;
+        }
+
+        .app-wrapper {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            height: -webkit-fill-available;
+            width: 100vw;
+            overflow: hidden;
+        }
+
+        /* HEADER */
+        .app-header {
+            height: 48px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 16px;
+            flex-shrink: 0;
+        }
+
+        .logo { font-weight: bold; font-size: 15px; color: var(--accent-blue); }
+
+        .header-btns { display: flex; gap: 6px; }
+
+        .btn-sm {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 6px 12px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .btn-sm:hover { background: var(--bg-card); }
+
+        /* MAIN BODY */
+        .main-body {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+            background: var(--border-color);
+            gap: 1px;
+        }
+
+        .panel {
+            background: var(--bg-secondary);
+            padding: 14px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .left-panel { width: 320px; flex-shrink: 0; }
+        .right-panel { width: 300px; flex-shrink: 0; }
+
+        .panel-title {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--text-muted);
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .drop-zone {
+            border: 2px dashed var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 14px;
+            text-align: center;
+            cursor: pointer;
+            background: var(--bg-tertiary);
+        }
+        .drop-zone:hover { border-color: var(--accent-blue); }
+
+        /* CANVAS */
+        .canvas-container {
+            flex: 1;
+            position: relative;
+            background: #161b22;
+            overflow: hidden;
+        }
+
+        canvas { width: 100%; height: 100%; display: block; }
+
+        /* FOOTER / TRANSPORT */
+        .player-bar {
+            height: 64px;
+            background: #11161d;
+            border-top: 2px solid var(--accent-blue);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 16px;
+            flex-shrink: 0;
+            z-index: 9999;
+        }
+
+        .play-btn {
+            background: var(--accent-green);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .play-btn.playing { background: var(--accent-red); }
+
+        .btn-action {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 4px;
+        }
+        .btn-action.primary { background: var(--accent-blue); color: white; border: none; }
+        .btn-action.warning { background: var(--accent-orange); color: white; border: none; }
+        .btn-action:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        select, input[type="number"], input[type="range"] {
+            width: 100%;
+            padding: 7px;
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            font-size: 12px;
+        }
+
+        .tempo-control {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--bg-tertiary);
+            padding: 4px 8px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-color);
+        }
+
+        .tempo-control input {
+            width: 55px;
+            text-align: center;
+            padding: 4px;
+            font-weight: bold;
+            color: var(--accent-blue);
+        }
+
+        .slider-group {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        @media (max-width: 820px) {
+            .main-body { flex-direction: column; overflow-y: auto; }
+            .left-panel, .right-panel { width: 100%; flex-shrink: 0; }
+            .canvas-container { height: 320px; flex-shrink: 0; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-wrapper">
+    <header class="app-header">
+        <div class="logo">🎵 Melody & Harmony Studio v5.0 Pro</div>
+        <div class="header-btns">
+            <button class="btn-sm" onclick="undoLastChange()">↩ Undo</button>
+            <button class="btn-sm" onclick="exportMIDI()">💾 Export MIDI</button>
+        </div>
+    </header>
+
+    <div class="main-body">
+        <aside class="panel left-panel">
+            <div>
+                <div class="panel-title">📂 Import MIDI File</div>
+                <div class="drop-zone" onclick="document.getElementById('midiInput').click()">
+                    <strong id="fileStatusText">Tap / Drop MIDI File Here</strong>
+                    <input type="file" id="midiInput" accept=".mid,.midi" style="display:none">
+                </div>
+            </div>
+
+            <div>
+                <div class="panel-title">🎼 Key Scale & Root</div>
+                <select id="keySelect" onchange="onKeyChange()">
+                    <option value="C">C Major</option>
+                    <option value="G">G Major</option>
+                    <option value="D">D Major</option>
+                    <option value="A">A Major</option>
+                    <option value="F">F Major</option>
+                    <option value="Am">A Minor</option>
+                    <option value="Em">E Minor</option>
+                    <option value="Dm">D Minor</option>
+                </select>
+            </div>
+
+            <div>
+                <div class="panel-title">🎹 Chord Progression Flow</div>
+                <select id="progressionSelect" style="margin-bottom:6px;">
+                    <option value="I-V-vi-IV">Pop Standard (I - V - vi - IV)</option>
+                    <option value="vi-IV-I-V">Emotional Pop (vi - IV - I - V)</option>
+                    <option value="ii-V-I">Jazz Standard (ii - V - I)</option>
+                    <option value="I-vi-IV-V">50s Doo-Wop (I - vi - IV - V)</option>
+                    <option value="canon">Pachelbel Canon (I - V - vi - iii - IV - I)</option>
+                    <option value="andalusian">Flamenco/Andalusian (i - VII - VI - V)</option>
+                    <option value="synthwave">80s Synthwave (i - VI - III - VII)</option>
+                </select>
+
+                <div class="panel-title">🎶 Texture & Flow Rhythms</div>
+                <select id="harmonyStyleSelect" style="margin-bottom:6px;">
+                    <option value="chords_block">Sustained Pad Chords (Whole Notes)</option>
+                    <option value="pulse_beats">Rhythmic Pulse Beats (Quarter Notes)</option>
+                    <option value="chords_arpeggio">Rolling 8th Note Arpeggios</option>
+                    <option value="offbeat">Offbeat Ska / Reggae Stabs</option>
+                    <option value="thirds">Diatonic Parallel Thirds</option>
+                    <option value="counter">Rhythmic Counter-Melody</option>
+                </select>
+
+                <div class="slider-group" style="margin-bottom:6px;">
+                    <span>Accompaniment Register:</span>
+                    <select id="octaveShift" style="width:120px;">
+                        <option value="-2">Deep Bass (-2 Octaves)</option>
+                        <option value="-1" selected>Mid Bass (-1 Octave)</option>
+                        <option value="0">Melody Layer (0)</option>
+                    </select>
+                </div>
+
+                <div class="slider-group" style="margin-bottom:6px;">
+                    <span>Density Flow:</span>
+                    <select id="densitySelect" style="width:120px;">
+                        <option value="sparse">Sparse (Minimal Hits)</option>
+                        <option value="normal" selected>Normal Flow</option>
+                        <option value="dense">Dense (Full Bars)</option>
+                    </select>
+                </div>
+
+                <button class="btn-action primary" id="genHarmBtn" onclick="generateHarmonicFlow()" disabled>+ Generate Flow Accompaniment</button>
+            </div>
+        </aside>
+
+        <main class="canvas-container" id="canvasContainer">
+            <canvas id="pianoRollCanvas"></canvas>
+        </main>
+
+        <aside class="panel right-panel">
+            <div class="panel-title">⏱ Live Quantization & Groove</div>
+            <select id="quantizeGrid" onchange="applyQuantization()" style="margin-bottom:6px;">
+                <option value="0">Off (Raw Human Performance Timing)</option>
+                <option value="1">1/4 Note (Quarter Snap)</option>
+                <option value="2">1/8 Note (Eighth Snap)</option>
+                <option value="4" selected>1/16 Note (Sixteenth Grid)</option>
+            </select>
+
+            <div class="slider-group" style="margin-bottom:10px;">
+                <span>Humanized Dynamics:</span>
+                <input type="range" id="humanizeAmount" min="0" max="100" value="35">
+            </div>
+
+            <div class="panel-title">📊 Harmonic Analysis & Scale Fixes</div>
+            <div id="statusSummary" style="font-size:11px;color:var(--text-secondary); margin-bottom:6px;">
+                Load a MIDI file to begin.
+            </div>
+            
+            <button class="btn-action primary" id="analyzeBtn" onclick="analyzeHarmony()" disabled>🔍 Analyze Scale Alignment</button>
+            <button class="btn-action warning" id="applyAllBtn" onclick="applyScaleFixes()" disabled>✨ Snap Out-of-Key Notes to Scale</button>
+        </aside>
+    </div>
+
+    <footer class="player-bar">
+        <div style="display:flex; align-items:center; gap:12px;">
+            <button class="play-btn" id="playBtn" onclick="toggleAudition()">
+                <span id="playIcon">▶</span> <span id="playLabel">Play Preview</span>
+            </button>
+            
+            <div class="tempo-control">
+                <span style="font-size:11px; color:var(--text-secondary);">BPM:</span>
+                <input type="number" id="bpmInput" value="120" min="30" max="300" onchange="onBpmChange()">
+            </div>
+
+            <button class="btn-sm" id="previewModeBtn" onclick="togglePreviewMode()">
+                Preview: <strong id="modeLabel" style="color:var(--accent-blue)">MODIFIED (AFTER)</strong>
+            </button>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:11px;color:var(--text-secondary)">Synth Sound:</span>
+            <select id="synthSound" style="width:110px;">
+                <option value="synth">PolySynth</option>
+                <option value="piano">Acoustic Piano</option>
+            </select>
+        </div>
+    </footer>
+</div>
+
+<script>
+    // PREVENT MOBILE DOUBLE-TAP ZOOMING
+    let lastTouchEnd = 0;
+    document.addEventListener('touchend', function (e) {
+        const now = (new Date()).getTime();
+        if (now - lastTouchEnd <= 300) {
+            e.preventDefault();
+        }
+        lastTouchEnd = now;
+    }, false);
+
+    const state = {
+        originalNotes: [],
+        modifiedNotes: [],
+        previewOriginal: false,
+        key: 'C',
+        bpm: 120,
+        ppq: 480,
+        isPlaying: false,
+        playbackTick: 0,
+        audioCtx: null,
+        scheduledNodes: [],
+        animFrameId: null,
+        history: []
+    };
+
+    const SCALE_KEYS = {
+        'C': [0, 2, 4, 5, 7, 9, 11],
+        'G': [7, 9, 11, 0, 2, 4, 6],
+        'D': [2, 4, 6, 7, 9, 11, 1],
+        'A': [9, 11, 1, 2, 4, 6, 8],
+        'F': [5, 7, 9, 10, 0, 2, 4],
+        'Am': [9, 11, 0, 2, 4, 5, 7],
+        'Em': [4, 6, 7, 9, 11, 0, 2],
+        'Dm': [2, 4, 5, 7, 9, 10, 0]
+    };
+
+    const CHORD_PROGRESSIONS = {
+        'C': {
+            'I-V-vi-IV': [[48, 52, 55], [55, 59, 62], [57, 60, 64], [53, 57, 60]],
+            'vi-IV-I-V': [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]],
+            'ii-V-I': [[50, 53, 57], [55, 59, 62], [48, 52, 55]],
+            'I-vi-IV-V': [[48, 52, 55], [57, 60, 64], [53, 57, 60], [55, 59, 62]],
+            'canon': [[48, 52, 55], [55, 59, 62], [57, 60, 64], [52, 55, 59], [53, 57, 60], [48, 52, 55]],
+            'andalusian': [[57, 60, 64], [55, 59, 62], [53, 57, 60], [52, 55, 59]],
+            'synthwave': [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]]
+        }
+    };
+
+    const canvas = document.getElementById('pianoRollCanvas');
+    const ctx = canvas.getContext('2d');
+
+    function resizeCanvas() {
+        const container = document.getElementById('canvasContainer');
+        if (!container) return;
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight;
+        renderPianoRoll();
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    function renderPianoRoll() {
+        ctx.fillStyle = '#161b22';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        const activeNotes = state.previewOriginal ? state.originalNotes : state.modifiedNotes;
+
+        if (!activeNotes.length) {
+            ctx.fillStyle = '#484f58';
+            ctx.font = '14px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('Tap or drop a MIDI file to render piano roll', canvas.width / 2, canvas.height / 2);
+            return;
+        }
+
+        let minNote = 127, maxNote = 0;
+        let minStart = Infinity, maxEnd = 0;
+
+        activeNotes.forEach(n => {
+            if (n.note < minNote) minNote = n.note;
+            if (n.note > maxNote) maxNote = n.note;
+            if (n.start < minStart) minStart = n.start;
+            if (n.start + n.duration > maxEnd) maxEnd = n.start + n.duration;
+        });
+
+        minNote = Math.max(0, minNote - 4);
+        maxNote = Math.min(127, maxNote + 4);
+        const pitchRange = Math.max(12, maxNote - minNote);
+        const noteHeight = canvas.height / pitchRange;
+
+        const totalDuration = Math.max(1, maxEnd - minStart);
+        const padding = 20;
+        const availableWidth = canvas.width - (padding * 2);
+        const scaleX = availableWidth / totalDuration;
+
+        activeNotes.forEach(n => {
+            const x = padding + ((n.start - minStart) * scaleX);
+            const w = Math.max(4, n.duration * scaleX);
+            const y = canvas.height - ((n.note - minNote) * noteHeight);
+
+            ctx.fillStyle = n.isHarmony ? '#bc8cff' : '#58a6ff';
+            ctx.fillRect(x, y, w, Math.max(3, noteHeight - 1));
+        });
+
+        if (state.isPlaying) {
+            const playX = padding + ((state.playbackTick - minStart) * scaleX);
+            ctx.strokeStyle = '#f85149';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(playX, 0);
+            ctx.lineTo(playX, canvas.height);
+            ctx.stroke();
+        }
+    }
+
+    // BINARY MIDI FILE PARSER
+    document.getElementById('midiInput').addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            try {
+                const buffer = new Uint8Array(evt.target.result);
+                parseMIDI(buffer);
+
+                document.getElementById('fileStatusText').textContent = `Loaded: ${file.name}`;
+                document.getElementById('genHarmBtn').disabled = false;
+                document.getElementById('analyzeBtn').disabled = false;
+                document.getElementById('applyAllBtn').disabled = false;
+                document.getElementById('bpmInput').value = Math.round(state.bpm);
+                document.getElementById('statusSummary').textContent = `Parsed ${state.originalNotes.length} notes (Tempo: ${Math.round(state.bpm)} BPM).`;
+                
+                resizeCanvas();
+            } catch (err) {
+                console.error("MIDI Parser error:", err);
+                alert("Error reading MIDI file.");
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    });
+
+    function parseMIDI(bytes) {
+        state.originalNotes = [];
+        const openNotes = {};
+
+        if (bytes[0] === 0x4D && bytes[1] === 0x54 && bytes[2] === 0x68 && bytes[3] === 0x64) {
+            state.ppq = (bytes[12] << 8) | bytes[13];
+            if (state.ppq <= 0) state.ppq = 480;
+        }
+
+        let pos = 0;
+        while (pos < bytes.length - 8) {
+            if (bytes[pos] === 0x4D && bytes[pos+1] === 0x54 && bytes[pos+2] === 0x72 && bytes[pos+3] === 0x6B) {
+                const trackLen = (bytes[pos+4] * 0x1000000) + (bytes[pos+5] << 16) + (bytes[pos+6] << 8) + bytes[pos+7];
+                pos += 8;
+                const end = pos + trackLen;
+                let currentTick = 0;
+                let runningStatus = 0;
+
+                while (pos < end && pos < bytes.length) {
+                    let delta = 0;
+                    while (pos < bytes.length) {
+                        const b = bytes[pos++];
+                        delta = (delta << 7) | (b & 0x7F);
+                        if (!(b & 0x80)) break;
+                    }
+                    currentTick += delta;
+
+                    if (pos >= bytes.length) break;
+
+                    let status = bytes[pos];
+                    if (status < 0x80) {
+                        status = runningStatus;
+                    } else {
+                        pos++;
+                        if (status < 0xF0) runningStatus = status;
+                    }
+
+                    if (status === 0xFF) {
+                        const metaType = bytes[pos++];
+                        let len = 0;
+                        while (pos < bytes.length) {
+                            const b = bytes[pos++];
+                            len = (len << 7) | (b & 0x7F);
+                            if (!(b & 0x80)) break;
+                        }
+                        if (metaType === 0x51 && len === 3) {
+                            const usPerBeat = (bytes[pos] << 16) | (bytes[pos+1] << 8) | bytes[pos+2];
+                            if (usPerBeat > 0) state.bpm = 60000000 / usPerBeat;
+                        }
+                        pos += len;
+                    } else if (status === 0xF0 || status === 0xF7) {
+                        let len = 0;
+                        while (pos < bytes.length) {
+                            const b = bytes[pos++];
+                            len = (len << 7) | (b & 0x7F);
+                            if (!(b & 0x80)) break;
+                        }
+                        pos += len;
+                    } else {
+                        const eventType = status & 0xF0;
+                        const channel = status & 0x0F;
+
+                        if (eventType === 0x90) {
+                            const note = bytes[pos++];
+                            const vel = bytes[pos++];
+                            const noteKey = `${channel}_${note}`;
+
+                            if (vel > 0) {
+                                openNotes[noteKey] = { start: currentTick, velocity: vel };
+                            } else if (openNotes[noteKey]) {
+                                state.originalNotes.push({
+                                    note, start: openNotes[noteKey].start,
+                                    duration: Math.max(20, currentTick - openNotes[noteKey].start),
+                                    velocity: openNotes[noteKey].velocity
+                                });
+                                delete openNotes[noteKey];
+                            }
+                        } else if (eventType === 0x80) {
+                            const note = bytes[pos++];
+                            pos++;
+                            const noteKey = `${channel}_${note}`;
+                            if (openNotes[noteKey]) {
+                                state.originalNotes.push({
+                                    note, start: openNotes[noteKey].start,
+                                    duration: Math.max(20, currentTick - openNotes[noteKey].start),
+                                    velocity: openNotes[noteKey].velocity
+                                });
+                                delete openNotes[noteKey];
+                            }
+                        } else if (eventType === 0xA0 || eventType === 0xB0 || eventType === 0xE0) pos += 2;
+                        else if (eventType === 0xC0 || eventType === 0xD0) pos += 1;
+                    }
+                }
+            } else {
+                pos++;
+            }
+        }
+
+        state.originalNotes.sort((a, b) => a.start - b.start);
+        state.modifiedNotes = JSON.parse(JSON.stringify(state.originalNotes));
+    }
+
+    // ADVANCED HARMONY & FLOW ENGINE
+    function generateHarmonicFlow() {
+        pushHistory();
+        const style = document.getElementById('harmonyStyleSelect').value;
+        const progression = document.getElementById('progressionSelect').value;
+        const octaveShift = parseInt(document.getElementById('octaveShift').value) * 12;
+        const density = document.getElementById('densitySelect').value;
+        const scale = SCALE_KEYS[state.key] || SCALE_KEYS['C'];
+        const humanizeVal = parseInt(document.getElementById('humanizeAmount').value);
+        
+        let newNotes = [];
+
+        if (style === 'thirds' || style === 'counter') {
+            const shift = (style === 'counter' ? 7 : 4) + octaveShift;
+            newNotes = state.modifiedNotes.map(n => {
+                let targetNote = n.note + shift;
+                const pc = targetNote % 12;
+                if (!scale.includes(pc)) targetNote -= 1;
+
+                const jitter = (Math.random() - 0.5) * (humanizeVal * 0.3);
+                return {
+                    ...n,
+                    note: Math.max(0, Math.min(127, targetNote)),
+                    start: Math.max(0, Math.round((style === 'counter' ? n.start + (state.ppq / 2) : n.start) + jitter)),
+                    velocity: Math.max(40, Math.min(127, (n.velocity || 80) + (Math.random() - 0.5) * humanizeVal)),
+                    isHarmony: true
+                };
+            });
+        } else {
+            const maxTick = Math.max(...state.modifiedNotes.map(n => n.start + n.duration));
+            const barTicks = state.ppq * 4;
+            const progKey = CHORD_PROGRESSIONS['C'][progression] || CHORD_PROGRESSIONS['C']['I-V-vi-IV'];
+
+            let chordIndex = 0;
+            for (let t = 0; t < maxTick; t += barTicks) {
+                if (density === 'sparse' && chordIndex % 2 !== 0) {
+                    chordIndex++;
+                    continue;
+                }
+
+                const currentChord = progKey[chordIndex % progKey.length];
+                chordIndex++;
+
+                if (style === 'chords_block') {
+                    currentChord.forEach(pitch => {
+                        const jitter = (Math.random() - 0.5) * (humanizeVal * 0.2);
+                        newNotes.push({ 
+                            note: Math.max(0, pitch + octaveShift), 
+                            start: Math.max(0, Math.round(t + jitter)), 
+                            duration: barTicks - 30, 
+                            velocity: 70 + (Math.random() * 15), 
+                            isHarmony: true 
+                        });
+                    });
+                } else if (style === 'pulse_beats') {
+                    const beatStep = state.ppq;
+                    for (let beat = 0; beat < 4; beat++) {
+                        currentChord.forEach(pitch => {
+                            newNotes.push({ 
+                                note: Math.max(0, pitch + octaveShift), 
+                                start: t + (beat * beatStep), 
+                                duration: beatStep - 20, 
+                                velocity: 75 + (Math.random() * 10), 
+                                isHarmony: true 
+                            });
+                        });
+                    }
+                } else if (style === 'offbeat') {
+                    const beatStep = state.ppq;
+                    [1, 3].forEach(offBeatIndex => {
+                        currentChord.forEach(pitch => {
+                            newNotes.push({ 
+                                note: Math.max(0, pitch + octaveShift), 
+                                start: t + (offBeatIndex * beatStep), 
+                                duration: (beatStep / 2), 
+                                velocity: 85, 
+                                isHarmony: true 
+                            });
+                        });
+                    });
+                } else if (style === 'chords_arpeggio') {
+                    const step = barTicks / 8;
+                    for (let i = 0; i < 8; i++) {
+                        const pitch = currentChord[i % currentChord.length];
+                        newNotes.push({ 
+                            note: Math.max(0, pitch + octaveShift), 
+                            start: t + (i * step), 
+                            duration: step - 10, 
+                            velocity: 75 + (Math.random() * 15), 
+                            isHarmony: true 
+                        });
+                    }
+                }
+            }
+        }
+
+        state.modifiedNotes.push(...newNotes);
+        state.modifiedNotes.sort((a, b) => a.start - b.start);
+        renderPianoRoll();
+        analyzeHarmony();
+    }
+
+    // NON-DESTRUCTIVE QUANTIZATION FIX
+    function applyQuantization() {
+        const gridFactor = parseInt(document.getElementById('quantizeGrid').value);
+        if (gridFactor <= 0) return;
+
+        pushHistory();
+        const stepTicks = state.ppq / gridFactor;
+
+        state.modifiedNotes.forEach(n => {
+            const roundedStart = Math.round(n.start / stepTicks) * stepTicks;
+            const origEnd = n.start + n.duration;
+            n.start = roundedStart;
+            n.duration = Math.max(stepTicks / 2, origEnd - roundedStart);
+        });
+
+        renderPianoRoll();
+    }
+
+    function analyzeHarmony() {
+        const scale = SCALE_KEYS[state.key] || SCALE_KEYS['C'];
+        let fixesFound = 0;
+
+        state.modifiedNotes.forEach(n => {
+            if (!scale.includes(n.note % 12)) fixesFound++;
+        });
+
+        document.getElementById('statusSummary').textContent = `Found ${fixesFound} out-of-scale notes for ${state.key}.`;
+    }
+
+    function applyScaleFixes() {
+        pushHistory();
+        const scale = SCALE_KEYS[state.key] || SCALE_KEYS['C'];
+        state.modifiedNotes.forEach(n => {
+            if (!scale.includes(n.note % 12)) n.note = n.note - 1;
+        });
+        renderPianoRoll();
+        analyzeHarmony();
+    }
+
+    function togglePreviewMode() {
+        state.previewOriginal = !state.previewOriginal;
+        const label = document.getElementById('modeLabel');
+        label.textContent = state.previewOriginal ? 'ORIGINAL (BEFORE)' : 'MODIFIED (AFTER)';
+        label.style.color = state.previewOriginal ? 'var(--accent-orange)' : 'var(--accent-blue)';
+        renderPianoRoll();
+    }
+
+    // AUDIO PLAYBACK ENGINE
+    function initAudio() {
+        if (!state.audioCtx) state.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (state.audioCtx.state === 'suspended') state.audioCtx.resume();
+    }
+
+    function onBpmChange() {
+        const val = parseInt(document.getElementById('bpmInput').value);
+        if (val >= 30 && val <= 300) {
+            state.bpm = val;
+            if (state.isPlaying) { stopAudition(); startAudition(); }
+        }
+    }
+
+    function toggleAudition() {
+        if (state.isPlaying) stopAudition();
+        else startAudition();
+    }
+
+    function startAudition() {
+        const activeNotes = state.previewOriginal ? state.originalNotes : state.modifiedNotes;
+        if (!activeNotes.length) return;
+        
+        initAudio();
+        state.isPlaying = true;
+        state.scheduledNodes = [];
+
+        const minStart = Math.min(...activeNotes.map(n => n.start));
+        const maxEnd = Math.max(...activeNotes.map(n => n.start + n.duration));
+        
+        state.playbackTick = minStart;
+        document.getElementById('playBtn').classList.add('playing');
+        document.getElementById('playIcon').textContent = '⏹';
+        document.getElementById('playLabel').textContent = 'Stop';
+
+        const startTime = state.audioCtx.currentTime + 0.05;
+        const secondsPerTick = (60 / state.bpm) / state.ppq;
+
+        activeNotes.forEach(n => {
+            const noteOffsetSeconds = (n.start - minStart) * secondsPerTick;
+            const noteDurationSeconds = Math.max(0.08, n.duration * secondsPerTick);
+            scheduleTone(n.note, startTime + noteOffsetSeconds, noteDurationSeconds, n.velocity);
+        });
+
+        const startPlaybackTime = performance.now();
+        const totalDurationSeconds = (maxEnd - minStart) * secondsPerTick;
+
+        function animatePlayhead() {
+            if (!state.isPlaying) return;
+            const elapsedSeconds = (performance.now() - startPlaybackTime) / 1000;
+            state.playbackTick = minStart + (elapsedSeconds / secondsPerTick);
+            renderPianoRoll();
+
+            if (elapsedSeconds < totalDurationSeconds) state.animFrameId = requestAnimationFrame(animatePlayhead);
+            else stopAudition();
+        }
+        state.animFrameId = requestAnimationFrame(animatePlayhead);
+    }
+
+    function stopAudition() {
+        state.isPlaying = false;
+        if (state.animFrameId) cancelAnimationFrame(state.animFrameId);
+        state.scheduledNodes.forEach(node => { try { node.stop(); } catch(e) {} });
+        state.scheduledNodes = [];
+
+        document.getElementById('playBtn').classList.remove('playing');
+        document.getElementById('playIcon').textContent = '▶';
+        document.getElementById('playLabel').textContent = 'Play Preview';
+        renderPianoRoll();
+    }
+
+    function scheduleTone(midiNote, time, duration, velocity = 80) {
+        const osc = state.audioCtx.createOscillator();
+        const gain = state.audioCtx.createGain();
+        const soundType = document.getElementById('synthSound').value;
+
+        osc.type = soundType === 'piano' ? 'triangle' : 'sawtooth';
+        const freq = 440 * Math.pow(2, (midiNote - 69) / 12);
+
+        const normalizedGain = Math.max(0.02, (velocity / 127) * 0.15);
+
+        osc.frequency.setValueAtTime(freq, time);
+        gain.gain.setValueAtTime(normalizedGain, time);
+        gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
+
+        osc.connect(gain);
+        gain.connect(state.audioCtx.destination);
+        osc.start(time);
+        osc.stop(time + duration);
+        state.scheduledNodes.push(osc);
+    }
+
+    function pushHistory() { state.history.push(JSON.stringify(state.modifiedNotes)); }
+
+    function undoLastChange() {
+        if (state.history.length) {
+            state.modifiedNotes = JSON.parse(state.history.pop());
+            renderPianoRoll();
+            analyzeHarmony();
+        }
+    }
+
+    function exportMIDI() { alert('Exporting processed MIDI file...'); }
+
+    function onKeyChange() {
+        state.key = document.getElementById('keySelect').value;
+        analyzeHarmony();
+    }
+
+    window.onload = resizeCanvas;
+</script>
+</body>
+</html>

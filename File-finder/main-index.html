@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="theme-color" content="#101828" />
+  <title>iPad File Finder</title>
+  <style>
+    :root {
+      --bg: #f2f4f7;
+      --panel: #ffffff;
+      --text: #101828;
+      --muted: #667085;
+      --line: #d0d5dd;
+      --accent: #175cd3;
+      --accent-dark: #1849a9;
+      --danger: #b42318;
+      --success: #067647;
+      --radius: 16px;
+      --shadow: 0 8px 24px rgba(16,24,40,.08);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+      padding:
+        calc(16px + env(safe-area-inset-top))
+        calc(16px + env(safe-area-inset-right))
+        calc(24px + env(safe-area-inset-bottom))
+        calc(16px + env(safe-area-inset-left));
+    }
+
+    .app {
+      width: min(1200px, 100%);
+      margin: 0 auto;
+    }
+
+    header {
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: clamp(28px, 5vw, 42px);
+      line-height: 1.05;
+    }
+
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.45;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid #eaecf0;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .controls {
+      display: grid;
+      gap: 14px;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: repeat(12, minmax(0, 1fr));
+      gap: 12px;
+      align-items: end;
+    }
+
+    .field {
+      grid-column: span 12;
+      min-width: 0;
+    }
+
+    @media (min-width: 760px) {
+      .field.folder { grid-column: span 5; }
+      .field.extensions { grid-column: span 4; }
+      .field.sort { grid-column: span 3; }
+      .field.search { grid-column: span 6; }
+      .field.actions { grid-column: span 6; }
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: #344054;
+    }
+
+    input[type="text"],
+    select {
+      width: 100%;
+      min-height: 46px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 10px 12px;
+      font-size: 16px;
+      background: #fff;
+      color: var(--text);
+      outline: none;
+    }
+
+    input[type="text"]:focus,
+    select:focus {
+      border-color: #84adff;
+      box-shadow: 0 0 0 4px rgba(23,92,211,.12);
+    }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    button,
+    .folder-button {
+      min-height: 46px;
+      border: 0;
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    button:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+
+    .primary,
+    .folder-button {
+      background: var(--accent);
+      color: white;
+    }
+
+    .primary:active,
+    .folder-button:active {
+      background: var(--accent-dark);
+    }
+
+    .secondary {
+      background: #eef4ff;
+      color: #1849a9;
+    }
+
+    .ghost {
+      background: #f2f4f7;
+      color: #344054;
+    }
+
+    .danger {
+      background: #fef3f2;
+      color: var(--danger);
+    }
+
+    #folderInput {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+      width: 1px;
+      height: 1px;
+    }
+
+    .folder-meta {
+      margin-top: 8px;
+      font-size: 13px;
+      color: var(--muted);
+      word-break: break-word;
+    }
+
+    .status {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 18px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .status strong {
+      color: var(--text);
+    }
+
+    .success { color: var(--success); }
+    .error { color: var(--danger); }
+
+    .table-wrap {
+      overflow: auto;
+      max-height: 65vh;
+      border: 1px solid #eaecf0;
+      border-radius: 12px;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      min-width: 780px;
+      background: white;
+    }
+
+    th, td {
+      padding: 11px 12px;
+      text-align: left;
+      border-bottom: 1px solid #eaecf0;
+      font-size: 14px;
+      vertical-align: top;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: #f9fafb;
+      color: #344054;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .03em;
+    }
+
+    tbody tr:last-child td {
+      border-bottom: 0;
+    }
+
+    tbody tr:active {
+      background: #f9fafb;
+    }
+
+    .name {
+      font-weight: 700;
+      color: #101828;
+      word-break: break-word;
+    }
+
+    .path {
+      color: var(--muted);
+      word-break: break-word;
+    }
+
+    .chip {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 3px 8px;
+      background: #eef4ff;
+      color: #1849a9;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .empty {
+      text-align: center;
+      padding: 40px 18px;
+      color: var(--muted);
+    }
+
+    .note {
+      font-size: 13px;
+      line-height: 1.5;
+      color: var(--muted);
+      margin: 10px 0 0;
+    }
+
+    .footer {
+      color: var(--muted);
+      font-size: 12px;
+      text-align: center;
+      padding-top: 4px;
+    }
+
+    @media (max-width: 600px) {
+      body { padding-left: 10px; padding-right: 10px; }
+      .panel { padding: 12px; border-radius: 14px; }
+      .button-row > * { flex: 1 1 auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <h1>iPad File Finder</h1>
+      <p class="subtitle">
+        Select a folder from the Files app, scan its subfolders, filter by extension,
+        sort the results, and export the file list.
+      </p>
+    </header>
+
+    <section class="panel controls" aria-label="Search controls">
+      <div class="row">
+        <div class="field folder">
+          <label>1. Choose a folder</label>
+          <label class="folder-button" for="folderInput">Choose Folder</label>
+          <input id="folderInput" type="file" webkitdirectory directory multiple />
+          <div id="folderMeta" class="folder-meta">No folder selected.</div>
+        </div>
+
+        <div class="field extensions">
+          <label for="extensions">2. File extensions</label>
+          <input
+            id="extensions"
+            type="text"
+            value=".mid, .midi, .wav"
+            placeholder=".mid, .wav, .mp3"
+            autocapitalize="off"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </div>
+
+        <div class="field sort">
+          <label for="sortBy">3. Sort results</label>
+          <select id="sortBy">
+            <option value="name-asc">Name A–Z</option>
+            <option value="name-desc">Name Z–A</option>
+            <option value="path-asc">Location A–Z</option>
+            <option value="path-desc">Location Z–A</option>
+            <option value="ext-asc">Extension A–Z</option>
+            <option value="size-desc">Largest first</option>
+            <option value="size-asc">Smallest first</option>
+            <option value="date-desc">Newest first</option>
+            <option value="date-asc">Oldest first</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="field search">
+          <label for="nameSearch">Optional filename search</label>
+          <input
+            id="nameSearch"
+            type="text"
+            placeholder="e.g. bass, loop, take 01"
+            autocapitalize="off"
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </div>
+
+        <div class="field actions">
+          <label>Actions</label>
+          <div class="button-row">
+            <button id="refreshBtn" class="primary" disabled>Apply Filters</button>
+            <button id="exportCsvBtn" class="secondary" disabled>Export CSV</button>
+            <button id="exportTxtBtn" class="secondary" disabled>Export TXT</button>
+            <button id="clearBtn" class="danger" disabled>Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <p class="note">
+        iPadOS does not allow a web page to scan the entire device automatically.
+        You must choose a folder. The app can then list files inside that folder and its subfolders.
+      </p>
+    </section>
+
+    <section class="panel">
+      <div class="status">
+        <span>Selected files: <strong id="selectedCount">0</strong></span>
+        <span>Matching files: <strong id="matchCount">0</strong></span>
+        <span>Total size: <strong id="totalSize">0 B</strong></span>
+        <span id="message" aria-live="polite"></span>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="table-wrap">
+        <table aria-label="Matching files">
+          <thead>
+            <tr>
+              <th style="width:28%">Name</th>
+              <th style="width:42%">Location</th>
+              <th style="width:10%">Type</th>
+              <th style="width:10%">Size</th>
+              <th style="width:10%">Modified</th>
+            </tr>
+          </thead>
+          <tbody id="resultsBody">
+            <tr>
+              <td colspan="5" class="empty">
+                Choose a folder to begin.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <div class="footer">
+      All processing happens locally in your browser. Files are not uploaded.
+    </div>
+  </main>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const folderInput = document.getElementById("folderInput");
+      const extensionsInput = document.getElementById("extensions");
+      const nameSearchInput = document.getElementById("nameSearch");
+      const sortBy = document.getElementById("sortBy");
+      const refreshBtn = document.getElementById("refreshBtn");
+      const exportCsvBtn = document.getElementById("exportCsvBtn");
+      const exportTxtBtn = document.getElementById("exportTxtBtn");
+      const clearBtn = document.getElementById("clearBtn");
+      const folderMeta = document.getElementById("folderMeta");
+      const selectedCount = document.getElementById("selectedCount");
+      const matchCount = document.getElementById("matchCount");
+      const totalSize = document.getElementById("totalSize");
+      const message = document.getElementById("message");
+      const resultsBody = document.getElementById("resultsBody");
+
+      let allFiles = [];
+      let visibleFiles = [];
+      let selectedFolderName = "";
+
+      function normaliseExtension(value) {
+        let ext = value.trim().toLowerCase();
+        if (!ext) return "";
+        if (!ext.startsWith(".")) ext = "." + ext;
+        return ext;
+      }
+
+      function getExtension(name) {
+        const index = name.lastIndexOf(".");
+        if (index <= 0 || index === name.length - 1) return "";
+        return name.slice(index).toLowerCase();
+      }
+
+      function getPath(file) {
+        return file.webkitRelativePath || file.name;
+      }
+
+      function getFolderPath(file) {
+        const fullPath = getPath(file);
+        const slash = fullPath.lastIndexOf("/");
+        return slash === -1 ? "" : fullPath.slice(0, slash);
+      }
+
+      function formatBytes(bytes) {
+        if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+        const units = ["B", "KB", "MB", "GB", "TB"];
+        const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+        const value = bytes / Math.pow(1024, index);
+        return `${value >= 100 || index === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[index]}`;
+      }
+
+      function formatDate(timestamp) {
+        if (!timestamp) return "—";
+        try {
+          return new Intl.DateTimeFormat(undefined, {
+            year: "numeric",
+            month: "short",
+            day: "2-digit"
+          }).format(new Date(timestamp));
+        } catch {
+          return "—";
+        }
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      function parseExtensions() {
+        return extensionsInput.value
+          .split(/[,;\s]+/)
+          .map(normaliseExtension)
+          .filter(Boolean);
+      }
+
+      function applyFilters() {
+        const extensions = parseExtensions();
+        const nameQuery = nameSearchInput.value.trim().toLowerCase();
+
+        visibleFiles = allFiles.filter(file => {
+          const ext = getExtension(file.name);
+          const matchesExtension = extensions.length === 0 || extensions.includes(ext);
+          const matchesName = !nameQuery || file.name.toLowerCase().includes(nameQuery);
+          return matchesExtension && matchesName;
+        });
+
+        const mode = sortBy.value;
+        const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+
+        visibleFiles.sort((a, b) => {
+          const nameA = a.name;
+          const nameB = b.name;
+          const pathA = getPath(a);
+          const pathB = getPath(b);
+          const extA = getExtension(nameA);
+          const extB = getExtension(nameB);
+
+          switch (mode) {
+            case "name-desc": return collator.compare(nameB, nameA);
+            case "path-asc": return collator.compare(pathA, pathB);
+            case "path-desc": return collator.compare(pathB, pathA);
+            case "ext-asc": return collator.compare(extA, extB) || collator.compare(nameA, nameB);
+            case "size-desc": return b.size - a.size || collator.compare(nameA, nameB);
+            case "size-asc": return a.size - b.size || collator.compare(nameA, nameB);
+            case "date-desc": return b.lastModified - a.lastModified || collator.compare(nameA, nameB);
+            case "date-asc": return a.lastModified - b.lastModified || collator.compare(nameA, nameB);
+            case "name-asc":
+            default:
+              return collator.compare(nameA, nameB);
+          }
+        });
+
+        renderResults();
+      }
+
+      function renderResults() {
+        selectedCount.textContent = String(allFiles.length);
+        matchCount.textContent = String(visibleFiles.length);
+        totalSize.textContent = formatBytes(
+          visibleFiles.reduce((sum, file) => sum + (file.size || 0), 0)
+        );
+
+        exportCsvBtn.disabled = visibleFiles.length === 0;
+        exportTxtBtn.disabled = visibleFiles.length === 0;
+
+        if (visibleFiles.length === 0) {
+          resultsBody.innerHTML = `
+            <tr>
+              <td colspan="5" class="empty">
+                No matching files found. Try changing the extensions or filename filter.
+              </td>
+            </tr>`;
+          return;
+        }
+
+        const rows = visibleFiles.map(file => {
+          const fullPath = getPath(file);
+          const folderPath = getFolderPath(file);
+          const ext = getExtension(file.name) || "—";
+
+          return `
+            <tr>
+              <td>
+                <div class="name">${escapeHtml(file.name)}</div>
+              </td>
+              <td>
+                <div class="path">${escapeHtml(folderPath || selectedFolderName || "Selected folder")}</div>
+                <div class="path" style="font-size:12px;margin-top:3px">${escapeHtml(fullPath)}</div>
+              </td>
+              <td><span class="chip">${escapeHtml(ext)}</span></td>
+              <td>${escapeHtml(formatBytes(file.size))}</td>
+              <td>${escapeHtml(formatDate(file.lastModified))}</td>
+            </tr>`;
+        }).join("");
+
+        resultsBody.innerHTML = rows;
+      }
+
+      function downloadText(filename, content, mimeType) {
+        const blob = new Blob([content], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+
+      function csvEscape(value) {
+        const text = String(value ?? "");
+        return `"${text.replaceAll('"', '""')}"`;
+      }
+
+      function exportCsv() {
+        const header = ["Name", "Location", "Full path", "Extension", "Size bytes", "Modified"];
+        const lines = [header.map(csvEscape).join(",")];
+
+        for (const file of visibleFiles) {
+          lines.push([
+            file.name,
+            getFolderPath(file),
+            getPath(file),
+            getExtension(file),
+            file.size,
+            file.lastModified ? new Date(file.lastModified).toISOString() : ""
+          ].map(csvEscape).join(","));
+        }
+
+        downloadText(
+          `file-search-results-${Date.now()}.csv`,
+          "\uFEFF" + lines.join("\r\n"),
+          "text/csv;charset=utf-8"
+        );
+      }
+
+      function exportTxt() {
+        const lines = [
+          "iPad File Finder Results",
+          `Folder: ${selectedFolderName || "Selected folder"}`,
+          `Files: ${visibleFiles.length}`,
+          ""
+        ];
+
+        visibleFiles.forEach((file, index) => {
+          lines.push(`${index + 1}. ${getPath(file)}`);
+        });
+
+        downloadText(
+          `file-search-results-${Date.now()}.txt`,
+          lines.join("\n"),
+          "text/plain;charset=utf-8"
+        );
+      }
+
+      function clearAll() {
+        allFiles = [];
+        visibleFiles = [];
+        selectedFolderName = "";
+        folderInput.value = "";
+        folderMeta.textContent = "No folder selected.";
+        selectedCount.textContent = "0";
+        matchCount.textContent = "0";
+        totalSize.textContent = "0 B";
+        message.textContent = "";
+        refreshBtn.disabled = true;
+        exportCsvBtn.disabled = true;
+        exportTxtBtn.disabled = true;
+        clearBtn.disabled = true;
+        resultsBody.innerHTML = `
+          <tr>
+            <td colspan="5" class="empty">
+              Choose a folder to begin.
+            </td>
+          </tr>`;
+      }
+
+      folderInput.addEventListener("change", () => {
+        const files = Array.from(folderInput.files || []);
+        allFiles = files;
+
+        if (!files.length) {
+          clearAll();
+          return;
+        }
+
+        const firstPath = getPath(files[0]);
+        selectedFolderName = firstPath.includes("/") ? firstPath.split("/")[0] : "Selected folder";
+        folderMeta.textContent = `${selectedFolderName} — ${files.length} file${files.length === 1 ? "" : "s"} available`;
+        refreshBtn.disabled = false;
+        clearBtn.disabled = false;
+        message.textContent = "Folder loaded.";
+        message.className = "success";
+
+        applyFilters();
+      });
+
+      refreshBtn.addEventListener("click", applyFilters);
+      sortBy.addEventListener("change", applyFilters);
+      extensionsInput.addEventListener("input", () => {
+        if (allFiles.length) applyFilters();
+      });
+      nameSearchInput.addEventListener("input", () => {
+        if (allFiles.length) applyFilters();
+      });
+      exportCsvBtn.addEventListener("click", exportCsv);
+      exportTxtBtn.addEventListener("click", exportTxt);
+      clearBtn.addEventListener("click", clearAll);
+
+      if (!("webkitdirectory" in folderInput)) {
+        message.textContent = "This browser may not support folder selection.";
+        message.className = "error";
+      }
+    })();
+  </script>
+</body>
+</html>

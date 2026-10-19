@@ -1,0 +1,1693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#100E0B">
+<title>Smart Multi-Track MIDI Stitcher</title>
+<style>
+  :root{
+    --bg:#100E0B;
+    --panel:#1B1712;
+    --panel-raised:#241F18;
+    --hairline:#382F23;
+    --ink:#F4EEE2;
+    --ink-dim:#A79C89;
+    --amber:#E8A33D;
+    --amber-dim:#8C6526;
+    --teal:#3FA796;
+    --red:#D9553D;
+    --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "Menlo", "Consolas", monospace;
+  }
+
+  *{ box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body{
+    height:100%;
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--font-ui);
+    overscroll-behavior:none;
+    overflow:hidden;
+    position:fixed;
+    inset:0;
+    touch-action:manipulation;
+    -webkit-user-select:none;
+    user-select:none;
+  }
+
+  input, select{
+    -webkit-user-select:auto;
+    user-select:auto;
+  }
+
+  #app{
+    position:absolute;
+    inset:0;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+  }
+
+  /* ---------- Header ---------- */
+  header{
+    flex:0 0 auto;
+    padding:18px 20px 14px;
+    border-bottom:1px solid var(--hairline);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    background:linear-gradient(180deg, #15120D 0%, #100E0B 100%);
+  }
+
+  .brand{ display:flex; align-items:center; gap:12px; min-width:0; }
+
+  .brand-mark{
+    width:40px; height:40px; flex:0 0 auto;
+    border-radius:8px;
+    background:
+      repeating-linear-gradient(90deg, var(--amber) 0 3px, transparent 3px 7px);
+    background-color:#2A2216;
+    border:1px solid var(--amber-dim);
+    position:relative;
+    overflow:hidden;
+  }
+  .brand-mark::after{
+    content:"";
+    position:absolute; left:0; right:0; top:50%;
+    height:1px; background:var(--amber-dim);
+  }
+
+  .brand-text{ min-width:0; }
+  .brand-text h1{
+    margin:0; font-size:17px; font-weight:700; letter-spacing:0.02em;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .brand-text p{
+    margin:2px 0 0; font-size:12px; color:var(--ink-dim); font-family:var(--font-mono);
+    letter-spacing:0.03em;
+  }
+
+  .vu{
+    display:flex; align-items:flex-end; gap:3px; height:22px; flex:0 0 auto;
+  }
+  .vu span{
+    width:4px; border-radius:1px;
+    background:var(--amber-dim);
+    animation:vu-bounce 1.6s ease-in-out infinite;
+  }
+  .vu span:nth-child(1){ height:40%; animation-delay:-1.1s; }
+  .vu span:nth-child(2){ height:75%; animation-delay:-0.4s; background:var(--amber); }
+  .vu span:nth-child(3){ height:55%; animation-delay:-0.9s; }
+  .vu span:nth-child(4){ height:90%; animation-delay:-0.2s; background:var(--teal); }
+  .vu span:nth-child(5){ height:30%; animation-delay:-1.4s; }
+  @keyframes vu-bounce{
+    0%, 100%{ transform:scaleY(0.4); }
+    50%{ transform:scaleY(1); }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .vu span{ animation:none; }
+  }
+
+  /* ---------- Scroll body ---------- */
+  #scrollBody{
+    flex:1 1 auto;
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+    overscroll-behavior:contain;
+    touch-action:pan-y;
+    padding:16px 16px 24px;
+  }
+
+  section{ margin-bottom:18px; }
+
+  .section-label{
+    font-family:var(--font-mono);
+    font-size:11px;
+    letter-spacing:0.12em;
+    text-transform:uppercase;
+    color:var(--ink-dim);
+    margin:0 2px 8px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .section-label::after{
+    content:"";
+    flex:1 1 auto;
+    height:1px;
+    background:var(--hairline);
+  }
+
+  /* ---------- Ingestion zone ---------- */
+  #ingestZone{
+    border:1.5px dashed var(--hairline);
+    border-radius:14px;
+    background:var(--panel);
+    padding:22px 16px;
+    text-align:center;
+    transition:opacity 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+    min-height:48px;
+  }
+  #ingestZone.has-files{
+    opacity:0.72;
+    border-color:var(--amber-dim);
+  }
+  #ingestZone.drag-over{
+    border-color:var(--amber);
+    background:var(--panel-raised);
+  }
+  #ingestZone .ingest-icon{
+    font-size:26px; margin-bottom:6px; color:var(--amber);
+  }
+  #ingestZone h2{
+    margin:0 0 4px; font-size:15px; font-weight:600;
+  }
+  #ingestZone p{
+    margin:0; font-size:12.5px; color:var(--ink-dim);
+  }
+  #fileInput{ display:none; }
+
+  .btn-browse{
+    display:inline-flex; align-items:center; justify-content:center;
+    margin-top:12px; padding:0 20px; height:48px; min-height:48px;
+    border-radius:10px; border:1px solid var(--amber-dim);
+    background:var(--panel-raised); color:var(--ink);
+    font-size:14px; font-weight:600; font-family:var(--font-ui);
+  }
+  .btn-browse:active{ background:#2E2617; }
+
+  /* ---------- Arrangement list ---------- */
+  #arrangementList{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+
+  .placeholder{
+    padding:26px 14px;
+    text-align:center;
+    color:var(--ink-dim);
+    font-size:13px;
+    border:1px solid var(--hairline);
+    border-radius:12px;
+    background:var(--panel);
+  }
+
+  .clip-card{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    min-height:64px;
+    padding:8px 10px;
+    background:var(--panel);
+    border:1px solid var(--hairline);
+    border-radius:12px;
+    touch-action:pan-y;
+    position:relative;
+  }
+  .clip-card.dragging{
+    z-index:20;
+    border-color:var(--amber);
+    background:var(--panel-raised);
+    box-shadow:0 10px 24px rgba(0,0,0,0.45);
+  }
+
+  .drag-handle{
+    flex:0 0 auto;
+    width:48px; height:48px;
+    border-radius:8px;
+    border:none;
+    background:transparent;
+    color:var(--ink-dim);
+    font-size:18px;
+    letter-spacing:-2px;
+    touch-action:none;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .drag-handle:active{ color:var(--amber); }
+
+  .clip-info{
+    flex:1 1 auto;
+    min-width:0;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+
+  .clip-index{
+    flex:0 0 auto;
+    font-family:var(--font-mono);
+    font-size:12px;
+    color:var(--amber);
+    background:rgba(232,163,61,0.1);
+    border:1px solid var(--amber-dim);
+    border-radius:6px;
+    padding:3px 6px;
+  }
+
+  .clip-meta{ min-width:0; flex:1 1 auto; }
+  .clip-name{
+    font-size:14px; font-weight:600;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .clip-sub{
+    font-size:11px; color:var(--ink-dim); font-family:var(--font-mono);
+    margin-top:2px;
+  }
+
+  .density-bars{
+    flex:0 0 auto;
+    display:flex;
+    align-items:flex-end;
+    gap:2px;
+    width:70px;
+    height:32px;
+  }
+  .density-bars span{
+    width:2.5px;
+    background:var(--teal);
+    opacity:0.75;
+    border-radius:1px;
+  }
+
+  .remove-btn{
+    flex:0 0 auto;
+    width:44px; height:44px;
+    border-radius:8px;
+    border:none;
+    background:transparent;
+    color:var(--ink-dim);
+    font-size:15px;
+  }
+  .remove-btn:active{ color:var(--red); }
+
+  /* ---------- Controls ---------- */
+  .control-row{
+    background:var(--panel);
+    border:1px solid var(--hairline);
+    border-radius:12px;
+    padding:14px;
+    margin-bottom:10px;
+  }
+  .control-row label{
+    display:flex; align-items:center; justify-content:space-between;
+    font-size:13px; font-weight:600; margin-bottom:8px;
+  }
+  .control-row label .value{
+    font-family:var(--font-mono); color:var(--amber); font-size:13px;
+  }
+
+  input[type="range"]{
+    -webkit-appearance:none;
+    width:100%;
+    height:48px;
+    background:transparent;
+  }
+  input[type="range"]::-webkit-slider-runnable-track{
+    height:6px;
+    border-radius:3px;
+    background:var(--hairline);
+  }
+  input[type="range"]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:26px; height:26px;
+    margin-top:-10px;
+    border-radius:50%;
+    background:var(--amber);
+    border:2px solid #100E0B;
+    box-shadow:0 0 0 1px var(--amber-dim);
+  }
+
+  select{
+    width:100%;
+    height:48px;
+    min-height:48px;
+    border-radius:10px;
+    border:1px solid var(--hairline);
+    background:var(--panel-raised);
+    color:var(--ink);
+    font-size:14px;
+    font-family:var(--font-ui);
+    padding:0 12px;
+  }
+
+  .groove-desc{
+    margin:8px 2px 0;
+    font-size:11.5px;
+    color:var(--ink-dim);
+    line-height:1.4;
+  }
+
+  /* ---------- Toggle switch ---------- */
+  .toggle-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    min-height:48px;
+    font-size:14px;
+    font-weight:600;
+  }
+  .switch{
+    position:relative;
+    display:inline-block;
+    width:46px; height:28px;
+    flex:0 0 auto;
+  }
+  .switch input{
+    position:absolute;
+    inset:0;
+    opacity:0;
+    margin:0;
+    cursor:pointer;
+    z-index:1;
+  }
+  .switch-track{
+    position:absolute; inset:0;
+    border-radius:14px;
+    background:var(--hairline);
+    transition:background 0.15s ease;
+    pointer-events:none;
+  }
+  .switch-thumb{
+    position:absolute; top:3px; left:3px;
+    width:22px; height:22px;
+    border-radius:50%;
+    background:var(--ink);
+    transition:transform 0.15s ease;
+  }
+  .switch input:checked + .switch-track{ background:var(--amber-dim); }
+  .switch input:checked + .switch-track .switch-thumb{ transform:translateX(18px); background:var(--amber); }
+  .switch input:disabled + .switch-track{ opacity:0.4; }
+  .toggle-row:has(input:disabled){ color:var(--ink-dim); }
+
+  /* ---------- Action buttons ---------- */
+  .actions{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+  }
+
+  button.action-btn{
+    min-height:52px;
+    border-radius:12px;
+    border:none;
+    font-size:15px;
+    font-weight:700;
+    font-family:var(--font-ui);
+    letter-spacing:0.01em;
+  }
+
+  #stitchBtn{
+    background:linear-gradient(180deg, #F0B156, var(--amber));
+    color:#231704;
+  }
+  #stitchBtn:active{ filter:brightness(0.92); }
+  #stitchBtn:disabled{
+    background:var(--panel-raised);
+    color:var(--ink-dim);
+  }
+
+  #downloadLink{
+    display:flex; align-items:center; justify-content:center;
+    min-height:52px;
+    border-radius:12px;
+    background:var(--teal);
+    color:#08211D;
+    font-weight:700;
+    font-size:15px;
+    text-decoration:none;
+  }
+  #downloadLink[hidden]{ display:none; }
+
+  /* ---------- Preview ---------- */
+  .preview-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    background:var(--panel);
+    border:1px solid var(--hairline);
+    border-radius:12px;
+    padding:8px 10px;
+    min-height:52px;
+  }
+  .preview-btn{
+    flex:0 0 auto;
+    width:44px; height:44px;
+    border-radius:10px;
+    border:1px solid var(--hairline);
+    background:var(--panel-raised);
+    color:var(--ink);
+    font-size:15px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .preview-btn:active:not(:disabled){ border-color:var(--teal); color:var(--teal); }
+  .preview-btn:disabled{ color:var(--ink-dim); opacity:0.5; }
+
+  .preview-track{
+    flex:1 1 auto;
+    height:6px;
+    border-radius:3px;
+    background:var(--hairline);
+    overflow:hidden;
+  }
+  .preview-progress{
+    height:100%;
+    width:0%;
+    background:var(--teal);
+  }
+
+  .preview-time{
+    flex:0 0 auto;
+    font-family:var(--font-mono);
+    font-size:11px;
+    color:var(--ink-dim);
+    min-width:78px;
+    text-align:right;
+  }
+
+  #resetBtn{
+    background:transparent;
+    color:var(--red);
+    border:1px solid var(--red);
+  }
+  #resetBtn:active{ background:rgba(217,85,61,0.12); }
+
+  /* ---------- Status ---------- */
+  #statusBar{
+    margin-top:4px;
+    padding:10px 12px;
+    border-radius:10px;
+    background:var(--panel);
+    border:1px solid var(--hairline);
+    font-size:12.5px;
+    font-family:var(--font-mono);
+    color:var(--ink-dim);
+    min-height:20px;
+  }
+  #statusBar.error{ color:var(--red); border-color:var(--red); }
+  #statusBar.success{ color:var(--teal); border-color:var(--teal); }
+
+  footer{
+    flex:0 0 auto;
+    padding:8px 16px calc(10px + env(safe-area-inset-bottom));
+    font-size:10.5px;
+    color:var(--ink-dim);
+    text-align:center;
+    font-family:var(--font-mono);
+    border-top:1px solid var(--hairline);
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true"></div>
+      <div class="brand-text">
+        <h1>MIDI Stitcher</h1>
+        <p>multi-track arrangement bench</p>
+      </div>
+    </div>
+    <div class="vu" aria-hidden="true">
+      <span></span><span></span><span></span><span></span><span></span>
+    </div>
+  </header>
+
+  <div id="scrollBody">
+
+    <section>
+      <div class="section-label">Import</div>
+      <div id="ingestZone">
+        <div class="ingest-icon">&#9835;</div>
+        <h2>Add MIDI clips</h2>
+        <p>Tap below to choose two or more .mid files from your library</p>
+        <button type="button" class="btn-browse" id="browseBtn">Choose Files</button>
+        <input type="file" id="fileInput" multiple accept=".mid,.midi,audio/midi,audio/x-midi,application/x-midi">
+      </div>
+    </section>
+
+    <section>
+      <div class="section-label">Arrangement Timeline</div>
+      <p class="groove-desc" id="arrangementHint" style="margin:0 2px 8px;"></p>
+      <div id="arrangementList"></div>
+    </section>
+
+    <section>
+      <div class="section-label">Session Settings</div>
+
+      <div class="control-row">
+        <label for="modeSelect">Combine Mode</label>
+        <select id="modeSelect">
+          <option value="stitch">Stitch — sequence, one after another</option>
+          <option value="merge">Merge — layer together from the start</option>
+        </select>
+        <p class="groove-desc" id="modeDesc"></p>
+      </div>
+
+      <div class="control-row" id="loopRow">
+        <label class="toggle-row" for="loopToggle">
+          <span>Loop Short Layers</span>
+          <span class="switch">
+            <input type="checkbox" id="loopToggle" checked>
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+          </span>
+        </label>
+        <p class="groove-desc" id="loopDesc"></p>
+      </div>
+
+      <div class="control-row">
+        <label class="toggle-row" for="harmonizeToggle">
+          <span>Harmonize Key</span>
+          <span class="switch">
+            <input type="checkbox" id="harmonizeToggle" checked>
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+          </span>
+        </label>
+        <p class="groove-desc" id="harmonizeDesc"></p>
+
+        <label class="toggle-row" for="snapToggle" id="snapRow">
+          <span>Snap Notes to Scale</span>
+          <span class="switch">
+            <input type="checkbox" id="snapToggle">
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+          </span>
+        </label>
+        <p class="groove-desc" id="snapDesc"></p>
+      </div>
+
+      <div class="control-row">
+        <label for="tempoSlider">Tempo <span class="value"><span id="tempoValue">120</span> BPM</span></label>
+        <input type="range" id="tempoSlider" min="60" max="180" step="1" value="120">
+      </div>
+
+      <div class="control-row">
+        <label for="grooveSelect">Groove Profile</label>
+        <select id="grooveSelect">
+          <option value="lofi">Lo-Fi Hip Hop</option>
+          <option value="synthwave">Synthwave</option>
+          <option value="ambient">Ambient</option>
+          <option value="trap">Trap</option>
+          <option value="house">House</option>
+          <option value="reggae">Reggae (One Drop)</option>
+          <option value="jazz">Jazz Swing</option>
+        </select>
+        <p class="groove-desc" id="grooveDesc"></p>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-label">Output</div>
+      <div class="actions">
+        <button type="button" class="action-btn" id="stitchBtn" disabled>Stitch Arrangement</button>
+
+        <div class="preview-row" id="previewRow" hidden>
+          <button type="button" class="preview-btn" id="playBtn" aria-label="Play preview">&#9654;</button>
+          <button type="button" class="preview-btn" id="stopBtn" aria-label="Stop preview" disabled>&#9632;</button>
+          <div class="preview-track"><div class="preview-progress" id="previewProgress"></div></div>
+          <div class="preview-time" id="previewTime">0:00 / 0:00</div>
+        </div>
+
+        <a id="downloadLink" download="stitched_multitrack_arrangement.mid" hidden>Download stitched_multitrack_arrangement.mid</a>
+        <button type="button" class="action-btn" id="resetBtn">Reset Workspace</button>
+      </div>
+      <div id="statusBar">Add two or more MIDI files to begin.</div>
+    </section>
+
+  </div>
+
+  <footer>Runs entirely in this page &middot; nothing is uploaded anywhere</footer>
+</div>
+
+<script type="module">
+let Midi;
+try {
+  ({ Midi } = await import("https://esm.sh/@tonejs/midi@2.0.28"));
+} catch (libErr){
+  console.error('Failed to load @tonejs/midi from CDN:', libErr);
+  const bar = document.getElementById('statusBar');
+  bar.textContent = 'Could not load the MIDI library (no connection to esm.sh?). Import/export will not work until this loads.';
+  bar.classList.add('error');
+}
+
+/* ============================================================
+   State
+   ============================================================ */
+let clips = [];        // { id, name, midi, duration, originalBpm }
+let clipIdCounter = 0;
+let currentBlobUrl = null;
+let lastBuiltMidi = null;      // the tonejs Midi instance behind the last successful stitch
+let lastBuiltDuration = 0;     // seconds
+
+let audioCtx = null;
+let activeAudioNodes = [];
+let isPreviewPlaying = false;
+let previewRafId = null;
+let previewStartCtxTime = 0;
+let previewEndTimeoutId = null;
+
+/* ============================================================
+   DOM refs
+   ============================================================ */
+const ingestZone      = document.getElementById('ingestZone');
+const browseBtn       = document.getElementById('browseBtn');
+const fileInput       = document.getElementById('fileInput');
+const arrangementList = document.getElementById('arrangementList');
+const arrangementHint = document.getElementById('arrangementHint');
+const modeSelect      = document.getElementById('modeSelect');
+const modeDesc        = document.getElementById('modeDesc');
+const loopRow         = document.getElementById('loopRow');
+const loopToggle      = document.getElementById('loopToggle');
+const loopDesc        = document.getElementById('loopDesc');
+const harmonizeToggle = document.getElementById('harmonizeToggle');
+const harmonizeDesc   = document.getElementById('harmonizeDesc');
+const snapToggle      = document.getElementById('snapToggle');
+const snapRow         = document.getElementById('snapRow');
+const snapDesc        = document.getElementById('snapDesc');
+const tempoSlider     = document.getElementById('tempoSlider');
+const tempoValue      = document.getElementById('tempoValue');
+const grooveSelect    = document.getElementById('grooveSelect');
+const grooveDesc      = document.getElementById('grooveDesc');
+const stitchBtn       = document.getElementById('stitchBtn');
+const downloadLink    = document.getElementById('downloadLink');
+const resetBtn        = document.getElementById('resetBtn');
+const statusBar       = document.getElementById('statusBar');
+const previewRow      = document.getElementById('previewRow');
+const playBtn         = document.getElementById('playBtn');
+const stopBtn         = document.getElementById('stopBtn');
+const previewProgress = document.getElementById('previewProgress');
+const previewTime     = document.getElementById('previewTime');
+
+const MODE_COPY = {
+  stitch: "Clips play one after another with a short musical crossfade between them — good for turning several short ideas into one longer song.",
+  merge: "All clips start together and play simultaneously as layered parts — good for combining a melody, bassline, and drum file that belong to the same song."
+};
+
+const HARMONIZE_DESC = "Detects each clip's key and transposes the others to match the most melodically dominant clip, so unrelated files don't clash.";
+const SNAP_DESC = "Also nudges any note outside the target scale onto the nearest in-key pitch. Stronger blend, but can noticeably alter melodies.";
+const LOOP_DESC = "Repeats a shorter clip so it fills the whole merged length instead of ending early — keeps every layer's track the same length.";
+
+const GROOVE_COPY = {
+  lofi: "Laid-back boom-bap pocket. Kick on 1, snare dragged a hair behind the grid, loose 8th-note hats.",
+  synthwave: "Driving four-on-the-floor. Kick and hats locked dead to the quarter-note grid, no drag.",
+  ambient: "Sparse pulse. A soft kick and distant hat every other bar, lots of open space.",
+  trap: "Syncopated kick with a rolling 16th-note hi-hat, snare/clap on 3, occasional hat flourish.",
+  house: "Four-on-the-floor kick with a clapped backbeat and open off-beat hats for that classic lift.",
+  reggae: "One-drop feel — kick and snare land together on beat 3, beat 1 stays open, steady 8th-note hats.",
+  jazz: "Swung ride-style hats on a triplet subdivision, a feathered kick, and sparse loose snare comping."
+};
+
+/* ============================================================
+   Utilities
+   ============================================================ */
+function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
+
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, (c) => ({
+    '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'
+  }[c]));
+}
+
+function setStatus(message, tone){
+  statusBar.textContent = message;
+  statusBar.classList.remove('error', 'success');
+  if (tone === 'error') statusBar.classList.add('error');
+  if (tone === 'success') statusBar.classList.add('success');
+}
+
+function updateStitchAvailability(){
+  stitchBtn.disabled = clips.length < 2;
+}
+
+function updateGrooveDesc(){
+  grooveDesc.textContent = GROOVE_COPY[grooveSelect.value] || '';
+}
+
+function updateModeDesc(){
+  modeDesc.textContent = MODE_COPY[modeSelect.value] || '';
+  const isMerge = modeSelect.value === 'merge';
+  stitchBtn.textContent = isMerge ? 'Merge Tracks' : 'Stitch Arrangement';
+  arrangementHint.textContent = isMerge
+    ? 'All clips will play together from the start — drag order only changes track order in the file, not timing.'
+    : 'Drag clips to set the playback order.';
+  loopRow.hidden = !isMerge;
+  loopDesc.hidden = !isMerge;
+  if (isMerge) loopDesc.textContent = LOOP_DESC;
+}
+
+function updateHarmonizeDesc(){
+  harmonizeDesc.textContent = HARMONIZE_DESC;
+  snapDesc.textContent = SNAP_DESC;
+  snapToggle.disabled = !harmonizeToggle.checked;
+  snapRow.style.opacity = harmonizeToggle.checked ? '1' : '0.5';
+}
+
+function formatTime(seconds){
+  const s = Math.max(0, Math.round(seconds || 0));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return m + ':' + String(r).padStart(2, '0');
+}
+
+// Called whenever the arrangement changes after a stitch already exists,
+// so a stale preview/download never lingers against a different arrangement.
+function invalidateBuiltOutput(){
+  stopPreview();
+  lastBuiltMidi = null;
+  lastBuiltDuration = 0;
+  previewRow.hidden = true;
+  if (currentBlobUrl){
+    URL.revokeObjectURL(currentBlobUrl);
+    currentBlobUrl = null;
+  }
+  downloadLink.hidden = true;
+  downloadLink.removeAttribute('href');
+}
+
+/* ============================================================
+   Micro-timing & humanisation
+   ============================================================ */
+// Dynamic micro-timing swing: roughly -6ms to +10ms
+function swingDelta(){
+  return (Math.random() * 0.016) - 0.006;
+}
+
+function isDownbeat(timeSeconds, bpm){
+  const beatLen = 60 / bpm;
+  const barLen = beatLen * 4;
+  const posInBar = ((timeSeconds % barLen) + barLen) % barLen;
+  return posInBar < beatLen * 0.12 || posInBar > barLen - beatLen * 0.12;
+}
+
+function humanizeVelocity(baseVelocity, downbeat){
+  const base = typeof baseVelocity === 'number' ? baseVelocity : 0.8;
+  const variance = (Math.random() * 0.1) - 0.05; // +/- 0.05
+  let result = base + variance;
+  if (downbeat) result += 0.08; // downbeats read louder than upbeats
+  return clamp(result, 0.15, 1);
+}
+
+/* ============================================================
+   MIDI parsing / note density preview
+   ============================================================ */
+async function parseMidiFile(file){
+  if (!Midi) throw new Error('MIDI library not loaded');
+  const buffer = await file.arrayBuffer();
+  const midi = new Midi(buffer);
+  let duration = midi.duration;
+  if (!duration || !isFinite(duration)){
+    duration = midi.tracks.reduce((max, t) => {
+      const trackEnd = t.notes.reduce((m, n) => Math.max(m, n.time + n.duration), 0);
+      return Math.max(max, trackEnd);
+    }, 0);
+  }
+  const originalBpm = (midi.header.tempos[0] && midi.header.tempos[0].bpm) || 120;
+  return { midi, duration, originalBpm };
+}
+
+function computeDensityBars(midi, duration, bucketCount){
+  bucketCount = bucketCount || 20;
+  const buckets = new Array(bucketCount).fill(0);
+  midi.tracks.forEach((t) => {
+    t.notes.forEach((n) => {
+      const idx = duration > 0
+        ? clamp(Math.floor((n.time / duration) * bucketCount), 0, bucketCount - 1)
+        : 0;
+      buckets[idx]++;
+    });
+  });
+  const max = Math.max(1, ...buckets);
+  return buckets.map((b) => Math.round((b / max) * 100));
+}
+
+/* ============================================================
+   Rendering: arrangement list
+   ============================================================ */
+function renderClipList(){
+  arrangementList.innerHTML = '';
+
+  if (clips.length === 0){
+    const placeholder = document.createElement('div');
+    placeholder.className = 'placeholder';
+    placeholder.textContent = 'No clips yet — imported files will line up here for reordering.';
+    arrangementList.appendChild(placeholder);
+    return;
+  }
+
+  clips.forEach((clip, i) => {
+    const bars = computeDensityBars(clip.midi, clip.duration || 1);
+    const card = document.createElement('div');
+    card.className = 'clip-card';
+    card.dataset.clipId = clip.id;
+    card.innerHTML =
+      '<button type="button" class="drag-handle" aria-label="Reorder ' + escapeHtml(clip.name) + '">&#10241;&#10241;</button>' +
+      '<div class="clip-info">' +
+        '<div class="clip-index">' + String(i + 1).padStart(2, '0') + '</div>' +
+        '<div class="clip-meta">' +
+          '<div class="clip-name">' + escapeHtml(clip.name) + '</div>' +
+          '<div class="clip-sub">' + clip.duration.toFixed(1) + 's &middot; ' + Math.round(clip.originalBpm) + ' BPM &middot; ' + clip.midi.tracks.length + (clip.midi.tracks.length === 1 ? ' track' : ' tracks') + '</div>' +
+        '</div>' +
+        '<div class="density-bars">' + bars.map((h) => '<span style="height:' + Math.max(6, h) + '%"></span>').join('') + '</div>' +
+      '</div>' +
+      '<button type="button" class="remove-btn" aria-label="Remove ' + escapeHtml(clip.name) + '">&#10005;</button>';
+
+    arrangementList.appendChild(card);
+    attachDragHandlers(card);
+
+    card.querySelector('.remove-btn').addEventListener('click', () => {
+      clips = clips.filter((c) => c.id !== clip.id);
+      invalidateBuiltOutput();
+      renderClipList();
+      updateStitchAvailability();
+      ingestZone.classList.toggle('has-files', clips.length > 0);
+      setStatus('Removed "' + clip.name + '" from the arrangement.');
+    });
+  });
+}
+
+/* ============================================================
+   Pointer-based drag reordering (Pointer Events, no HTML5 DnD)
+   ============================================================ */
+function attachDragHandlers(cardEl){
+  const handle = cardEl.querySelector('.drag-handle');
+
+  handle.addEventListener('pointerdown', (evt) => {
+    evt.preventDefault();
+    cardEl.setPointerCapture(evt.pointerId);
+    cardEl.classList.add('dragging');
+
+    const onMove = (moveEvt) => {
+      const clientY = moveEvt.clientY;
+      const list = arrangementList;
+      const siblings = Array.from(list.querySelectorAll('.clip-card')).filter((el) => el !== cardEl);
+
+      for (const sib of siblings){
+        const rect = sib.getBoundingClientRect();
+        const midpoint = rect.top + rect.height / 2;
+        const cardIsBeforeSib = Array.prototype.indexOf.call(list.children, cardEl) <
+                                 Array.prototype.indexOf.call(list.children, sib);
+
+        if (clientY < midpoint && !cardIsBeforeSib){
+          list.insertBefore(cardEl, sib);
+          break;
+        }
+        if (clientY > midpoint && cardIsBeforeSib){
+          list.insertBefore(cardEl, sib.nextSibling);
+          break;
+        }
+      }
+    };
+
+    const onUp = () => {
+      try { cardEl.releasePointerCapture(evt.pointerId); } catch (e) { /* already released */ }
+      cardEl.classList.remove('dragging');
+      cardEl.removeEventListener('pointermove', onMove);
+      cardEl.removeEventListener('pointerup', onUp);
+      cardEl.removeEventListener('pointercancel', onUp);
+      syncClipOrderFromDom();
+    };
+
+    cardEl.addEventListener('pointermove', onMove);
+    cardEl.addEventListener('pointerup', onUp);
+    cardEl.addEventListener('pointercancel', onUp);
+  });
+}
+
+function syncClipOrderFromDom(){
+  const orderedIds = Array.from(arrangementList.querySelectorAll('.clip-card')).map((el) => el.dataset.clipId);
+  clips.sort((a, b) => orderedIds.indexOf(a.id) - orderedIds.indexOf(b.id));
+  invalidateBuiltOutput();
+  renderClipList();
+}
+
+/* ============================================================
+   Groove pattern generation
+   ============================================================ */
+const GM_KICK = 36;
+const GM_SNARE = 38;
+const GM_HIHAT = 42;
+
+function addDrumHit(track, note, time, velBase, allowSwing, extraLag){
+  const swing = allowSwing ? swingDelta() : 0;
+  const lag = extraLag || 0;
+  const velocity = clamp(velBase + ((Math.random() * 0.1) - 0.05), 0.1, 1);
+  track.addNote({
+    midi: note,
+    time: Math.max(0, time + swing + lag),
+    duration: 0.12,
+    velocity: velocity
+  });
+}
+
+function applyGroovePattern(drumTrack, groove, totalDuration, bpm){
+  const beatLen = 60 / bpm;
+  const barLen = beatLen * 4;
+  const totalBars = Math.max(1, Math.ceil(totalDuration / barLen));
+
+  for (let bar = 0; bar < totalBars; bar++){
+    const barStart = bar * barLen;
+
+    if (groove === 'lofi'){
+      // Boom-bap pocket: kick on 1 and the "and" of 3, snare laid back on 3
+      addDrumHit(drumTrack, GM_KICK, barStart + 0 * beatLen, 0.85, true);
+      addDrumHit(drumTrack, GM_SNARE, barStart + 2 * beatLen, 0.72, true, 0.015 + Math.random() * 0.02);
+      addDrumHit(drumTrack, GM_KICK, barStart + 2.5 * beatLen, 0.6, true);
+      for (let e = 0; e < 8; e++){
+        addDrumHit(drumTrack, GM_HIHAT, barStart + e * 0.5 * beatLen, e % 2 === 0 ? 0.4 : 0.3, true);
+      }
+    } else if (groove === 'synthwave'){
+      // Straight four-on-the-floor, no swing, locked to the grid
+      for (let b = 0; b < 4; b++){
+        addDrumHit(drumTrack, GM_KICK, barStart + b * beatLen, 0.9, false);
+        addDrumHit(drumTrack, GM_HIHAT, barStart + b * beatLen + beatLen / 2, 0.5, false);
+      }
+      addDrumHit(drumTrack, GM_SNARE, barStart + 1 * beatLen, 0.8, false);
+      addDrumHit(drumTrack, GM_SNARE, barStart + 3 * beatLen, 0.8, false);
+    } else if (groove === 'ambient'){
+      // Sparse pulse, only every other bar
+      if (bar % 2 === 0){
+        addDrumHit(drumTrack, GM_KICK, barStart, 0.5, true);
+        addDrumHit(drumTrack, GM_HIHAT, barStart + 2 * beatLen, 0.25, true);
+      }
+    } else if (groove === 'trap'){
+      // Syncopated kick, snare/clap on 3, rolling 16th-note hats with an
+      // occasional flourish every other bar
+      addDrumHit(drumTrack, GM_KICK, barStart, 0.9, true);
+      addDrumHit(drumTrack, GM_KICK, barStart + 2.5 * beatLen, 0.65, true);
+      addDrumHit(drumTrack, GM_SNARE, barStart + 2 * beatLen, 0.85, true);
+      for (let s = 0; s < 16; s++){
+        const isRollZone = bar % 2 === 1 && s >= 12;
+        const vel = isRollZone ? 0.28 + (s % 2) * 0.12 : (s % 4 === 0 ? 0.45 : 0.22);
+        addDrumHit(drumTrack, GM_HIHAT, barStart + s * 0.25 * beatLen, vel, true);
+      }
+    } else if (groove === 'house'){
+      // Four-on-the-floor kick, clapped backbeat, open off-beat hats
+      for (let b = 0; b < 4; b++){
+        addDrumHit(drumTrack, GM_KICK, barStart + b * beatLen, 0.88, false);
+        addDrumHit(drumTrack, GM_HIHAT, barStart + b * beatLen + beatLen * 0.5, 0.55, false);
+      }
+      addDrumHit(drumTrack, GM_SNARE, barStart + 1 * beatLen, 0.75, false);
+      addDrumHit(drumTrack, GM_SNARE, barStart + 1 * beatLen + 0.02, 0.4, false); // clap flam
+      addDrumHit(drumTrack, GM_SNARE, barStart + 3 * beatLen, 0.75, false);
+      addDrumHit(drumTrack, GM_SNARE, barStart + 3 * beatLen + 0.02, 0.4, false);
+    } else if (groove === 'reggae'){
+      // One-drop: kick and snare land together on beat 3, beat 1 left open,
+      // steady 8th-note hats
+      addDrumHit(drumTrack, GM_KICK, barStart + 2 * beatLen, 0.8, true);
+      addDrumHit(drumTrack, GM_SNARE, barStart + 2 * beatLen, 0.75, true);
+      for (let e = 0; e < 8; e++){
+        addDrumHit(drumTrack, GM_HIHAT, barStart + e * 0.5 * beatLen, 0.3, true);
+      }
+    } else if (groove === 'jazz'){
+      // Swung ride pattern on a triplet subdivision, feathered kick,
+      // sparse loose snare comping
+      for (let b = 0; b < 4; b++){
+        addDrumHit(drumTrack, GM_HIHAT, barStart + b * beatLen, 0.5, true);
+        addDrumHit(drumTrack, GM_HIHAT, barStart + b * beatLen + beatLen * 0.667, 0.32, true);
+      }
+      if (bar % 2 === 0){
+        addDrumHit(drumTrack, GM_KICK, barStart, 0.32, true);
+      }
+      if (Math.random() < 0.45){
+        addDrumHit(drumTrack, GM_SNARE, barStart + (1 + Math.random() * 2) * beatLen, 0.28, true);
+      }
+    }
+  }
+}
+
+/* ============================================================
+   Key detection & harmonization
+   ============================================================ */
+const PITCH_CLASS_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const MAJOR_PROFILE = [6.35,2.23,3.48,2.33,4.38,4.09,2.52,5.19,2.39,3.66,2.29,2.88];
+const MINOR_PROFILE = [6.33,2.68,3.52,5.38,2.60,3.53,2.54,4.75,3.98,2.69,3.34,3.17];
+const MAJOR_SCALE_STEPS = [0,2,4,5,7,9,11];
+const MINOR_SCALE_STEPS = [0,2,3,5,7,8,10]; // natural minor
+
+// Duration-and-velocity-weighted pitch-class histogram for a clip's melodic content
+function computePitchClassProfile(midi){
+  const hist = new Array(12).fill(0);
+  midi.tracks.forEach((t) => {
+    const isDrum = t.channel === 9 || /drum|kit|perc/i.test(t.name || '');
+    if (isDrum) return;
+    t.notes.forEach((n) => {
+      const pc = ((n.midi % 12) + 12) % 12;
+      hist[pc] += Math.max(0.05, n.duration || 0.1) * Math.max(0.2, n.velocity || 0.8);
+    });
+  });
+  return hist;
+}
+
+function pearsonCorrelation(a, b){
+  const n = a.length;
+  const meanA = a.reduce((s, v) => s + v, 0) / n;
+  const meanB = b.reduce((s, v) => s + v, 0) / n;
+  let num = 0, denA = 0, denB = 0;
+  for (let i = 0; i < n; i++){
+    const da = a[i] - meanA, db = b[i] - meanB;
+    num += da * db; denA += da * da; denB += db * db;
+  }
+  const den = Math.sqrt(denA * denB);
+  return den === 0 ? 0 : num / den;
+}
+
+// Krumhansl-Schmuckler style key-finding: correlate the clip's pitch-class
+// weights (rotated to each candidate tonic) against major/minor key profiles.
+function detectKey(midi){
+  const hist = computePitchClassProfile(midi);
+  let best = { tonic: 0, mode: 'major', score: -Infinity };
+  for (let tonic = 0; tonic < 12; tonic++){
+    const rotated = [];
+    for (let i = 0; i < 12; i++) rotated.push(hist[(tonic + i) % 12]);
+    const majorScore = pearsonCorrelation(rotated, MAJOR_PROFILE);
+    const minorScore = pearsonCorrelation(rotated, MINOR_PROFILE);
+    if (majorScore > best.score) best = { tonic, mode: 'major', score: majorScore };
+    if (minorScore > best.score) best = { tonic, mode: 'minor', score: minorScore };
+  }
+  return best;
+}
+
+function keyLabel(key){
+  return PITCH_CLASS_NAMES[key.tonic] + ' ' + (key.mode === 'minor' ? 'minor' : 'major');
+}
+
+// Smallest signed semitone shift (-6..+6) that rotates sourceTonic onto targetTonic
+function semitoneShiftToMatch(sourceTonic, targetTonic){
+  let diff = (targetTonic - sourceTonic) % 12;
+  if (diff > 6) diff -= 12;
+  if (diff < -6) diff += 12;
+  return diff;
+}
+
+function buildScaleSet(tonic, mode){
+  const steps = mode === 'minor' ? MINOR_SCALE_STEPS : MAJOR_SCALE_STEPS;
+  return steps.map((s) => (tonic + s) % 12);
+}
+
+function snapMidiToScale(midiNote, scaleSet){
+  const pc = ((midiNote % 12) + 12) % 12;
+  if (scaleSet.indexOf(pc) !== -1) return midiNote;
+  for (let d = 1; d <= 6; d++){
+    if (scaleSet.indexOf(((pc + d) % 12 + 12) % 12) !== -1) return midiNote + d;
+    if (scaleSet.indexOf(((pc - d) % 12 + 12) % 12) !== -1) return midiNote - d;
+  }
+  return midiNote;
+}
+
+// Detects every clip's key, picks the most melodically dominant clip as the
+// anchor, and works out how many semitones to shift every other clip so
+// they all sit in the same key.
+function buildHarmonyPlan(){
+  let anchor = clips[0];
+  let anchorWeight = -1;
+  const keys = new Map();
+
+  clips.forEach((c) => {
+    const hist = computePitchClassProfile(c.midi);
+    const weight = hist.reduce((s, v) => s + v, 0);
+    keys.set(c.id, detectKey(c.midi));
+    if (weight > anchorWeight){ anchorWeight = weight; anchor = c; }
+  });
+
+  const targetKey = keys.get(anchor.id) || { tonic: 0, mode: 'major' };
+  const scaleSet = buildScaleSet(targetKey.tonic, targetKey.mode);
+
+  const shifts = new Map();
+  clips.forEach((c) => {
+    const key = keys.get(c.id);
+    const shift = c.id === anchor.id ? 0 : semitoneShiftToMatch(key.tonic, targetKey.tonic);
+    shifts.set(c.id, shift);
+  });
+
+  return { anchorId: anchor.id, targetKey, scaleSet, shifts };
+}
+
+// Applies the harmony plan (transpose, then optionally snap to scale) to a
+// single note's pitch for the given clip. Leaves drum note numbers alone —
+// those are GM percussion codes, not pitches.
+function harmonizePitch(midiNote, clip, harmonyPlan, snap){
+  if (!harmonyPlan) return midiNote;
+  let pitch = midiNote + (harmonyPlan.shifts.get(clip.id) || 0);
+  if (snap) pitch = snapMidiToScale(pitch, harmonyPlan.scaleSet);
+  return clamp(pitch, 0, 127);
+}
+
+/* ============================================================
+   Stitch / Merge engine
+   ============================================================ */
+function buildOutputMidi(){
+  if (!Midi) throw new Error('MIDI library not loaded');
+  const bpm = Number(tempoSlider.value);
+  const groove = grooveSelect.value;
+  const mode = modeSelect.value;
+  const harmonize = harmonizeToggle.checked && clips.length > 0;
+  const snap = harmonize && snapToggle.checked;
+  const loopShort = mode === 'merge' && loopToggle.checked;
+
+  const harmonyPlan = harmonize ? buildHarmonyPlan() : null;
+
+  const result = mode === 'merge'
+    ? buildMergedMidi(bpm, groove, harmonyPlan, snap, loopShort)
+    : buildSequencedMidi(bpm, groove, harmonyPlan, snap);
+
+  const bytes = result.midi.toArray();
+  const blob = new Blob([bytes], { type: 'audio/midi' });
+  const url = URL.createObjectURL(blob);
+
+  return {
+    url,
+    midi: result.midi,
+    duration: result.duration,
+    keyLabel: harmonyPlan ? keyLabel(harmonyPlan.targetKey) : null
+  };
+}
+
+// STITCH: clips play one after another, each handed off through a short
+// crossfade so the transition blends instead of cutting hard.
+function buildSequencedMidi(bpm, groove, harmonyPlan, snap){
+  const output = new Midi();
+  output.header.setTempo(bpm);
+
+  const melodyTrack = output.addTrack();
+  melodyTrack.name = 'Melody Track';
+
+  const bassTrack = output.addTrack();
+  bassTrack.name = 'Auto Bassline';
+
+  const drumTrack = output.addTrack();
+  drumTrack.name = 'Standard Drums';
+  drumTrack.channel = 9; // GM Channel 10, 0-indexed
+
+  const beatLen = 60 / bpm;
+  const baseCrossfade = beatLen * 2; // ~2 beats of overlap glues consecutive clips together
+  const clipCount = clips.length;
+
+  let timelineCursor = 0;
+
+  clips.forEach((clip, clipIndex) => {
+    // Every clip is re-timed onto the SAME target-tempo grid, otherwise a clip
+    // authored at a different original BPM drifts against the chosen tempo and
+    // the generated groove, which is what made clips sound like separate songs.
+    const tempoRatio = clip.originalBpm / bpm;
+    const scaledClipDuration = Math.max(0.1, (clip.duration || 1) * tempoRatio);
+    const crossfade = Math.min(baseCrossfade, scaledClipDuration / 2);
+
+    const clipStart = timelineCursor;
+    let clipMaxTime = 0;
+    let melodicIndex = 0;
+
+    clip.midi.tracks.forEach((srcTrack) => {
+      const isDrumSource = srcTrack.channel === 9 || /drum|kit|perc/i.test(srcTrack.name || '');
+
+      srcTrack.notes.forEach((note) => {
+        const scaledTime = note.time * tempoRatio;
+        const scaledDuration = Math.max(0.02, note.duration * tempoRatio);
+        const noteEnd = scaledTime + scaledDuration;
+        clipMaxTime = Math.max(clipMaxTime, noteEnd);
+
+        const downbeat = isDownbeat(scaledTime, bpm);
+        let velocity = humanizeVelocity(note.velocity, downbeat);
+
+        // Fade this clip in where it overlaps the tail of the previous one
+        if (clipIndex > 0 && scaledTime < crossfade){
+          velocity *= clamp(scaledTime / crossfade, 0.35, 1);
+        }
+        // Fade this clip out where it overlaps the start of the next one
+        if (clipIndex < clipCount - 1){
+          const distFromEnd = scaledClipDuration - noteEnd;
+          if (distFromEnd < crossfade){
+            velocity *= clamp(distFromEnd / crossfade, 0.35, 1);
+          }
+        }
+        velocity = clamp(velocity, 0.12, 1);
+
+        const placedTime = Math.max(0, clipStart + scaledTime + swingDelta());
+
+        if (isDrumSource){
+          drumTrack.addNote({
+            midi: note.midi,
+            time: placedTime,
+            duration: scaledDuration,
+            velocity: velocity
+          });
+        } else {
+          const pitch = harmonizePitch(note.midi, clip, harmonyPlan, snap);
+          melodyTrack.addNote({
+            midi: pitch,
+            time: placedTime,
+            duration: scaledDuration,
+            velocity: velocity
+          });
+
+          melodicIndex++;
+          // Every second melodic tick gets a complementary bassline note
+          if (melodicIndex % 2 === 0){
+            const bassPitch = (pitch % 12) + 36; // dropped to octave 2
+            bassTrack.addNote({
+              midi: bassPitch,
+              time: placedTime,
+              duration: Math.min(scaledDuration * 1.5, 1.5),
+              velocity: clamp(velocity * 0.9, 0.2, 1)
+            });
+          }
+        }
+      });
+    });
+
+    if (clipMaxTime === 0) clipMaxTime = scaledClipDuration;
+    const clipEnd = clipStart + Math.ceil(clipMaxTime);
+
+    // Every clip but the last hands off early into the next one's crossfade window;
+    // the last clip keeps its full tail so the song doesn't get cut short.
+    timelineCursor = clipIndex < clipCount - 1
+      ? Math.max(clipStart + 0.5, clipEnd - crossfade)
+      : clipEnd;
+  });
+
+  // A continuous groove bed under the whole timeline is what makes the whole
+  // thing read as one song rather than clips playing back to back.
+  applyGroovePattern(drumTrack, groove, timelineCursor, bpm);
+
+  return { midi: output, duration: timelineCursor };
+}
+
+// MERGE: every clip starts at time zero and plays simultaneously as its own
+// layer — for combining files that are already parts of the same song
+// (e.g. a melody file, a bass file, a drum file).
+function buildMergedMidi(bpm, groove, harmonyPlan, snap, loopShort){
+  const output = new Midi();
+  output.header.setTempo(bpm);
+
+  const bassTrack = output.addTrack();
+  bassTrack.name = 'Auto Bassline';
+
+  const drumTrack = output.addTrack();
+  drumTrack.name = 'Standard Drums';
+  drumTrack.channel = 9; // GM Channel 10, 0-indexed
+
+  // Work out the shared total length up front so every layer can be filled
+  // to it — otherwise a short clip's track just stops early while longer
+  // ones keep going, which is what makes tracks look mismatched in a DAW.
+  const scaledDurations = clips.map((c) => Math.max(0.1, (c.duration || 1) * (c.originalBpm / bpm)));
+  const totalDuration = Math.max(1, ...scaledDurations);
+  const MAX_LOOPS = 200; // bounds worst-case note count for pathologically short clips
+
+  clips.forEach((clip, clipIndex) => {
+    // Re-time each layer onto the shared tempo grid so they all lock together.
+    const tempoRatio = clip.originalBpm / bpm;
+    const scaledClipDuration = scaledDurations[clipIndex];
+
+    const melodyTrack = output.addTrack();
+    melodyTrack.name = (clip.name || 'Clip').slice(0, 28) + ' — Melody';
+
+    let melodicIndex = 0;
+    const loopCount = loopShort
+      ? Math.min(MAX_LOOPS, Math.max(1, Math.ceil(totalDuration / scaledClipDuration)))
+      : 1;
+
+    for (let loop = 0; loop < loopCount; loop++){
+      const loopOffset = loop * scaledClipDuration;
+      if (loopOffset >= totalDuration) break;
+
+      clip.midi.tracks.forEach((srcTrack) => {
+        const isDrumSource = srcTrack.channel === 9 || /drum|kit|perc/i.test(srcTrack.name || '');
+
+        srcTrack.notes.forEach((note) => {
+          const scaledTime = note.time * tempoRatio;
+          const scaledDuration = Math.max(0.02, note.duration * tempoRatio);
+          const placedBase = loopOffset + scaledTime;
+          if (placedBase >= totalDuration) return; // don't spill past the shared end point
+
+          const downbeat = isDownbeat(scaledTime, bpm);
+          const velocity = humanizeVelocity(note.velocity, downbeat);
+          const placedTime = Math.max(0, placedBase + swingDelta());
+
+          if (isDrumSource){
+            drumTrack.addNote({
+              midi: note.midi,
+              time: placedTime,
+              duration: scaledDuration,
+              velocity: velocity
+            });
+          } else {
+            const pitch = harmonizePitch(note.midi, clip, harmonyPlan, snap);
+            melodyTrack.addNote({
+              midi: pitch,
+              time: placedTime,
+              duration: scaledDuration,
+              velocity: velocity
+            });
+
+            melodicIndex++;
+            if (melodicIndex % 2 === 0){
+              const bassPitch = (pitch % 12) + 36; // dropped to octave 2
+              bassTrack.addNote({
+                midi: bassPitch,
+                time: placedTime,
+                duration: Math.min(scaledDuration * 1.5, 1.5),
+                velocity: clamp(velocity * 0.9, 0.2, 1)
+              });
+            }
+          }
+        });
+      });
+    }
+  });
+
+  applyGroovePattern(drumTrack, groove, totalDuration, bpm);
+
+  return { midi: output, duration: totalDuration };
+}
+
+/* ============================================================
+   Preview playback (raw Web Audio API — no extra dependency)
+   ============================================================ */
+function midiToFreq(midiNote){
+  return 440 * Math.pow(2, (midiNote - 69) / 12);
+}
+
+function createNoiseBuffer(ctx, durationSeconds){
+  const size = Math.max(1, Math.floor(ctx.sampleRate * durationSeconds));
+  const buffer = ctx.createBuffer(1, size, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < size; i++) data[i] = Math.random() * 2 - 1;
+  return buffer;
+}
+
+function scheduleMelodicNote(ctx, master, note, voiceType, when){
+  const startAt = when + note.time;
+  const dur = Math.max(0.05, note.duration);
+  const stopAt = startAt + dur;
+  const peak = clamp(note.velocity, 0.05, 1) * 0.28;
+  const attack = 0.012;
+  const release = Math.min(0.18, dur * 0.4);
+
+  const osc = ctx.createOscillator();
+  osc.type = voiceType;
+  osc.frequency.value = midiToFreq(note.midi);
+
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0, startAt);
+  gain.gain.linearRampToValueAtTime(peak, startAt + attack);
+  gain.gain.setValueAtTime(peak, Math.max(startAt + attack, stopAt - release));
+  gain.gain.linearRampToValueAtTime(0.0001, stopAt);
+
+  osc.connect(gain);
+  gain.connect(master);
+  osc.start(startAt);
+  osc.stop(stopAt + 0.03);
+  activeAudioNodes.push(osc, gain);
+}
+
+function scheduleDrumHit(ctx, master, note, when){
+  const startAt = when + note.time;
+  const peak = clamp(note.velocity, 0.05, 1);
+
+  if (note.midi === GM_KICK){
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(150, startAt);
+    osc.frequency.exponentialRampToValueAtTime(45, startAt + 0.12);
+    gain.gain.setValueAtTime(peak * 0.9, startAt);
+    gain.gain.exponentialRampToValueAtTime(0.001, startAt + 0.22);
+    osc.connect(gain); gain.connect(master);
+    osc.start(startAt); osc.stop(startAt + 0.24);
+    activeAudioNodes.push(osc, gain);
+  } else if (note.midi === GM_SNARE){
+    const noise = ctx.createBufferSource();
+    noise.buffer = createNoiseBuffer(ctx, 0.2);
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = 1800; bp.Q.value = 0.9;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(peak * 0.6, startAt);
+    gain.gain.exponentialRampToValueAtTime(0.001, startAt + 0.16);
+    noise.connect(bp); bp.connect(gain); gain.connect(master);
+    noise.start(startAt); noise.stop(startAt + 0.18);
+    activeAudioNodes.push(noise, bp, gain);
+  } else if (note.midi === GM_HIHAT){
+    const noise = ctx.createBufferSource();
+    noise.buffer = createNoiseBuffer(ctx, 0.08);
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = 7000;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(peak * 0.35, startAt);
+    gain.gain.exponentialRampToValueAtTime(0.001, startAt + 0.06);
+    noise.connect(hp); hp.connect(gain); gain.connect(master);
+    noise.start(startAt); noise.stop(startAt + 0.08);
+    activeAudioNodes.push(noise, hp, gain);
+  } else {
+    const noise = ctx.createBufferSource();
+    noise.buffer = createNoiseBuffer(ctx, 0.1);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(peak * 0.4, startAt);
+    gain.gain.exponentialRampToValueAtTime(0.001, startAt + 0.1);
+    noise.connect(gain); gain.connect(master);
+    noise.start(startAt); noise.stop(startAt + 0.1);
+    activeAudioNodes.push(noise, gain);
+  }
+}
+
+function playPreview(){
+  if (!lastBuiltMidi) return;
+  stopPreview();
+
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const master = audioCtx.createGain();
+  master.gain.value = 0.85;
+  master.connect(audioCtx.destination);
+
+  const when = audioCtx.currentTime + 0.08;
+
+  lastBuiltMidi.tracks.forEach((track) => {
+    const isDrum = track.channel === 9;
+    const voiceType = track.name === 'Auto Bassline' ? 'triangle' : 'sawtooth';
+    track.notes.forEach((note) => {
+      if (isDrum){
+        scheduleDrumHit(audioCtx, master, note, when);
+      } else {
+        scheduleMelodicNote(audioCtx, master, note, voiceType, when);
+      }
+    });
+  });
+
+  isPreviewPlaying = true;
+  previewStartCtxTime = audioCtx.currentTime;
+  playBtn.disabled = true;
+  stopBtn.disabled = false;
+  previewRafId = requestAnimationFrame(tickPreview);
+
+  previewEndTimeoutId = setTimeout(stopPreview, (lastBuiltDuration + 0.6) * 1000);
+}
+
+function tickPreview(){
+  if (!isPreviewPlaying || !audioCtx) return;
+  const elapsed = audioCtx.currentTime - previewStartCtxTime;
+  const pct = clamp(elapsed / Math.max(0.01, lastBuiltDuration), 0, 1);
+  previewProgress.style.width = (pct * 100) + '%';
+  previewTime.textContent = formatTime(Math.min(elapsed, lastBuiltDuration)) + ' / ' + formatTime(lastBuiltDuration);
+  if (elapsed < lastBuiltDuration){
+    previewRafId = requestAnimationFrame(tickPreview);
+  }
+}
+
+function stopPreview(){
+  if (previewRafId) cancelAnimationFrame(previewRafId);
+  if (previewEndTimeoutId) clearTimeout(previewEndTimeoutId);
+  previewRafId = null;
+  previewEndTimeoutId = null;
+
+  activeAudioNodes.forEach((node) => {
+    try { node.stop(); } catch (e){ /* not a source node, or already stopped */ }
+    try { node.disconnect(); } catch (e){ /* ignore */ }
+  });
+  activeAudioNodes = [];
+
+  if (audioCtx){
+    audioCtx.close().catch(() => {});
+    audioCtx = null;
+  }
+
+  isPreviewPlaying = false;
+  playBtn.disabled = !lastBuiltMidi;
+  stopBtn.disabled = true;
+  previewProgress.style.width = '0%';
+  previewTime.textContent = '0:00 / ' + formatTime(lastBuiltDuration);
+}
+
+/* ============================================================
+   Event wiring
+   ============================================================ */
+browseBtn.addEventListener('click', () => fileInput.click());
+
+fileInput.addEventListener('change', async (e) => {
+  const files = Array.from(e.target.files || []);
+  if (files.length === 0) return;
+
+  setStatus('Reading ' + files.length + ' file' + (files.length === 1 ? '' : 's') + '...');
+
+  for (const file of files){
+    try {
+      const { midi, duration, originalBpm } = await parseMidiFile(file);
+      clips.push({
+        id: 'clip-' + (clipIdCounter++),
+        name: file.name.replace(/\.(mid|midi)$/i, ''),
+        midi,
+        duration,
+        originalBpm
+      });
+    } catch (err){
+      setStatus('Could not read "' + file.name + '": ' + err.message, 'error');
+    }
+  }
+
+  fileInput.value = '';
+  ingestZone.classList.toggle('has-files', clips.length > 0);
+  invalidateBuiltOutput();
+  renderClipList();
+  updateStitchAvailability();
+
+  if (clips.length >= 2){
+    setStatus(clips.length + ' clips loaded. Drag to reorder, then stitch.');
+  } else if (clips.length === 1){
+    setStatus('One clip loaded — add at least one more to stitch.');
+  }
+});
+
+// Optional drag-and-drop support for larger touch surfaces / trackpads
+['dragover', 'dragenter'].forEach((evtName) => {
+  ingestZone.addEventListener(evtName, (e) => {
+    e.preventDefault();
+    ingestZone.classList.add('drag-over');
+  });
+});
+['dragleave', 'drop'].forEach((evtName) => {
+  ingestZone.addEventListener(evtName, (e) => {
+    e.preventDefault();
+    ingestZone.classList.remove('drag-over');
+  });
+});
+ingestZone.addEventListener('drop', (e) => {
+  const dropped = e.dataTransfer && e.dataTransfer.files;
+  if (dropped && dropped.length){
+    const dt = new DataTransfer();
+    Array.from(dropped).forEach((f) => dt.items.add(f));
+    fileInput.files = dt.files;
+    fileInput.dispatchEvent(new Event('change'));
+  }
+});
+
+tempoSlider.addEventListener('input', () => {
+  tempoValue.textContent = tempoSlider.value;
+});
+tempoSlider.addEventListener('change', invalidateBuiltOutput);
+
+grooveSelect.addEventListener('change', () => {
+  updateGrooveDesc();
+  invalidateBuiltOutput();
+});
+
+modeSelect.addEventListener('change', () => {
+  updateModeDesc();
+  invalidateBuiltOutput();
+});
+
+loopToggle.addEventListener('change', invalidateBuiltOutput);
+
+harmonizeToggle.addEventListener('change', () => {
+  updateHarmonizeDesc();
+  invalidateBuiltOutput();
+});
+
+snapToggle.addEventListener('change', invalidateBuiltOutput);
+
+stitchBtn.addEventListener('click', () => {
+  if (clips.length < 2){
+    setStatus('Add at least two MIDI files first.', 'error');
+    return;
+  }
+
+  const isMerge = modeSelect.value === 'merge';
+  stopPreview();
+  setStatus(isMerge ? 'Merging layers...' : 'Compiling multi-track arrangement...');
+  stitchBtn.disabled = true;
+
+  // Yield a frame so the status message paints before the synchronous work runs
+  requestAnimationFrame(() => {
+    try {
+      const result = buildOutputMidi();
+      if (currentBlobUrl) URL.revokeObjectURL(currentBlobUrl);
+      currentBlobUrl = result.url;
+      lastBuiltMidi = result.midi;
+      lastBuiltDuration = result.duration;
+
+      downloadLink.href = result.url;
+      const outName = isMerge ? 'merged_multitrack_arrangement.mid' : 'stitched_multitrack_arrangement.mid';
+      downloadLink.download = outName;
+      downloadLink.textContent = 'Download ' + outName;
+      downloadLink.hidden = false;
+
+      previewRow.hidden = false;
+      playBtn.disabled = false;
+      stopBtn.disabled = true;
+      previewProgress.style.width = '0%';
+      previewTime.textContent = '0:00 / ' + formatTime(lastBuiltDuration);
+
+      const verb = isMerge ? 'Merged' : 'Stitched';
+      const shape = isMerge ? 'layered arrangement' : 'continuous arrangement';
+      const keyNote = result.keyLabel ? (' Harmonized to ' + result.keyLabel + '.') : '';
+      setStatus(verb + ' ' + clips.length + ' clips into one ' + shape + ' (~' + formatTime(lastBuiltDuration) + ').' + keyNote + ' Preview it, then export.', 'success');
+    } catch (err){
+      console.error(err);
+      setStatus((isMerge ? 'Merge' : 'Stitch') + ' failed: ' + err.message, 'error');
+    } finally {
+      updateStitchAvailability();
+    }
+  });
+});
+
+playBtn.addEventListener('click', playPreview);
+stopBtn.addEventListener('click', stopPreview);
+
+resetBtn.addEventListener('click', () => {
+  clips = [];
+  clipIdCounter = 0;
+  fileInput.value = '';
+  ingestZone.classList.remove('has-files');
+
+  invalidateBuiltOutput();
+
+  tempoSlider.value = 120;
+  tempoValue.textContent = '120';
+  grooveSelect.value = 'lofi';
+  updateGrooveDesc();
+  modeSelect.value = 'stitch';
+  updateModeDesc();
+  loopToggle.checked = true;
+  harmonizeToggle.checked = true;
+  snapToggle.checked = false;
+  updateHarmonizeDesc();
+
+  renderClipList();
+  updateStitchAvailability();
+  setStatus('Workspace cleared. Add MIDI files to begin.');
+});
+
+/* ============================================================
+   Init
+   ============================================================ */
+updateGrooveDesc();
+updateModeDesc();
+updateHarmonizeDesc();
+renderClipList();
+updateStitchAvailability();
+</script>
+</body>
+</html>

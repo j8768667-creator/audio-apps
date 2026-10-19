@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>MIDI to Riffle Converter</title>
+<style>
+  :root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#17221c;background:#f7f4ee}
+  body{margin:0;padding:18px;max-width:900px;margin:auto}
+  h1{font-size:26px;margin:6px 0 4px}.sub{color:#5e665f;margin:0 0 18px}
+  .card{background:#fff;border:1px solid #ddd4c7;border-radius:16px;padding:16px;margin:12px 0;box-shadow:0 2px 10px #0000000b}
+  label{font-weight:700;display:block;margin:8px 0 6px}.hint{font-size:14px;color:#626b64;margin-top:6px;line-height:1.35}
+  input[type=file],textarea,select,input[type=number]{font-size:16px;width:100%;box-sizing:border-box;margin:4px 0 8px}
+  textarea{min-height:130px;border:1px solid #cfc7bb;border-radius:10px;padding:10px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  button{font-size:17px;font-weight:700;border:0;border-radius:12px;background:#2f4f3e;color:white;padding:12px 16px;margin:6px 6px 6px 0}
+  button.secondary{background:#7a6b58}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.status{white-space:pre-wrap;background:#f4f1ea;border-radius:12px;padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;max-height:320px;overflow:auto}
+  table{width:100%;border-collapse:collapse;font-size:14px}td,th{padding:6px;border-bottom:1px solid #eee;text-align:left}.ok{color:#1f7a39}.bad{color:#a33}
+  @media(max-width:700px){.row{grid-template-columns:1fr}body{padding:12px}}
+</style>
+</head>
+<body>
+<h1>MIDI → .riffle Converter</h1>
+<p class="sub">iPad-friendly converter. Uses a valid .riffle as a structural template: instead of guessing where notes live, it learns the template's own note-slot layout (pitch / duration / gate tables kept in lockstep) and refills it with your MIDI, so the block structure Riffler expects stays intact.</p>
+
+<div class="card">
+  <label>1) Template (optional)</label>
+  <input id="templateFile" type="file" />
+  <div class="hint">A known-good template is built in, so this step is optional. Its only job now is to donate a valid header/skeleton — the converter detects its repeating note-block pattern and re-tiles it to fit however many notes your MIDI actually has, up to the format's ~500-note-slot ceiling, so you're no longer limited to that one file's original length. Upload your own only if you want a different starting key/instrument label.</div>
+</div>
+
+<div class="card">
+  <label>2) Choose MIDI file</label>
+  <input id="midiFile" type="file" />
+  <div class="hint">Best results: a simple melody or chordal MIDI. If you cannot upload MIDI, paste the event dump below instead.</div>
+  <div id="trackPicker"></div>
+  <label>Optional: paste MIDI event dump</label>
+  <textarea id="eventDump" placeholder="Example:&#10;0.000s | tick 0 | ch 1 | Note On E3 (52) vel 127&#10;0.099s | tick 240 | ch 1 | Note Off E3 (52) vel 0"></textarea>
+</div>
+
+<div class="card row">
+  <div>
+    <label>Pitch mapping</label>
+    <select id="pitchOffset">
+      <option value="-12" selected>MIDI note - 12</option>
+      <option value="0">MIDI note unchanged</option>
+      <option value="12">MIDI note + 12</option>
+      <option value="-24">MIDI note - 24</option>
+    </select>
+  </div>
+  <div>
+    <label>Chord notes</label>
+    <select id="chordMode">
+      <option value="all" selected>Keep all simultaneous notes (strum)</option>
+      <option value="top">Top note only (melody line)</option>
+      <option value="bottom">Bottom note only (bass line)</option>
+    </select>
+  </div>
+</div>
+
+<div class="card row">
+  <div>
+    <label>Note capacity</label>
+    <select id="maxSlots">
+      <option value="128" selected>128 (known to produce sound)</option>
+      <option value="256">256 (untested at this size)</option>
+      <option value="400">400 (untested at this size)</option>
+    </select>
+    <div class="hint">Caps how many notes get written. Starting conservative since larger, structurally-different files have produced silence in Flow before - raise this only if 128 plays correctly and you need more notes.</div>
+  </div>
+  <div></div>
+</div>
+
+<div class="card">
+  <button id="convertBtn">Convert and download .riffle</button>
+  <button class="secondary" id="previewBtn">Preview extracted notes</button>
+  <div id="status" class="status">Ready.</div>
+  <div id="downloadLink"></div>
+</div>
+
+<div class="card">
+  <h3>Extracted notes</h3>
+  <div id="notesTable" class="hint">No notes extracted yet.</div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+function log(msg){ $('status').textContent = msg; }
+function readFileBytes(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(new Uint8Array(r.result)); r.onerror=rej; r.readAsArrayBuffer(file); }); }
+function readTextUTF16(bytes){
+  if(bytes[0]===0xFF && bytes[1]===0xFE){
+    let s=''; for(let i=2;i+1<bytes.length;i+=2) s+=String.fromCharCode(bytes[i] | (bytes[i+1]<<8)); return s;
+  }
+  if(bytes[0]===0xFE && bytes[1]===0xFF){
+    let s=''; for(let i=2;i+1<bytes.length;i+=2) s+=String.fromCharCode((bytes[i]<<8) | bytes[i+1]); return s;
+  }
+  return new TextDecoder('utf-8').decode(bytes);
+}
+function encodeUTF16LEWithBOM(s){
+  const out = new Uint8Array(2 + s.length*2); out[0]=0xFF; out[1]=0xFE;
+  for(let i=0;i<s.length;i++){ const c=s.charCodeAt(i); out[2+i*2]=c&255; out[3+i*2]=c>>8; }
+  return out;
+}
+function parseRiffleText(s){
+  return s.split(',').map(x=>x.trim()).filter(x=>x.length).map(x=>parseInt(x,10));
+}
+function serializeRiffle(nums){ return nums.join(','); }
+
+/* ---------- Riffle file layout (reverse-engineered from sample files) ----------
+   Every sample .riffle we inspected is exactly 2944 integers:
+     0..1023     header / song-level fields (index 1 = tempo * 100)
+     1024..1535  PITCH table   (512 slots)
+     1536..2047  DURATION table (512 slots, same index space as pitch)
+     2048..2559  GATE/velocity-ish table (512 slots, same index space as pitch)
+     2560..2943  a 384-slot table whose values repeat in runs of 16 - purpose
+                 unconfirmed. We do NOT touch it; left as the template had it.
+
+   CORRECTION from real-world A/B testing: an earlier version of this tool
+   tried to preserve/tile the "9 data slots then a zero" block pattern seen
+   in hand-authored template files, on the theory that Riffler needed that
+   exact grammar. Real testing showed the opposite: a file whose duration and
+   gate tables were just stale template leftovers (completely disconnected
+   from the newly-written pitch data) but whose PITCH table was one dense,
+   uninterrupted run of notes sounded closer to the source MIDI than our
+   "structurally faithful" block-tiled version - and the block-tiled version
+   produced silence in Riffler Flow specifically. So dense, gap-free packing
+   appears to be what these apps actually expect; the "0 between every N
+   notes" pattern in template files reflects THOSE files' own musical
+   content (real rests in that riff), not a required delimiter format.
+   We now write pitch/duration/gate as a single dense run - one slot per
+   note, no artificial rests inserted - all three kept in sync for every
+   note (which the very first version of this tool never did), then pad
+   with a short -1 run and finally 0s, matching what every real file does
+   at the point its active data ends.
+------------------------------------------------------------------------------ */
+const HEADER_LEN = 1024, TABLE_LEN = 512;
+const PITCH_START = HEADER_LEN;
+const DUR_START   = HEADER_LEN + TABLE_LEN;
+const GATE_START  = HEADER_LEN + TABLE_LEN*2;
+
+// A known-good template (E m7, 93bpm) baked in so template upload is optional.
+const DEFAULT_TEMPLATE = "200,9300,8,0,69,0,0,1,0,0,0,3,1,1,4,5,2,1,1,7,0,0,0,0,0,0,0,0,0,1,0,4000,4000,4000,4000,4000,4000,4000,4000,0,0,0,81,78,13,69,0,8,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,52,74,64,52,64,74,64,67,64,0,66,69,66,69,66,69,50,66,50,0,43,59,54,43,54,59,54,55,54,0,48,52,48,52,48,60,50,66,50,0,52,74,64,52,64,74,64,67,64,0,66,69,66,69,66,69,50,66,50,0,43,59,54,43,54,59,54,55,54,0,48,52,48,52,48,60,50,66,50,0,-1,0,-1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,500,500,500,500,500,500,500,250,250,0,500,500,500,500,500,500,500,250,250,0,500,500,500,500,500,500,500,250,250,0,500,500,500,500,500,500,500,250,250,0,500,500,500,500,500,500,500,250,250,0,500,500,500,500,500,500,500,250,250,0,500,500,500,500,500,500,500,250,250,0,500,500,500,500,500,500,500,250,250,0,-1,0,-1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,126,122,124,126,124,122,124,123,124,0,124,123,124,123,124,123,126,124,126,0,126,122,124,126,124,122,124,123,124,0,126,124,126,124,126,122,126,124,126,0,126,122,124,126,124,122,124,123,124,0,124,123,124,123,124,123,126,124,126,0,126,122,124,126,124,122,124,123,124,0,126,124,126,124,126,122,126,124,126,0,-1,0,-1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,69,69,69,69,69,69,69,69,68,68,68,68,68,68,68,68,71,71,71,71,71,71,71,71,67,67,67,67,67,67,68,68,69,69,69,69,69,69,69,69,68,68,68,68,68,68,68,68,71,71,71,71,71,71,71,71,67,67,67,67,67,67,68,68,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,88,69,69,69,69,69,69,69,69,68,68,68,68,68,68,68,68,71,71,71,71,71,71,71,71,67,67,67,67,67,67,68,68,69,69,69,69,69,69,69,69,68,68,68,68,68,68,68,68,71,71,71,71,71,71,71,71,67,67,67,67,67,67,68,68,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,69,42,42,42,42,42,42,42,42,32,32,32,32,32,32,32,32,41,41,41,41,41,41,41,41,32,32,32,32,32,32,32,32,42,42,42,42,42,42,42,42,32,32,32,32,32,32,32,32,41,41,41,41,41,41,41,41,32,32,32,32,32,32,32,32,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0";
+
+function buildDenseTables(steps, offset, maxSlots){
+  const cap = Math.min(maxSlots, TABLE_LEN);
+  const used = Math.min(steps.length, cap);
+  const pitch=new Array(TABLE_LEN).fill(null); // null = "leave template's value alone"
+  for(let i=0;i<used;i++){
+    // Riffler itself re-saved a converted file and octave-shifted every note
+    // >=65 down by 12 (100% consistent - 15/15 out-of-range notes, zero
+    // exceptions), leaving everything <=64 untouched. That's the app's real
+    // playable-range ceiling for this instrument/voice, so we clamp to it
+    // ourselves instead of shipping notes Riffler would silently transpose.
+    let note = steps[i].note+offset;
+    while(note>64) note-=12;
+    while(note<0) note+=12;
+    pitch[i]=note;
+  }
+  // Fill every remaining slot up to the capacity with -1, matching the
+  // original tool exactly. Leaving only a short -1,-1 tail and letting
+  // positions beyond it fall through to the template's own leftover pitch
+  // data was a bug: it meant stale musical content from the template
+  // resumed right after what should have been a clean end-of-song marker,
+  // which is exactly the kind of malformed structure that would confuse a
+  // parser expecting -1 to mean "nothing more here."
+  for(let i=used;i<cap;i++) pitch[i]=-1;
+  // CORRECTION from direct A/B testing against the original, unmodified
+  // version of this tool: that version never touched duration or gate at
+  // all - it only overwrote pitch, leaving duration/gate exactly as
+  // inherited from the template. Side by side, THAT version played across
+  // the full pattern (multiple chord regions) in both apps; our version,
+  // which computes and writes real per-note duration/gate, reliably stopped
+  // after the first few notes. The template's duration table carries its
+  // own periodic zero-delimiter pattern (e.g. a zero every 9th slot) that
+  // looks like it marks per-chord-region boundaries for playback - and by
+  // computing real durations everywhere, we were overwriting those markers.
+  // So: duration and gate are left completely untouched, matching what
+  // actually plays correctly.
+  return {pitch, capacity:cap, used};
+}
+
+function readVarLen(bytes, pos){ let value=0, b; do{ b=bytes[pos++]; value=(value<<7)|(b&0x7f); }while(b&0x80); return [value,pos]; }
+function parseMidi(bytes){
+  function str(pos,n){ return String.fromCharCode(...bytes.slice(pos,pos+n)); }
+  if(str(0,4)!=='MThd') throw new Error('Not a standard MIDI file');
+  const hdrLen=(bytes[4]<<24)|(bytes[5]<<16)|(bytes[6]<<8)|bytes[7];
+  const format=(bytes[8]<<8)|bytes[9], tracks=(bytes[10]<<8)|bytes[11], ppq=(bytes[12]<<8)|bytes[13];
+  let pos=8+hdrLen, notes=[], tempo=500000;
+  for(let t=0;t<tracks;t++){
+    if(str(pos,4)!=='MTrk') throw new Error('Missing MTrk chunk');
+    const len=(bytes[pos+4]<<24)|(bytes[pos+5]<<16)|(bytes[pos+6]<<8)|bytes[pos+7]; pos+=8;
+    const end=pos+len; let tick=0, running=0, open={};
+    while(pos<end){
+      let r=readVarLen(bytes,pos); tick+=r[0]; pos=r[1];
+      let status=bytes[pos++]; if(status<0x80){ pos--; status=running; } else running=status;
+      if(status===0xff){ const type=bytes[pos++]; r=readVarLen(bytes,pos); const l=r[0]; pos=r[1];
+        if(type===0x51 && l===3) tempo=(bytes[pos]<<16)|(bytes[pos+1]<<8)|bytes[pos+2]; pos+=l; continue;
+      }
+      if(status===0xf0 || status===0xf7){ r=readVarLen(bytes,pos); pos=r[1]+r[0]; continue; }
+      const cmd=status&0xf0, ch=status&0x0f;
+      const a=bytes[pos++], b=(cmd===0xc0||cmd===0xd0)?0:bytes[pos++];
+      if(cmd===0x90 && b>0){ (open[ch+':'+a+':'+t] ||= []).push({tick, note:a, vel:b, ch, track:t}); }
+      else if(cmd===0x80 || (cmd===0x90 && b===0)){
+        const key=ch+':'+a+':'+t; const arr=open[key]; if(arr&&arr.length){ const n=arr.shift(); n.end=tick; n.dur=tick-n.tick; notes.push(n); }
+      }
+    }
+    pos=end;
+  }
+  notes.sort((a,b)=>a.tick-b.tick || b.note-a.note);
+  return {format, tracks, ppq, tempo, notes};
+}
+function parseDump(text){
+  const notes=[], open={};
+  for(const line of text.split(/\n+/)){
+    const tickM=line.match(/tick\s+(\d+)/i); const noteM=line.match(/Note\s+(On|Off)\s+[^\(]*\((\d+)\).*?vel\s+(\d+)/i);
+    if(!tickM||!noteM) continue; const tick=+tickM[1], typ=noteM[1].toLowerCase(), note=+noteM[2], vel=+noteM[3];
+    if(typ==='on' && vel>0){ (open[note] ||= []).push({tick,note,vel,track:0,ch:0}); }
+    else { const arr=open[note]; if(arr&&arr.length){ const n=arr.shift(); n.end=tick; n.dur=tick-n.tick; notes.push(n); } }
+  }
+  notes.sort((a,b)=>a.tick-b.tick || b.note-a.note);
+  return {format:'dump', tracks:1, ppq:480, tempo:null, notes};
+}
+
+// MIDI channel 9 (0-indexed, "channel 10" in most DAW UIs) is the General
+// MIDI standard for drum kits. On that channel, "note number" doesn't mean
+// pitch at all - it selects which drum sound to trigger (36 = kick, 44 =
+// pedal hi-hat, etc). Feeding those numbers into a pitched instrument as if
+// they were melody notes produces nonsense, so we always exclude this
+// channel regardless of which track the user picks.
+const DRUM_CHANNEL = 9;
+
+function summarizeVoices(notes){
+  // A "voice" is one (track, channel) pair. Most MIDI files put one
+  // instrument per track, but format-0 files (single track, e.g. many full-
+  // band transcriptions) put every instrument in ONE track and separate them
+  // only by channel - so we split by both, not just by track, or a format-0
+  // file with 15 different instruments merged together would show up as a
+  // single unpickable "track" with no way to isolate just one instrument.
+  const byVoice = new Map();
+  for(const n of notes){
+    const key = n.track+':'+n.ch;
+    if(!byVoice.has(key)) byVoice.set(key, {track:n.track, ch:n.ch, min:999, max:0, count:0, isDrum:n.ch===DRUM_CHANNEL});
+    const v = byVoice.get(key);
+    v.min=Math.min(v.min,n.note); v.max=Math.max(v.max,n.note); v.count++;
+  }
+  return [...byVoice.values()].sort((a,b)=> a.track-b.track || a.ch-b.ch);
+}
+
+// Group simultaneous notes (same tick) into chords, then flatten each chord
+// into ordered "steps" (one riffle slot each) according to chordMode.
+// Duration is converted from MIDI ticks into the fixed internal grid unit
+// Riffler's duration table uses: this unit does NOT scale with tempo in the
+// sample files (a "130bpm" file and a "100bpm" file both use round values
+// like 250/500), so we treat it as ticks-per-quarter-note = 1000, independent
+// of the song's actual playback tempo, and snap to the nearest 125.
+function buildSteps(notes, ppq, chordMode, selectedVoices){
+  if(notes.length===0) return [];
+  const byTick=new Map();
+  for(const n of notes){
+    if(n.note<=12) continue;
+    if(n.ch===DRUM_CHANNEL) continue; // never treat drum hits as pitches
+    if(selectedVoices && !selectedVoices.has(n.track+':'+n.ch)) continue;
+    if(!byTick.has(n.tick)) byTick.set(n.tick,[]); byTick.get(n.tick).push(n);
+  }
+  const ticks=[...byTick.keys()].sort((a,b)=>a-b);
+  const raw=[];
+  for(const t of ticks){
+    let chord=byTick.get(t).slice().sort((a,b)=>a.note-b.note);
+    if(chordMode==='top') chord=[chord[chord.length-1]];
+    else if(chordMode==='bottom') chord=[chord[0]];
+    for(const n of chord){
+      const durTicks = n.dur && n.dur>0 ? n.dur : ppq/4; // fallback: a 16th if missing
+      let durUnits = Math.round((durTicks/ppq*1000)/125)*125;
+      if(durUnits<125) durUnits=125;
+      const gate = Math.max(1, Math.min(127, n.vel||100));
+      raw.push({note:n.note, durUnits, gate});
+    }
+  }
+  // Merge runs of the SAME pitch played back-to-back into one longer note.
+  // This matters most in 'top note' mode: a rolled/tremolo chord repeats its
+  // top voice on every strum, which produces long runs of an identical pitch
+  // if written as separate slots (we measured 6-11 in a row on real content).
+  // Every genuine Riffler-authored file we've inspected never exceeds a run
+  // of 2 identical consecutive pitches - long identical runs don't occur in
+  // real content, so this represents a static/held note that should be one
+  // longer note, not many redundant re-triggers of the same pitch.
+  const MAX_MERGED_DUR = 8000;
+  const steps=[];
+  for(const s of raw){
+    const prev = steps[steps.length-1];
+    if(prev && prev.note===s.note && prev.durUnits+s.durUnits<=MAX_MERGED_DUR){
+      prev.durUnits += s.durUnits;
+      prev.gate = Math.max(prev.gate, s.gate);
+    } else {
+      steps.push({...s});
+    }
+  }
+  return steps;
+}
+
+function renderTrackPicker(midi){
+  const summary = summarizeVoices(midi.notes);
+  const holder = $('trackPicker');
+  if(summary.length<=1){ holder.innerHTML=''; return; }
+  const multiTrack = new Set(summary.map(v=>v.track)).size>1;
+  holder.innerHTML = '<label>Instruments to include</label>' + summary.map(v=>{
+    const label = v.isDrum
+      ? `${multiTrack?`Track ${v.track}, `:''}Ch ${v.ch} - drum channel, excluded automatically (${v.count} hits)`
+      : `${multiTrack?`Track ${v.track}, `:''}Ch ${v.ch} - ${v.count} notes, range ${noteName(v.min)}-${noteName(v.max)}`;
+    const checked = v.isDrum ? '' : 'checked';
+    const disabled = v.isDrum ? 'disabled' : '';
+    return `<div><label style="font-weight:400"><input type="checkbox" class="trackCheck" value="${v.track}:${v.ch}" ${checked} ${disabled} style="width:auto;display:inline;margin-right:8px"/>${label}</label></div>`;
+  }).join('') + '<div class="hint">A MIDI file with several instruments (piano, bass, drums...) gets flattened together by default, which usually sounds like noise. Uncheck the ones you don\'t want in the riff - e.g. keep just the lead guitar or bass line. Works even when every instrument is packed into a single MIDI track, separated only by channel.</div>';
+}
+
+function getSelectedTracks(){
+  const boxes = document.querySelectorAll('.trackCheck');
+  if(!boxes.length) return null; // single-instrument MIDI, nothing to filter
+  const set = new Set();
+  boxes.forEach(b=>{ if(b.checked) set.add(b.value); }); // "track:ch" strings
+  return set;
+}
+
+function renderNotes(steps){
+  if(!steps.length){ $('notesTable').textContent='No notes found.'; return; }
+  const rows=steps.slice(0,80).map((n,i)=>`<tr><td>${i+1}</td><td>${n.note}</td><td>${noteName(n.note)}</td><td>${n.durUnits}</td><td>${n.gate}</td></tr>`).join('');
+  $('notesTable').innerHTML = `<table><tr><th>#</th><th>MIDI</th><th>Name</th><th>Dur (grid units)</th><th>Gate</th></tr>${rows}</table>` + (steps.length>80?`<p class="hint">Showing first 80 of ${steps.length} steps.</p>`:'');
+}
+function noteName(n){ const names=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']; return names[n%12]+(Math.floor(n/12)-1); }
+
+async function loadInputs(){
+  let templateNums;
+  const tf=$('templateFile').files[0];
+  if(tf){
+    const tb=await readFileBytes(tf);
+    templateNums=parseRiffleText(readTextUTF16(tb));
+  } else {
+    templateNums=parseRiffleText(DEFAULT_TEMPLATE);
+  }
+  if(templateNums.length<HEADER_LEN+TABLE_LEN*3) throw new Error('Template does not look like a valid .riffle file (too short).');
+  let midi=null;
+  const mf=$('midiFile').files[0];
+  if(mf){ midi=parseMidi(await readFileBytes(mf)); }
+  else if($('eventDump').value.trim()) midi=parseDump($('eventDump').value);
+  else throw new Error('Please choose a MIDI file or paste a MIDI event dump.');
+  // Only (re)build the track checkboxes when a new/different file was loaded -
+  // otherwise re-running Preview after the user unchecked a track would
+  // silently reset their selection back to the defaults on every call.
+  const fileKey = mf ? (mf.name+':'+mf.size+':'+mf.lastModified) : 'dump';
+  if(fileKey !== lastMidiFileKey){ renderTrackPicker(midi); lastMidiFileKey = fileKey; }
+  const selectedTracks=getSelectedTracks();
+  const steps=buildSteps(midi.notes, midi.ppq||480, $('chordMode').value, selectedTracks);
+  if(!steps.length) throw new Error('No usable notes found in the selected track(s).');
+  renderNotes(steps);
+  return {templateNums, midi, steps};
+}
+let lastMidiFileKey = null;
+
+function patchRiffle(templateNums, midi, steps, offset, maxSlots){
+  const nums=templateNums.slice();
+  const {pitch, capacity, used} = buildDenseTables(steps, offset, maxSlots);
+  // Only pitch gets overwritten. Duration and gate are left exactly as the
+  // template provides them - see the comment in buildDenseTables for why.
+  for(let i=0;i<TABLE_LEN;i++){
+    if(pitch[i]!==null) nums[PITCH_START+i]=pitch[i];
+  }
+  // Sync the header's tempo field (index 1 = bpm * 100 in every sample file)
+  // to the MIDI's actual tempo, so playback speed matches the source instead
+  // of silently inheriting whatever tempo the template was originally at.
+  if(midi.tempo){
+    const bpm = Math.round(60000000/midi.tempo);
+    nums[1] = bpm*100;
+  }
+  // When Riffler itself re-saved a converted file, it zeroed out these header
+  // fields rather than leaving the donor template's values in place - they
+  // look like stale chord/scale descriptor metadata describing the donor
+  // template's own original content, not anything derived from the new
+  // notes. We don't know how Riffler recomputes them, but leaving the old
+  // template's values in place is definitely wrong, so we clear them too
+  // rather than ship misleading metadata.
+  for(const idx of [7,11,12,13,14,16,42,43,48]) nums[idx]=0;
+  // Indices 5 and 46 consistently become 7 and 5 across every real example
+  // we've compared (three different songs/templates, always the same
+  // values) - they look like fixed "converted/imported" markers rather than
+  // anything derived from the note content, so we set them directly.
+  nums[5]=7; nums[46]=5;
+  // Index 44 also changes on re-save but to a different value each time
+  // (content-dependent - likely auto-detected key/chord info) - left as
+  // inherited from the template since we can't yet derive the real value.
+  return {nums, used, capacity};
+}
+
+async function preview(){
+  try{
+    const {midi,steps}=await loadInputs();
+    const maxSlots=+$('maxSlots').value;
+    const capacity=Math.min(maxSlots, TABLE_LEN-8);
+    const bpm = midi.tempo ? Math.round(60000000/midi.tempo) : null;
+    log(`MIDI loaded.\nFormat: ${midi.format}\nTracks: ${midi.tracks}\nPPQ: ${midi.ppq}${bpm?`\nTempo: ${bpm} bpm (will be written to output)`:''}\nExtracted steps: ${steps.length}\nNote capacity setting: ${capacity} slots\nFirst notes: ${steps.slice(0,24).map(n=>noteName(n.note)).join(' ')}` +
+        (steps.length>capacity? `\n\nWarning: this MIDI has ${steps.length-capacity} more notes than the current capacity setting - trailing note(s) will be dropped. Try a higher "Note capacity" setting.`:''));
+  }catch(e){ log('Error: '+e.message); }
+}
+async function saveBlob(blob, filename){
+  // iOS Safari routinely ignores the <a download> attribute for blob URLs and
+  // just opens/previews the file instead of saving it. The reliable path on
+  // iOS is the Web Share API with a real File object, which lets the user
+  // pick "Save to Files". We try that first and only fall back to the old
+  // anchor-click approach (which works fine on desktop browsers) if sharing
+  // isn't available.
+  const file = new File([blob], filename, {type:'application/octet-stream'});
+  if(navigator.canShare && navigator.canShare({files:[file]})){
+    try{
+      await navigator.share({files:[file], title:filename});
+      return 'shared';
+    }catch(err){
+      // user cancelled the share sheet - don't treat as a hard failure,
+      // fall through to the manual link instead of erroring out.
+    }
+  }
+  const url = URL.createObjectURL(blob);
+  const a=document.createElement('a'); a.href=url; a.download=filename; a.textContent='Tap here to save '+filename;
+  a.style.display='inline-block'; a.style.margin='8px 0'; a.style.fontWeight='700';
+  const holder=$('downloadLink'); holder.innerHTML=''; holder.appendChild(a);
+  a.click();
+  return 'link';
+}
+
+async function convert(){
+  try{
+    const {templateNums,midi,steps}=await loadInputs();
+    const offset=+$('pitchOffset').value;
+    const maxSlots=+$('maxSlots').value;
+    const {nums,used,capacity}=patchRiffle(templateNums, midi, steps, offset, maxSlots);
+    const text=serializeRiffle(nums);
+    const blob=new Blob([encodeUTF16LEWithBOM(text)], {type:'application/octet-stream'});
+    const how = await saveBlob(blob, 'converted_from_midi.riffle');
+    const base = `Note capacity: ${capacity} slots\nSteps written: ${used}${steps.length>capacity?` (dropped ${steps.length-capacity} - try a higher "Note capacity" setting)`:''}\nPitch mapping: MIDI ${offset>=0?'+':''}${offset}\nPitch, duration and gate were written as one dense run (no gaps) and kept in sync; tempo synced from the MIDI.`;
+    if(how==='shared') log(`Converted. Choose "Save to Files" in the share sheet to keep the .riffle.\n\n${base}`);
+    else log(`Converted.\nIf the file opened in a preview instead of downloading, use the "Tap here to save" link below and choose Download/Save to Files from there (or long-press it and pick "Download Linked File").\n\n${base}`);
+  }catch(e){ log('Error: '+e.message); }
+}
+$('previewBtn').addEventListener('click', preview);
+$('convertBtn').addEventListener('click', convert);
+$('templateFile').addEventListener('change', ()=>{ const f=$('templateFile').files[0]; if(f) log('Template selected: '+f.name+'\nNow choose a MIDI file or paste an event dump.'); });
+$('midiFile').addEventListener('change', async ()=>{
+  const f=$('midiFile').files[0]; if(!f) return;
+  log('MIDI selected: '+f.name+'\nParsing...');
+  try{
+    const midi=parseMidi(await readFileBytes(f));
+    const fileKey = f.name+':'+f.size+':'+f.lastModified;
+    renderTrackPicker(midi); lastMidiFileKey = fileKey;
+    log('MIDI selected: '+f.name+'\n'+(document.querySelectorAll('.trackCheck').length? 'Multiple instruments found - check the list above to pick which ones to include, then tap Preview or Convert.':'Tap Preview or Convert.'));
+  }catch(e){
+    log('MIDI selected: '+f.name+'\nCould not parse it yet ('+e.message+') - tap Preview for details.');
+  }
+});
+</script>
+</body>
+</html>

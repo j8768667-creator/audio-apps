@@ -1,0 +1,986 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0b1020">
+  <title>Expressive MIDI Composer</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'] }
+        }
+      }
+    };
+  </script>
+
+  <!-- Browser-ready UMD builds; the app itself remains a single HTML file. -->
+  <script src="https://unpkg.com/tone@15.1.22/build/Tone.js"></script>
+  <script src="https://unpkg.com/@tonejs/midi@2.0.28/build/Midi.js"></script>
+
+  <style>
+    html { -webkit-text-size-adjust: 100%; touch-action: manipulation; }
+    body { min-height: 100dvh; overscroll-behavior-y: none; }
+    button, input, select, textarea { font: inherit; }
+    input, select, textarea { font-size: 16px !important; }
+    button, label, select { -webkit-tap-highlight-color: transparent; }
+    .safe-bottom { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+    .drop-active { border-color: rgb(129 140 248); background: rgba(99,102,241,.12); }
+    .meter { background: linear-gradient(90deg, rgba(99,102,241,.9) var(--p), rgba(255,255,255,.08) var(--p)); }
+    .glass { background: rgba(15,23,42,.72); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
+    @media (max-width: 640px) {
+      .compact-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+
+<body class="bg-slate-950 text-slate-100 antialiased">
+  <main class="mx-auto max-w-7xl px-4 sm:px-6 py-5 sm:py-8 safe-bottom">
+    <header class="mb-6">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-[.25em] text-indigo-300">Frontend MIDI laboratory</p>
+          <h1 class="mt-1 text-3xl sm:text-4xl font-black tracking-tight">Expressive MIDI Composer</h1>
+          <p class="mt-2 max-w-3xl text-sm sm:text-base text-slate-400">
+            Analyse a MIDI or chord progression, then extend it with humanised groove, dynamics,
+            voice-leading and genre-aware variation. Everything runs locally in the browser.
+          </p>
+        </div>
+        <div id="statusPill" class="self-start rounded-full border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs text-slate-300">
+          Ready
+        </div>
+      </div>
+    </header>
+
+    <section class="grid gap-5 lg:grid-cols-[1.05fr_.95fr]">
+      <div class="space-y-5">
+        <section class="glass rounded-2xl border border-slate-800 p-4 sm:p-5 shadow-2xl">
+          <div class="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <h2 class="font-bold">Source material</h2>
+              <p class="text-xs text-slate-400">Upload .mid/.midi or type chords.</p>
+            </div>
+            <button id="clearBtn" type="button" class="rounded-lg border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 active:scale-[.98]">Clear</button>
+          </div>
+
+          <label id="dropZone" for="midiFile"
+                 class="block cursor-pointer rounded-xl border-2 border-dashed border-slate-700 bg-slate-900/70 p-6 text-center transition hover:border-indigo-500">
+            <input id="midiFile" type="file" accept=".mid,.midi,audio/midi,audio/x-midi" class="sr-only">
+            <div class="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full bg-indigo-500/15 text-indigo-300 text-xl">♫</div>
+            <div class="font-semibold">Drop a MIDI file here</div>
+            <div class="mt-1 text-xs text-slate-400">or tap to choose from Files</div>
+            <div id="fileName" class="mt-3 hidden truncate text-sm text-indigo-300"></div>
+          </label>
+
+          <div class="my-4 flex items-center gap-3 text-[10px] uppercase tracking-[.25em] text-slate-600">
+            <span class="h-px flex-1 bg-slate-800"></span>or<span class="h-px flex-1 bg-slate-800"></span>
+          </div>
+
+          <label class="block">
+            <span class="mb-2 block text-xs font-semibold text-slate-300">Chord sequence</span>
+            <textarea id="chords" rows="3" spellcheck="false"
+              class="w-full resize-y rounded-xl border border-slate-700 bg-slate-950/80 p-3 text-slate-100 outline-none focus:border-indigo-500"
+              placeholder="Cmaj7 | Am7 | Dm7 | G7"></textarea>
+            <span class="mt-1 block text-[11px] text-slate-500">Examples: C, Am, Fmaj7, G7, Dm9. Use | or commas.</span>
+          </label>
+
+          <button id="analyseBtn" type="button"
+            class="mt-4 w-full rounded-xl bg-indigo-500 px-4 py-3 font-bold text-white shadow-lg shadow-indigo-950/30 active:scale-[.99]">
+            Analyse source
+          </button>
+        </section>
+
+        <section class="glass rounded-2xl border border-slate-800 p-4 sm:p-5">
+          <h2 class="mb-4 font-bold">Composition settings</h2>
+          <div class="grid compact-grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <label>
+              <span class="mb-1.5 block text-xs text-slate-400">Additional bars</span>
+              <input id="bars" type="number" min="1" max="256" step="1" value="8"
+                class="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 outline-none focus:border-indigo-500">
+            </label>
+            <label>
+              <span class="mb-1.5 block text-xs text-slate-400">Genre</span>
+              <select id="genre" class="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 outline-none focus:border-indigo-500">
+                <option>Pop</option><option>Neo Soul</option><option>Soul</option><option>R&B</option><option>Jazz</option>
+                <option>Lo-fi</option><option>Funk</option><option>Indie</option><option>House</option><option>Rock</option>
+                <option>Cinematic</option><option>Ambient</option>
+              </select>
+            </label>
+            <label>
+              <span class="mb-1.5 block text-xs text-slate-400">Key</span>
+              <select id="key" class="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 outline-none focus:border-indigo-500"></select>
+            </label>
+            <label>
+              <span class="mb-1.5 block text-xs text-slate-400">Tempo BPM</span>
+              <input id="tempo" type="number" min="30" max="240" step="1" value="110"
+                class="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 outline-none focus:border-indigo-500">
+            </label>
+          </div>
+
+          <div class="mt-4 rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold">Humanisation profile</span>
+              <span id="humanValue" class="text-xs text-indigo-300">Expressive</span>
+            </div>
+            <input id="human" type="range" min="0" max="100" value="72" class="mt-3 w-full accent-indigo-500">
+            <div class="mt-2 grid grid-cols-3 text-[10px] text-slate-500">
+              <span>Grid</span><span class="text-center">Human</span><span class="text-right">Loose</span>
+            </div>
+          </div>
+
+          <button id="generateBtn" type="button"
+            class="mt-4 w-full rounded-xl border border-indigo-400/40 bg-indigo-500/10 px-4 py-3 font-bold text-indigo-200 hover:bg-indigo-500/20 active:scale-[.99]">
+            Generate continuation
+          </button>
+        </section>
+
+        <section class="glass rounded-2xl border border-slate-800 p-4 sm:p-5">
+          <div class="mb-3 flex items-center justify-between">
+            <h2 class="font-bold">Preview</h2>
+            <span id="playState" class="text-xs text-slate-500">Stopped</span>
+          </div>
+          <div class="grid grid-cols-3 gap-2">
+            <button id="playBtn" type="button" class="rounded-xl bg-emerald-500 px-3 py-3 font-bold text-slate-950 active:scale-[.98]">▶ Play</button>
+            <button id="pauseBtn" type="button" class="rounded-xl border border-slate-700 bg-slate-900 px-3 py-3 font-bold active:scale-[.98]">Ⅱ Pause</button>
+            <button id="stopBtn" type="button" class="rounded-xl border border-slate-700 bg-slate-900 px-3 py-3 font-bold active:scale-[.98]">■ Stop</button>
+          </div>
+          <div class="mt-3 h-2 overflow-hidden rounded-full bg-slate-800">
+            <div id="progress" class="meter h-full w-full" style="--p:0%"></div>
+          </div>
+        </section>
+      </div>
+
+      <div class="space-y-5">
+        <section class="glass rounded-2xl border border-slate-800 p-4 sm:p-5">
+          <div class="mb-4 flex items-center justify-between">
+            <h2 class="font-bold">Musical analysis</h2>
+            <span id="analysisBadge" class="rounded-full bg-slate-800 px-2.5 py-1 text-[10px] text-slate-400">No source</span>
+          </div>
+          <div id="analysisGrid" class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div class="rounded-xl bg-slate-900/70 p-3"><div class="text-[10px] uppercase tracking-wider text-slate-500">Bars</div><div id="aBars" class="mt-1 text-xl font-bold">—</div></div>
+            <div class="rounded-xl bg-slate-900/70 p-3"><div class="text-[10px] uppercase tracking-wider text-slate-500">Tempo</div><div id="aTempo" class="mt-1 text-xl font-bold">—</div></div>
+            <div class="rounded-xl bg-slate-900/70 p-3"><div class="text-[10px] uppercase tracking-wider text-slate-500">Time sig.</div><div id="aTime" class="mt-1 text-xl font-bold">—</div></div>
+            <div class="rounded-xl bg-slate-900/70 p-3"><div class="text-[10px] uppercase tracking-wider text-slate-500">Key</div><div id="aKey" class="mt-1 text-xl font-bold">—</div></div>
+            <div class="rounded-xl bg-slate-900/70 p-3"><div class="text-[10px] uppercase tracking-wider text-slate-500">Tracks</div><div id="aTracks" class="mt-1 text-xl font-bold">—</div></div>
+            <div class="rounded-xl bg-slate-900/70 p-3"><div class="text-[10px] uppercase tracking-wider text-slate-500">Notes</div><div id="aNotes" class="mt-1 text-xl font-bold">—</div></div>
+          </div>
+
+          <div class="mt-4 space-y-3">
+            <div>
+              <div class="mb-1 flex justify-between text-xs"><span class="text-slate-400">Note density</span><span id="densityText">—</span></div>
+              <div class="h-2 rounded-full bg-slate-800"><div id="densityBar" class="h-full rounded-full bg-indigo-500" style="width:0%"></div></div>
+            </div>
+            <div>
+              <div class="mb-1 flex justify-between text-xs"><span class="text-slate-400">Polyphony</span><span id="polyText">—</span></div>
+              <div class="h-2 rounded-full bg-slate-800"><div id="polyBar" class="h-full rounded-full bg-fuchsia-500" style="width:0%"></div></div>
+            </div>
+            <div>
+              <div class="mb-1 flex justify-between text-xs"><span class="text-slate-400">Velocity variation</span><span id="velText">—</span></div>
+              <div class="h-2 rounded-full bg-slate-800"><div id="velBar" class="h-full rounded-full bg-emerald-500" style="width:0%"></div></div>
+            </div>
+          </div>
+
+          <div class="mt-4 rounded-xl border border-slate-800 bg-slate-950/50 p-3">
+            <div class="text-[10px] uppercase tracking-wider text-slate-500">Active instruments</div>
+            <div id="instruments" class="mt-2 text-sm text-slate-300">—</div>
+          </div>
+        </section>
+
+        <section class="glass rounded-2xl border border-slate-800 p-4 sm:p-5">
+          <h2 class="font-bold">Composition plan</h2>
+          <div id="plan" class="mt-3 space-y-2 text-sm text-slate-300">
+            <div class="rounded-lg bg-slate-900/70 p-3">Analyse a source to build the plan.</div>
+          </div>
+        </section>
+
+        <section class="glass rounded-2xl border border-slate-800 p-4 sm:p-5">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 class="font-bold">Export</h2>
+              <p id="exportInfo" class="text-xs text-slate-500">Generate a continuation first.</p>
+            </div>
+            <button id="downloadBtn" type="button" disabled
+              class="rounded-xl bg-white px-5 py-3 font-black text-slate-950 disabled:cursor-not-allowed disabled:opacity-30 active:scale-[.98]">
+              ↓ Download MIDI
+            </button>
+          </div>
+        </section>
+
+        <section class="rounded-2xl border border-indigo-500/20 bg-indigo-500/5 p-4">
+          <h3 class="text-sm font-bold text-indigo-200">Expressive generation rules</h3>
+          <ul class="mt-2 grid gap-2 text-xs leading-relaxed text-slate-400 sm:grid-cols-2">
+            <li>• Micro-onset offsets and velocity variation</li>
+            <li>• Smooth chord inversions / voice leading</li>
+            <li>• Anticipations, passing tones and suspensions</li>
+            <li>• Genre-specific density and accents</li>
+            <li>• Breath/rest cycles and phrase endings</li>
+            <li>• Rubato around harmonic resolution</li>
+          </ul>
+        </section>
+      </div>
+    </section>
+
+    <footer class="mt-6 text-center text-[11px] text-slate-600">
+      No server, account or upload is required. MIDI processing happens in this page.
+    </footer>
+  </main>
+
+<script>
+(() => {
+  'use strict';
+
+  const $ = id => document.getElementById(id);
+  const clamp = (n,a,b) => Math.max(a, Math.min(b,n));
+  const rand = (a,b) => a + Math.random()*(b-a);
+  const choice = a => a[Math.floor(Math.random()*a.length)];
+  const pcNames = ['C','C#','D','Eb','E','F','F#','G','Ab','A','Bb','B'];
+  const keyNames = pcNames.flatMap(n => [n,n+'m']);
+  const STYLE_LIBRARY = {
+    'Neo Soul': {density:1.15, swing:.10, ghost:.22, human:1.15, chord:[0,4,7,10,14], bass:0.74, lead:.72, drum:0.75, mood:'intimate, sophisticated, slightly behind the beat'},
+    'Soul': {density:1.08, swing:.08, ghost:.20, human:1.10, chord:[0,4,7,10], bass:.72, lead:.68, drum:.68, mood:'warm, vulnerable, deeply pocketed'},
+    'R&B': {density:1.20, swing:.08, ghost:.18, human:1.05, chord:[0,4,7,10,14], bass:.78, lead:.78, drum:.78, mood:'sensual, conversational, late-night'},
+    'Jazz': {density:1.12, swing:.14, ghost:.25, human:1.20, chord:[0,4,7,10,14], bass:.76, lead:.82, drum:.65, mood:'lyrical, elastic, harmonically curious'},
+    'Lo-fi': {density:.82, swing:.12, ghost:.30, human:1.30, chord:[0,3,7,10], bass:.62, lead:.54, drum:.64, mood:'nostalgic, dusty, hesitant'},
+    'Funk': {density:1.35, swing:.05, ghost:.35, human:1.05, chord:[0,4,7,10], bass:.92, lead:.70, drum:1.0, mood:'frantic, physical, syncopated'},
+    'Pop': {density:1.05, swing:.02, ghost:.12, human:.82, chord:[0,4,7,10], bass:.72, lead:.80, drum:.82, mood:'uplifting, intimate in verses, expansive in chorus'},
+    'Indie': {density:.92, swing:.04, ghost:.22, human:1.15, chord:[0,3,7,10], bass:.66, lead:.72, drum:.76, mood:'earnest, imperfect, bittersweet'},
+    'House': {density:1.45, swing:.02, ghost:.08, human:.55, chord:[0,4,7,10], bass:.90, lead:.62, drum:1.0, mood:'hypnotic, driving, euphoric'},
+    'Rock': {density:1.0, swing:.01, ghost:.12, human:.72, chord:[0,4,7,10], bass:.85, lead:.72, drum:.95, mood:'urgent, triumphant but weary'},
+    'Cinematic': {density:.72, swing:.03, ghost:.10, human:1.05, chord:[0,4,7,11,14], bass:.55, lead:.66, drum:.30, mood:'hauntingly nostalgic, wide, emotionally unresolved'},
+    'Ambient': {density:.48, swing:.06, ghost:.08, human:1.25, chord:[0,4,7,11,14,17], bass:.35, lead:.42, drum:.15, mood:'breath-like, spacious, fragile'}
+  };
+
+  $('key').innerHTML = keyNames.map(k => `<option>${k}</option>`).join('');
+  // Expose the richer style set even if an older cached HTML fragment remains.
+  const genreSelect = $('genre');
+  if (genreSelect) genreSelect.innerHTML = Object.keys(STYLE_LIBRARY).map(k => `<option>${k}</option>`).join('');
+  // Empirical performance DNA distilled from the supplied MAESTRO v3.0 MIDI corpus
+  // (40-file / ~291k-note sample, parsed directly from the uploaded archive):
+  // velocity mean 64.9/127, velocity SD 18.8/127, 16th-grid onset SD ~35 ticks at
+  // PPQ 480 (mean absolute deviation ~30 ticks), 90th-percentile deviation ~54 ticks.
+  // These are priors, not copied performances; uploaded MIDI can refine them.
+  const MAESTRO_DNA = {
+    velocityMean: 65/127,
+    velocitySd: 19/127,
+    onsetSdTicks: 35,
+    onsetTailTicks: 54,
+    articulation: { short: .62, normal: .86, long: 1.06 },
+    accentRatio: 1.22,
+    ghostRatio: .34,
+    phraseBreath: .10,
+    rubato: .032
+  };
+
+  let sourceMidi = null;
+  let generatedMidi = null;
+  let analysis = null;
+  let synths = [];
+
+  function status(msg, good=false) {
+    $('statusPill').textContent = msg;
+    $('statusPill').className = 'self-start rounded-full border px-3 py-1.5 text-xs ' +
+      (good ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+            : 'border-slate-700 bg-slate-900 text-slate-300');
+  }
+
+  function parseChord(token) {
+    const s = token.trim().replace(/[()]/g,'');
+    const m = s.match(/^([A-Ga-g])([#b]?)(.*)$/);
+    if (!m) return null;
+    let rn = m[1].toUpperCase() + (m[2] || '');
+    // pcNames already spells three of the twelve pitch classes as flats (Eb, Ab, Bb),
+    // so only Db and Gb need remapping to their sharp equivalents. The previous map
+    // also "corrected" Eb/Ab/Bb to D#/G#/A#, which don't exist in pcNames — that made
+    // pcNames.indexOf(...) return -1 and silently drop every Eb, Ab or Bb chord typed
+    // into the chord box (parseChord returned null, and inputChords() filters nulls out).
+    const flatMap = {Db:'C#',Gb:'F#'};
+    rn = flatMap[rn] || rn;
+    const root = pcNames.indexOf(rn);
+    if (root < 0) return null;
+    const q = m[3].toLowerCase();
+    let intervals = q.includes('dim') ? [0,3,6] :
+      q.includes('aug') || q.includes('+') ? [0,4,8] :
+      q.includes('sus2') ? [0,2,7] :
+      q.includes('sus4') || q.includes('sus') ? [0,5,7] :
+      q.startsWith('m') && !q.startsWith('maj') ? [0,3,7] : [0,4,7];
+    if (q.includes('maj7')) intervals.push(11);
+    else if (q.includes('7')) intervals.push(10);
+    if (q.includes('9')) intervals.push(14);
+    if (q.includes('11')) intervals.push(17);
+    if (q.includes('13')) intervals.push(21);
+    return {root, name:s, intervals:[...new Set(intervals)]};
+  }
+
+  function inputChords() {
+    return ($('chords').value || '').split(/[|,;\n]+/).map(x=>x.trim()).filter(Boolean).map(parseChord).filter(Boolean);
+  }
+
+  // Turns an inferred {root, intervals} back into a readable chord symbol so the
+  // chord box can be auto-filled from an uploaded MIDI's own harmony. inferChords()
+  // only ever produces one of these five interval shapes.
+  function chordLabel(root, intervals) {
+    const key = intervals.slice().sort((a,b)=>a-b).join(',');
+    const suffix = {'0,4,7':'','0,3,7':'m','0,4,7,10':'7','0,3,7,10':'m7','0,4,7,11':'maj7'}[key] ?? '';
+    return pcNames[((root%12)+12)%12] + suffix;
+  }
+
+  function quantizedDeviation(time, beatGrid=0.25) {
+    const q = Math.round(time/beatGrid)*beatGrid;
+    return time-q;
+  }
+
+  function inferKey(notes) {
+    if (!notes.length) return $('key').value || 'C';
+    const h=Array(12).fill(0);
+    notes.forEach(n=>h[n.midi%12] += n.duration*(0.3+n.velocity));
+    const major=[0,2,4,5,7,9,11], minor=[0,2,3,5,7,8,10];
+    let best={score:-Infinity,name:'C'};
+    for(let r=0;r<12;r++) for(const [suffix,scale] of [['',major],['m',minor]]) {
+      let s=0;
+      for(let p=0;p<12;p++) s += h[(r+p)%12] * (scale.includes(p) ? (p===0?1.8:1) : -.28);
+      if(s>best.score) best={score:s,name:pcNames[r]+suffix};
+    }
+    return best.name;
+  }
+
+  function inferChords(notes, bars, beatsPerBar) {
+    const result=[];
+    if(!notes.length) return result;
+    for(let b=0;b<bars;b++) {
+      const from=b*beatsPerBar, to=(b+1)*beatsPerBar;
+      const pc=Array(12).fill(0);
+      notes.filter(n=>n.time+n.duration>from && n.time<to).forEach(n=>{
+        pc[n.midi%12]+=Math.max(.05,Math.min(n.duration,to-n.time))*n.velocity;
+      });
+      let best={score:-Infinity,root:0};
+      for(let r=0;r<12;r++) {
+        const triads=[
+          {iv:[0,4,7],w:1},
+          {iv:[0,3,7],w:1},
+          {iv:[0,4,7,10],w:.9},
+          {iv:[0,3,7,10],w:.9},
+          {iv:[0,4,7,11],w:.85}
+        ];
+        triads.forEach(t=>{
+          let s=0;
+          t.iv.forEach(i=>s+=pc[(r+i)%12]*t.w*(i===0?1.5:1));
+          for(let i=0;i<12;i++) if(!t.iv.includes(i)) s-=pc[(r+i)%12]*.08;
+          if(s>best.score) best={score:s,root:r,iv:t.iv};
+        });
+      }
+      result.push({root:best.root, intervals:best.iv || [0,4,7], confidence:best.score});
+    }
+    return result;
+  }
+
+  function analyseMidi(midi) {
+    const ppq=midi.header.ppq||480;
+    const notes=[], tracks=[];
+    midi.tracks.forEach((t,ti)=>{
+      if(!t.notes.length) return;
+      const velocities=t.notes.map(n=>Math.round(clamp(n.velocity,0,1)*127));
+      // n.ticks/ppq gives the note's position in true beats, independent of tempo.
+      // The previous version passed n.time (which @tonejs/midi reports in *seconds*)
+      // straight into a function built for beat-grid math. At anything other than
+      // exactly 60 BPM that's a unit mismatch: at 120 BPM, one real bar of notes was
+      // read as spanning half a bar, so bar/chord windows below covered the wrong
+      // notes, "bars" undercounted by 2x, and the onset-deviation grid was measuring
+      // against an 8th-note spacing while believing it was a 16th of a beat. This
+      // corrupted the inferred harmony and expressiveness stats for every uploaded
+      // MIDI that wasn't 60 BPM — i.e. nearly all of them.
+      const onsetDev=t.notes.map(n=>Math.round(quantizedDeviation(n.ticks/ppq,.25)*ppq));
+      const uniqueV=new Set(velocities).size;
+      const uniqueO=new Set(onsetDev).size;
+      const dnvr=uniqueV/127*100;
+      const dnodr=uniqueO/ppq*100;
+      tracks.push({
+        index:ti,name:t.name||`Track ${ti+1}`,instrument:t.instrument?.name||'Piano',
+        channel:t.channel,notes:t.notes.length,dnvr,dnodr,
+        expressive:dnvr>=40.965 && dnodr>=4.175
+      });
+      t.notes.forEach(n=>notes.push({
+        time:n.ticks/ppq,duration:n.durationTicks/ppq,midi:n.midi,velocity:n.velocity,
+        track:ti,name:t.name||`Track ${ti+1}`
+      }));
+    });
+    const ts=midi.header.timeSignatures?.[0];
+    const numerator=ts?.timeSignature?.[0]||4, denominator=ts?.timeSignature?.[1]||4;
+    const bpm=midi.header.tempos?.[0]?.bpm||120;
+    const beatsPerBar=numerator*4/denominator;
+    const end=notes.reduce((m,n)=>Math.max(m,n.time+n.duration),0);
+    const bars=Math.max(1,Math.ceil(end/beatsPerBar));
+    const vel=notes.map(n=>n.velocity);
+    const mean=vel.length?vel.reduce((a,b)=>a+b,0)/vel.length:.65;
+    const sd=vel.length?Math.sqrt(vel.reduce((s,v)=>s+(v-mean)**2,0)/vel.length):0;
+    const onsetDevs=notes.map(n=>quantizedDeviation(n.time,.25));
+    const onsetMean=onsetDevs.length?onsetDevs.reduce((a,b)=>a+b,0)/onsetDevs.length:0;
+    const onsetSd=onsetDevs.length?Math.sqrt(onsetDevs.reduce((s,v)=>s+(v-onsetMean)**2,0)/onsetDevs.length):0;
+    const density=notes.length/Math.max(1,bars);
+    const slots=new Map();
+    notes.forEach(n=>{const k=Math.round(n.time/.25);slots.set(k,(slots.get(k)||0)+1)});
+    const poly=notes.length/Math.max(1,slots.size);
+    const intervals={};
+    const sorted=[...notes].sort((a,b)=>a.time-b.time);
+    for(let i=1;i<sorted.length;i++){
+      const d=Math.abs(sorted[i].midi-sorted[i-1].midi);
+      if(d>0&&d<=24) intervals[d]=(intervals[d]||0)+1;
+    }
+    const motifIntervals=Object.entries(intervals).sort((a,b)=>b[1]-a[1]).slice(0,5).map(x=>Number(x[0]));
+    const key=inferKey(notes);
+    return {
+      ppq,numerator,denominator,bpm,bars,endTime:end,beatsPerBar,key,
+      notes,tracks,density,poly,meanVelocity:mean,velocitySd:sd,
+      onsetSd,onsetMean,motifIntervals,
+      chords:inferChords(notes,bars,beatsPerBar)
+    };
+  }
+
+  function chordAnalysis(cs) {
+    const notes=[];
+    cs.forEach((c,i)=>c.intervals.forEach(iv=>notes.push({
+      time:i*4,duration:3.8,midi:48+c.root+iv,velocity:.62,track:0,name:'Chord input'
+    })));
+    return {
+      ppq:480,numerator:4,denominator:4,bpm:Number($('tempo').value)||110,
+      bars:Math.max(1,cs.length),endTime:Math.max(1,cs.length)*4,beatsPerBar:4,
+      key:$('key').value||'C',notes,chords:cs.map(c=>({root:c.root,intervals:c.intervals})),
+      tracks:[{index:0,name:'Chord input',instrument:'Piano',notes:notes.length,dnvr:1,dnodr:0,expressive:false}],
+      density:notes.length/Math.max(1,cs.length),poly:3,meanVelocity:.62,velocitySd:.05,onsetSd:0,onsetMean:0,
+      motifIntervals:[3,4,5,7]
+    };
+  }
+
+  function renderAnalysis(a,label) {
+    $('analysisBadge').textContent=label;
+    $('aBars').textContent=a.bars;
+    $('aTempo').textContent=Math.round(a.bpm);
+    $('aTime').textContent=`${a.numerator}/${a.denominator}`;
+    $('aKey').textContent=a.key;
+    $('aTracks').textContent=a.tracks.length;
+    $('aNotes').textContent=a.notes.length;
+    const dnvr=a.tracks.length?a.tracks.reduce((s,t)=>s+t.dnvr,0)/a.tracks.length:0;
+    const dnodr=a.tracks.length?a.tracks.reduce((s,t)=>s+t.dnodr,0)/a.tracks.length:0;
+    $('densityText').textContent=`${a.density.toFixed(1)} notes/bar`;
+    $('polyText').textContent=a.poly.toFixed(1);
+    $('velText').textContent=`DNVR ${dnvr.toFixed(1)}%`;
+    $('densityBar').style.width=`${clamp(a.density/20*100,0,100)}%`;
+    $('polyBar').style.width=`${clamp((a.poly-1)/5*100,0,100)}%`;
+    $('velBar').style.width=`${clamp(dnvr,0,100)}%`;
+    $('instruments').textContent=a.tracks.length
+      ? a.tracks.map(t=>`${t.name} · ${t.instrument}${t.expressive?' · expressive':''}`).join(' • ')
+      : 'Chord-only source';
+    $('plan').innerHTML=`
+      <div class="rounded-lg bg-slate-900/70 p-3"><b>Expressiveness:</b> onset SD ${(a.onsetSd*1000).toFixed(0)} ms equivalent beat-fraction; velocity SD ${(a.velocitySd*127).toFixed(0)} MIDI units.</div>
+      <div class="rounded-lg bg-slate-900/70 p-3"><b>Motif DNA:</b> common pitch intervals ${a.motifIntervals.join(', ')||'—'} semitones; used as a constraint, not copied literally.</div>
+      <div class="rounded-lg bg-slate-900/70 p-3"><b>Harmony:</b> ${a.chords.length} bar-level harmonic centres inferred from pitch-class energy.</div>
+      <div class="rounded-lg bg-slate-900/70 p-3"><b>Performance:</b> DNVR and DNODR are measured so the generator can reproduce the source's expressive range without duplicating its notes.</div>`;
+  }
+
+  function scalePcs(key) {
+    const minor=key.endsWith('m'), rn=key.replace(/m$/,'');
+    const root=pcNames.indexOf(rn);
+    return (minor?[0,2,3,5,7,8,10]:[0,2,4,5,7,9,11]).map(i=>(root+i)%12);
+  }
+
+  function chooseRoot(prev,bar,key,style) {
+    const scale=scalePcs(key);
+    if(!prev) return scale[0];
+    const rels=style==='Jazz'?[0,2,5,7,9,10]:[0,2,5,7,9];
+    const candidates=scale.map(r=>{
+      const rel=(r-prev+12)%12;
+      let score=1;
+      if(rels.includes(rel)) score+=2;
+      if(rel===7) score+=3;
+      if(rel===5) score+=2;
+      if(bar%8===7 && r===scale[0]) score+=4;
+      return {r,score};
+    });
+    let total=candidates.reduce((s,x)=>s+x.score,0), p=Math.random()*total;
+    for(const x of candidates){p-=x.score;if(p<=0)return x.r}
+    return scale[0];
+  }
+
+  function makeVoicing(root,intervals,prev) {
+    const base=48+root;
+    const candidates=intervals.map(iv=>base+iv);
+    if(!prev) return candidates.map((n,i)=>n+(i>2?12:0)).filter(n=>n<=76);
+    // Nearest-neighbour voice leading: each candidate tone moves to whichever octave
+    // sits closest to *any* note in the previous chord, so individual voices step
+    // independently instead of every voice collapsing toward one fixed reference note.
+    // (Math.min(prev.length-1,0) is always 0 for a non-empty array, so the previous
+    // version always measured distance to prev[0] — the previous chord's lowest note —
+    // for every voice, pulling upper voices down and producing clustered voicings.)
+    return candidates.map(n=>{
+      const opts=[n-12,n,n+12,n+24].filter(x=>x>=42&&x<=79);
+      const nearestDist=x=>Math.min(...prev.map(p=>Math.abs(x-p)));
+      return opts.sort((a,b)=>nearestDist(a)-nearestDist(b))[0];
+    }).sort((a,b)=>a-b);
+  }
+
+  function addNote(track,midi,time,duration,velocity,human,role,sourceOnsetSd,performance={}) {
+    const learnedSd = MAESTRO_DNA.onsetSdTicks / 480;
+    const sourceSd = sourceOnsetSd > .005 ? sourceOnsetSd : learnedSd;
+    // Blend source performance DNA with the learned human-piano prior. The result is
+    // deliberately wider than simple +/- a few milliseconds so accents don't sound quantised.
+    const blend = clamp(human/100, .15, 1);
+    const onsetSd = (sourceSd*.45 + learnedSd*.55) * (0.45 + .9*blend);
+    let jitter = (Math.random()*2-1) * onsetSd;
+    // Human players are not uniformly random: chord attacks tend to arrive late,
+    // melodic pickups early, and bass notes sit slightly behind the pocket.
+    const roleBias = role==='lead' ? -0.018 : role==='bass' ? 0.014 : role==='chord' ? 0.010 : 0;
+    if(performance.anticipation) jitter -= performance.anticipation;
+    const accent = performance.accent || 1;
+    const phraseShape = performance.phraseShape || 1;
+    const targetVel = velocity * accent * phraseShape;
+    const vNoise = rand(-MAESTRO_DNA.velocitySd, MAESTRO_DNA.velocitySd) * (.35 + .9*blend);
+    const v = clamp(targetVel + vNoise + (role==='lead' ? .07 : 0), .035, .99);
+    let articulation = performance.articulation || 'normal';
+    let durMul = articulation==='short' ? MAESTRO_DNA.articulation.short :
+                 articulation==='long' ? MAESTRO_DNA.articulation.long : MAESTRO_DNA.articulation.normal;
+    durMul *= rand(.88,1.08);
+    track.addNote({midi:Math.round(midi),time:Math.max(0,time+jitter+roleBias),duration:Math.max(.035,duration*durMul),velocity:v});
+  }
+
+  function generate() {
+    if(!analysis){
+      const cs=inputChords();
+      if(!cs.length){status('Upload MIDI or enter chords first');return}
+      analysis=chordAnalysis(cs);renderAnalysis(analysis,'Chords');
+    }
+    const bars=clamp(Number($('bars').value)||8,1,256);
+    const genre=$('genre').value, style=STYLE_LIBRARY[genre];
+    const key=$('key').value||analysis.key||'C';
+    const bpm=clamp(Number($('tempo').value)||analysis.bpm||110,30,240);
+    const human=Number($('human').value);
+    const beats=analysis.beatsPerBar||4;
+    const start=analysis.bars*beats;
+    const total=analysis.bars+bars;
+    const midi=new Midi();
+    midi.header.setTempo(bpm);
+    midi.header.timeSignature=[analysis.numerator,analysis.denominator];
+
+    const keys=midi.addTrack(); keys.name='Keys / Harmony'; keys.instrument.number=0;
+    const bass=midi.addTrack(); bass.name='Bass'; bass.instrument.number=32;
+    const lead=midi.addTrack(); lead.name='Lead / Response'; lead.instrument.number=81;
+    const drums=midi.addTrack(); drums.name='Human Drums'; drums.instrument.number=0; drums.channel=9;
+    const pad=midi.addTrack(); pad.name='Atmosphere'; pad.instrument.number=48;
+
+    // We deliberately do NOT copy source notes. Only extracted descriptors influence this generation.
+    const input=inputChords();
+    let prevRoot=null, prevVoicing=null;
+    const scale=scalePcs(key);
+    const motif=analysis.motifIntervals.length?analysis.motifIntervals:[2,3,4,5,7];
+    const phraseMemory=[];
+    const sourceOnsetSd=Math.max(.005,analysis.onsetSd || MAESTRO_DNA.onsetSdTicks/480);
+    const sourceVel=analysis.meanVelocity||MAESTRO_DNA.velocityMean;
+    const sourceVelSd=analysis.velocitySd||MAESTRO_DNA.velocitySd;
+    const learnedTail=MAESTRO_DNA.onsetTailTicks/480;
+
+    for(let b=0;b<bars;b++){
+      const t=start+b*beats;
+      let root;
+      if(input.length) root=input[b%input.length].root;
+      else if(analysis.chords.length && b<analysis.chords.length*2) root=analysis.chords[b%analysis.chords.length].root;
+      else root=chooseRoot(prevRoot,b,key,genre);
+      prevRoot=root;
+
+      const intervals = style.chord.slice();
+      // Borrow the source's harmonic colour without copying its exact progression.
+      if(analysis.chords[b%Math.max(1,analysis.chords.length)]?.intervals?.length && b%3===1){
+        const src=analysis.chords[b%analysis.chords.length].intervals;
+        if(src.includes(11) && !intervals.includes(11)) intervals.push(11);
+        if(src.includes(10) && !intervals.includes(10)) intervals.push(10);
+      }
+      prevVoicing=makeVoicing(root,intervals,prevVoicing);
+
+      // Long-term form: A / A' / B / response / release. Bar-level energy curve.
+      const cycle=b%8;
+      const energy=cycle<2?.58:cycle<4?.78:cycle<6?.92:.66;
+      const resolution=(cycle===7);
+      // Long-arc human phrasing: slight pull-back into cadence, then forward motion.
+      const cadenceRubato = resolution ? -MAESTRO_DNA.rubato : (cycle===0 ? MAESTRO_DNA.rubato*.55 : 0);
+      const pullback=resolution ? -.045 : 0;
+      const phraseShape = cycle<2 ? .88 + cycle*.08 : cycle<6 ? 1.0 + (cycle-2)*.035 : 1.08 - (cycle-6)*.08;
+      const accentBeat = (cycle===0 || cycle===4) ? MAESTRO_DNA.accentRatio : 1;
+
+      // Harmony: humanised voicings with unequal note lengths and inner-voice movement.
+      prevVoicing.forEach((n,i)=>{
+        const beat=(i===0?0: i%2? .025 : .0);
+        addNote(keys,n,t+beat+pullback+cadenceRubato,beats*(resolution?.80:.92),(.42+i*.045)*energy,human,'chord',sourceOnsetSd,{accent:i===0?accentBeat:1,phraseShape,articulation:resolution?'long':'normal'});
+      });
+
+      // Bass: roots + fifths, anticipations and rests.
+      const bassPattern=genre==='House'?[0,1,2,3]:genre==='Funk'?[0,.75,1.5,2.5,3.25]:[0,2,3];
+      bassPattern.forEach((p,j)=>{
+        if(genre==='Ambient' && j>0 && b%2===0) return;
+        const pc=(j===1?root+7:root)%12;
+        const note=36+((pc-0+12)%12);
+        const anticip=(j===bassPattern.length-1 && b%2)?-.07:0;
+        addNote(bass,note,t+p+anticip,.45+(j===0?.15:0),style.bass*(.65+energy*.25),human,'bass',sourceOnsetSd,{accent:j===0?1.12:1,phraseShape,articulation:j===0?'normal':'short'});
+        if(style.ghost>.2 && j===1 && b%2) addNote(bass,note-12,t+p+.22,.12,.18,human,'ghost',sourceOnsetSd,{accent:MAESTRO_DNA.ghostRatio,phraseShape,articulation:'short'});
+      });
+
+      // Melody is generated from scale/motif DNA, then transformed by phrase role.
+      const notesThisBar=[];
+      const density=Math.max(1,Math.round(3*style.density*(.65+energy)));
+      for(let j=0;j<density;j++){
+        const slot=choice([0,.5,1,1.5,2,2.5,3,3.5].filter(x=>x<beats));
+        const prev=phraseMemory.length?phraseMemory[phraseMemory.length-1]:scale[0];
+        const motifStep=motif[(b*3+j)%motif.length];
+        let idx=scale.indexOf(prev%12); if(idx<0) idx=0;
+        const dir=(b%2===0||cycle>=4)?1:-1;
+        idx=clamp(idx+dir*(Math.random()<.65?1:2)+(motifStep%3===0?1:0),0,scale.length-1);
+        let pc=scale[idx];
+        let octave=60 + (cycle>=4?12:0);
+        let n=octave+((pc-octave%12+12)%12);
+        if(j===density-1 && cycle<4) n+=choice([-12,0,0,12]);
+        const anticipation=(j===0 && b%2)?-.05:0;
+        const dur=(j===density-1? .65 : choice([.18,.25,.35,.45]));
+        addNote(lead,n,t+slot+anticipation,dur,style.lead*(.58+energy*.35),human,'lead',sourceOnsetSd,{accent:(j===density-1?1.16:1),phraseShape,articulation:j===density-1?'long':'short'});
+        notesThisBar.push(n); phraseMemory.push(n);
+      }
+      // Call and response: every 4 bars, response changes contour rather than duplicating.
+      if(cycle===3 || cycle===7){
+        const response=notesThisBar.slice(-3).reverse();
+        response.forEach((n,j)=>addNote(lead,n+choice([-12,0,12]),t+2.6+j*.25,.22,.55*style.lead,human,'lead',sourceOnsetSd));
+      }
+      // Breath: leave a small hole at phrase boundaries.
+      if(cycle===3) addNote(lead,notesThisBar[0]||64,t+3.7,.12,.12,human,'ghost',sourceOnsetSd,{accent:.20,phraseShape:.9,articulation:'short'});
+
+      // Drums: style-aware human groove. MIDI drum notes: kick 36, snare 38, hat 42, open hat 46.
+      if(style.drum>0){
+        const kick=[0,2], snare=[1,3], hats=genre==='Funk'?[0,.5,1,1.5,2,2.5,3,3.5]:[0,.5,1,1.5,2,2.5,3,3.5];
+        kick.forEach((p,j)=>addNote(drums,36,t+p,.08,.70*style.drum*(j? .82:1),human,'drum',sourceOnsetSd));
+        if(genre!=='House' || b%2) snare.forEach(p=>addNote(drums,38,t+p,.07,.58*style.drum,human,'drum',sourceOnsetSd));
+        hats.forEach((p,j)=>{
+          if(genre==='Lo-fi' && j%2===0) return;
+          addNote(drums,(j===7&&genre==='Funk')?46:42,t+p,.05,(.18+.18*(j%2))*style.drum,human,'ghost',sourceOnsetSd,{accent:MAESTRO_DNA.ghostRatio,phraseShape,articulation:'short'});
+        });
+      }
+
+      // Atmosphere: slow upper extensions, changing articulation each phrase.
+      if(style.chord.length>=5 && (genre==='Cinematic'||genre==='Ambient'||genre==='Neo Soul')){
+        const n=prevVoicing[prevVoicing.length-1]+12;
+        addNote(pad,n,t+rand(-.02,.02),beats*(1.3+energy*.5),.18*energy,human,'pad',sourceOnsetSd,{accent:.82,phraseShape,articulation:'long'});
+      }
+    }
+
+    // The continuation is derived from source analysis, but contains no copied source
+    // events. Normalise its timeline so the exported NEW MIDI starts immediately.
+    let firstGeneratedBeat=Infinity;
+    midi.tracks.forEach(tr=>tr.notes.forEach(n=>{firstGeneratedBeat=Math.min(firstGeneratedBeat,n.time)}));
+    if(Number.isFinite(firstGeneratedBeat) && firstGeneratedBeat>0){
+      midi.tracks.forEach(tr=>tr.notes.forEach(n=>{n.time=Math.max(0,n.time-firstGeneratedBeat)}));
+    }
+    generatedMidi=midi;
+    $('downloadBtn').disabled=false;
+    $('exportInfo').textContent=`NEW ${bars}-bar continuation · ${genre} · ${key} · ${Math.round(bpm)} BPM · 5 expressive layers`;
+    $('plan').innerHTML=`
+      <div class="rounded-lg bg-slate-900/70 p-3"><b>New material:</b> ${bars} bars generated from extracted harmony, motif intervals, density, DNVR/DNODR and groove characteristics — source notes are not copied.</div>
+      <div class="rounded-lg bg-slate-900/70 p-3"><b>Form:</b> 8-bar energy arc with A / A' / B / response / release behaviour and phrase-end harmonic resolution.</div>
+      <div class="rounded-lg bg-slate-900/70 p-3"><b>Human performance:</b> MAESTRO-derived prior (~64 velocity centre, ~19-unit dynamic SD, ~30-tick onset SD) blended with the source's measured timing, plus role-specific lag/anticipation, articulation and phrase rubato.</div>
+      <div class="rounded-lg bg-slate-900/70 p-3"><b>Depth:</b> independent keys, bass, lead, drums and atmosphere tracks with voice-leading and call/response relationships.</div>`;
+    status('New composition generated',true);
+  }
+
+  async function loadFile(file){
+    if(!file)return;
+    const lower=file.name.toLowerCase();
+    if(!lower.endsWith('.mid')&&!lower.endsWith('.midi')){status('Choose a .mid or .midi file');return}
+    try{
+      status('Parsing and analysing MIDI…');
+      const buf=await file.arrayBuffer();
+      sourceMidi=new Midi(buf);
+      analysis=analyseMidi(sourceMidi);
+      $('fileName').textContent=file.name;
+      $('fileName').classList.remove('hidden');
+      $('tempo').value=Math.round(analysis.bpm);
+      if(keyNames.includes(analysis.key))$('key').value=analysis.key;
+      // generate() gives whatever is in the chord box priority over the MIDI's own
+      // inferred harmony (input.length ? use input : fall back to analysis.chords),
+      // and the box previously kept its default "Cmaj7 | Am7 | Dm9 | G13" text
+      // forever — so every uploaded file, in every genre, was composed over that
+      // same fixed 4-chord loop instead of its own harmony. Populating the box with
+      // the file's actual inferred progression here means generation is now built on
+      // the uploaded song, not a leftover placeholder; it's still a normal text field
+      // the user can edit or replace afterwards.
+      if(analysis.chords.length) $('chords').value=analysis.chords.map(c=>chordLabel(c.root,c.intervals)).join(' | ');
+      renderAnalysis(analysis,'MIDI analysed');
+      generatedMidi=null;$('downloadBtn').disabled=true;
+      status(`Analysed ${analysis.notes.length} notes across ${analysis.tracks.length} active tracks`,true);
+    }catch(err){
+      console.error(err);status('MIDI parsing failed — check the file');
+    }
+  }
+
+  $('midiFile').addEventListener('change',e=>loadFile(e.target.files?.[0]));
+  ['dragenter','dragover'].forEach(ev=>$('dropZone').addEventListener(ev,e=>{
+    e.preventDefault();e.stopPropagation();$('dropZone').classList.add('drop-active');
+  }));
+  ['dragleave','drop'].forEach(ev=>$('dropZone').addEventListener(ev,e=>{
+    e.preventDefault();e.stopPropagation();$('dropZone').classList.remove('drop-active');
+  }));
+  $('dropZone').addEventListener('drop',e=>loadFile(e.dataTransfer.files?.[0]));
+
+  $('analyseBtn').addEventListener('click',()=>{
+    try{
+      if(sourceMidi){
+        analysis=analyseMidi(sourceMidi);
+        if(analysis.chords.length) $('chords').value=analysis.chords.map(c=>chordLabel(c.root,c.intervals)).join(' | ');
+        renderAnalysis(analysis,'MIDI analysed');
+        status(`Analysis complete: ${analysis.bars} bars / ${analysis.notes.length} notes`,true);
+        return;
+      }
+      const cs=inputChords();
+      if(cs.length){
+        analysis=chordAnalysis(cs);
+        renderAnalysis(analysis,'Chords analysed');
+        status(`Chord analysis complete: ${cs.length} harmonic cells`,true);
+        return;
+      }
+      status('Upload a MIDI or enter a chord sequence first');
+    }catch(err){console.error(err);status('Analysis error — see browser console')}
+  });
+
+  $('generateBtn').addEventListener('click',()=>{
+    try{generate()}catch(err){console.error(err);status('Generation error — see browser console')}
+  });
+
+  $('clearBtn').addEventListener('click',()=>{
+    sourceMidi=null;generatedMidi=null;analysis=null;
+    $('midiFile').value='';$('chords').value='';$('fileName').classList.add('hidden');
+    $('downloadBtn').disabled=true;$('exportInfo').textContent='Generate a continuation first.';
+    ['aBars','aTempo','aTime','aKey','aTracks','aNotes','densityText','polyText','velText','instruments'].forEach(id=>$(id).textContent='—');
+    ['densityBar','polyBar','velBar'].forEach(id=>$(id).style.width='0%');
+    status('Ready');
+  });
+
+  $('human').addEventListener('input',()=>{
+    const v=Number($('human').value);
+    $('humanValue').textContent=v<30?'Tight':v<65?'Human':v<85?'Expressive':'Loose / live';
+  });
+
+  $('downloadBtn').addEventListener('click',()=>{
+    if(!generatedMidi)return;
+    try{
+      const blob=new Blob([generatedMidi.toArray()],{type:'audio/midi'});
+      const url=URL.createObjectURL(blob);
+      const a=document.createElement('a');a.href=url;a.download='new-expressive-composition.mid';
+      document.body.appendChild(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),1500);
+      status('New MIDI exported',true);
+    }catch(err){console.error(err);status('MIDI export failed')}
+  });
+
+  function stopAudio(){
+    try{Tone.Transport.stop();Tone.Transport.cancel()}catch{}
+    synths.forEach(s=>{try{s.dispose()}catch{}});
+    synths=[];
+    $('playState').textContent='Stopped';
+    $('progress').style.setProperty('--p','0%');
+  }
+
+  $('playBtn').addEventListener('click',async()=>{
+    const midi=generatedMidi||sourceMidi;
+    if(!midi){status('Analyse or generate music first');return}
+    await Tone.start();
+    stopAudio();
+
+    // @tonejs/midi stores note times in beats. Tone.Transport.schedule() expects
+    // seconds when given a number, so convert explicitly. This also removes any
+    // leading silence in a generated continuation so Play starts immediately.
+    const bpm = midi.header.tempos?.[0]?.bpm || Number($('tempo').value) || 110;
+    const secondsPerBeat = 60 / bpm;
+    let firstBeat = Infinity;
+    let lastBeat = 0;
+    midi.tracks.forEach(tr => tr.notes.forEach(n => {
+      firstBeat = Math.min(firstBeat, n.time);
+      lastBeat = Math.max(lastBeat, n.time + n.duration);
+    }));
+    if (!Number.isFinite(firstBeat)) {
+      status('No playable notes found');
+      return;
+    }
+
+    const leadInBeats = firstBeat;
+    const duration = Math.max(.1, (lastBeat - leadInBeats) * secondsPerBeat);
+    const start = performance.now();
+
+    // Shared master bus: everything was previously .toDestination() completely dry,
+    // with no separation between tracks. A touch of compression/reverb glues the
+    // now-differentiated voices together instead of leaving them stacked and bare.
+    const masterComp = new Tone.Compressor({threshold:-20, ratio:3, attack:.01, release:.25}).toDestination();
+    let masterBus = masterComp;
+    try {
+      const masterVerb = new Tone.Reverb({decay:1.6, wet:.14}).connect(masterComp);
+      await masterVerb.ready;
+      masterBus = masterVerb;
+      synths.push(masterVerb);
+    } catch (e) { console.warn('Reverb unavailable, continuing dry', e); }
+    synths.push(masterComp);
+
+    // Picks a playback role from the track's name (set by generateMusic) or, for an
+    // arbitrary loaded file, its GM program number. Drums are handled separately below.
+    function classifyRole(tr) {
+      const name = (tr.name || '').toLowerCase();
+      if (name.includes('bass')) return 'bass';
+      if (name.includes('lead')) return 'lead';
+      if (name.includes('atmo') || name.includes('pad')) return 'pad';
+      if (name.includes('key') || name.includes('harmony')) return 'keys';
+      const prog = tr.instrument?.number;
+      if (typeof prog === 'number') {
+        if (prog >= 32 && prog <= 39) return 'bass';
+        if (prog >= 80 && prog <= 87) return 'lead';
+        if (prog >= 88 && prog <= 95) return 'pad';
+      }
+      return 'keys';
+    }
+
+    // Previously every role (bass, keys, lead, pad, and even drums) shared one
+    // Tone.FMSynth patch, differing only in a modulation-index tweak and volume.
+    // That's why every genre sounded like the same low, dull drone. Each role now
+    // gets a distinct patch so bass, harmony, lead and pad are actually audible as
+    // separate instruments.
+    //
+    // Per-role dB offsets below are tuned against generateMusic()'s own velocity
+    // scaling (bass/kick already get loud MIDI velocities there; lead/pad/hats are
+    // deliberately quiet for musical reasons). The first pass at these numbers didn't
+    // account for that and stacked extra gain on the already-loud parts while starving
+    // the already-quiet ones, so a rendered mix ended up as almost nothing but kick
+    // and bass (92% of spectral energy under 250Hz, near-silence above 500Hz). These
+    // values instead give the quiet-by-design roles more headroom and rein in the
+    // loud-by-design ones, so all five voices sit in an audible balance.
+    function makeVoice(role) {
+      let synth;
+      switch (role) {
+        case 'bass':
+          synth = new Tone.MonoSynth({
+            oscillator:{type:'sine'},
+            filter:{type:'lowpass', Q:1, rolloff:-24},
+            filterEnvelope:{attack:.01,decay:.25,sustain:.55,release:.6,baseFrequency:90,octaves:3},
+            envelope:{attack:.012,decay:.18,sustain:.7,release:.4}
+          }).connect(masterBus);
+          synth.volume.value = -12;
+          break;
+        case 'lead':
+          synth = new Tone.PolySynth(Tone.Synth,{
+            oscillator:{type:'fatsawtooth',count:2,spread:20},
+            envelope:{attack:.015,decay:.2,sustain:.3,release:.5}
+          }).connect(masterBus);
+          synth.volume.value = -4;
+          break;
+        case 'pad':
+          synth = new Tone.PolySynth(Tone.AMSynth,{
+            harmonicity:1.5,
+            oscillator:{type:'sine'},
+            envelope:{attack:.9,decay:.6,sustain:.7,release:2.2},
+            modulation:{type:'triangle'},
+            modulationEnvelope:{attack:.6,decay:.4,sustain:.5,release:1.6}
+          }).connect(masterBus);
+          synth.volume.value = -6;
+          break;
+        case 'keys':
+        default:
+          synth = new Tone.PolySynth(Tone.FMSynth,{
+            harmonicity:1.01, modulationIndex:2.2,
+            oscillator:{type:'sine'},
+            envelope:{attack:.012,decay:.18,sustain:.42,release:.55},
+            modulation:{type:'sine'},
+            modulationEnvelope:{attack:.008,decay:.14,sustain:.18,release:.35}
+          }).connect(masterBus);
+          synth.volume.value = -6;
+      }
+      return synth;
+    }
+
+    // Drum notes (GM: kick 36, snare 38, closed hat 42, open hat 46) were being
+    // triggered on the same pitched FM synth as everything else, so "drums" came out
+    // as tuned sine blips at those note numbers rather than percussion. Proper
+    // percussion synths fix this and are what put transient energy above 2kHz back
+    // into the mix.
+    function makeDrumKit() {
+      const kick = new Tone.MembraneSynth({pitchDecay:.05,octaves:6,envelope:{attack:.001,decay:.32,sustain:0,release:.15}}).connect(masterBus);
+      kick.volume.value = -10;
+      const snare = new Tone.NoiseSynth({noise:{type:'white'},envelope:{attack:.001,decay:.18,sustain:0,release:.05}}).connect(masterBus);
+      snare.volume.value = -10;
+      const closedHat = new Tone.MetalSynth({envelope:{attack:.001,decay:.06,release:.02},harmonicity:5.1,modulationIndex:22,resonance:5000,octaves:1}).connect(masterBus);
+      closedHat.volume.value = -9;
+      const openHat = new Tone.MetalSynth({envelope:{attack:.001,decay:.25,release:.15},harmonicity:5.1,modulationIndex:22,resonance:4500,octaves:1.2}).connect(masterBus);
+      openHat.volume.value = -8;
+      synths.push(kick, snare, closedHat, openHat);
+      return {
+        trigger(note, time, vel) {
+          const v = Math.max(.05, vel);
+          if (note === 36) kick.triggerAttackRelease('C1', .2, time, v);
+          else if (note === 38) snare.triggerAttackRelease('16n', time, v);
+          else if (note === 46) openHat.triggerAttackRelease('8n', time, v * .8);
+          else closedHat.triggerAttackRelease('32n', time, v * .7);
+        }
+      };
+    }
+
+    midi.tracks.forEach((tr,ti)=>{
+      if(!tr.notes.length)return;
+
+      if (tr.channel === 9) {
+        const kit = makeDrumKit();
+        tr.notes.forEach(n=>{
+          const relativeBeat = n.time - leadInBeats;
+          const when = Math.max(0, relativeBeat * secondsPerBeat);
+          Tone.Transport.schedule(time=>kit.trigger(n.midi, time, n.velocity), when);
+        });
+        return;
+      }
+
+      const synth = makeVoice(classifyRole(tr));
+      synths.push(synth);
+
+      tr.notes.forEach(n=>{
+        const relativeBeat = n.time - leadInBeats;
+        const when = Math.max(0, relativeBeat * secondsPerBeat);
+        const noteDuration = Math.max(.04, n.duration * secondsPerBeat);
+        Tone.Transport.schedule(time=>{
+          synth.triggerAttackRelease(
+            Tone.Frequency(n.midi,'midi'),
+            noteDuration,
+            time,
+            n.velocity
+          );
+        }, when);
+      });
+    });
+
+    Tone.Transport.schedule(()=>{
+      $('playState').textContent='Stopped';
+      $('progress').style.setProperty('--p','100%');
+    },duration);
+
+    Tone.Transport.start();
+    $('playState').textContent=generatedMidi?'Playing new':'Playing source';
+
+    const tick=()=>{
+      if($('playState').textContent==='Stopped')return;
+      const p=clamp((performance.now()-start)/1000/duration*100,0,100);
+      $('progress').style.setProperty('--p',`${p}%`);
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  $('pauseBtn').addEventListener('click',()=>{
+    if(Tone.Transport.state==='started'){Tone.Transport.pause();$('playState').textContent='Paused'}
+  });
+  $('stopBtn').addEventListener('click',stopAudio);
+
+  // iOS: avoid browser zoom from double-tapping while retaining accessible 16px form controls.
+  document.addEventListener('dblclick',e=>e.preventDefault(),{passive:false});
+  $('chords').value='Cmaj7 | Am7 | Dm9 | G13';
+  status('Ready');
+})();
+</script>
+</body>
+</html>

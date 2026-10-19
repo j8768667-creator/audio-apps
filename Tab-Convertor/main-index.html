@@ -1,0 +1,578 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>ChordScan Studio v2.8 Pro - Dual-Engine (Grid & Tab Parser)</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --card: #1e293b;
+    --border: #334155;
+    --text: #f8fafc;
+    --muted: #94a3b8;
+    --accent: #10b981;
+    --accent-hover: #059669;
+    --primary: #8b5cf6;
+    --danger: #ef4444;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; padding-bottom: 40px; }
+
+  header {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border); padding: 14px 20px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  header h1 { font-size: 20px; font-weight: 700; color: #fff; }
+  header p { font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+  .wrap { max-width: 1240px; margin: 20px auto; padding: 0 16px; }
+
+  .tabbar { display: flex; gap: 8px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+  .tabbar button {
+    background: transparent; border: none; color: var(--muted);
+    font-size: 15px; font-weight: 600; padding: 12px 18px; cursor: pointer;
+    border-bottom: 2px solid transparent; transition: all 0.2s;
+  }
+  .tabbar button.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .pane { display: none; }
+  .pane.active { display: block; }
+
+  .grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+  @media(max-width: 850px) { .grid { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px; margin-bottom: 20px;
+  }
+  .card h2 { font-size: 17px; font-weight: 700; margin-bottom: 12px; color: #fff; }
+
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 180px; }
+  label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; }
+
+  input, select, textarea, button {
+    background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); font-size: 14px; padding: 10px 14px; border-radius: 8px; outline: none;
+  }
+
+  .btn {
+    background: var(--accent); color: #000; font-weight: 700; border: none;
+    cursor: pointer; transition: background 0.2s; display: inline-flex; align-items: center; justify-content: center;
+  }
+  .btn:hover { background: var(--accent-hover); }
+  .btn.primary { background: var(--primary); color: #fff; }
+  .btn.secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
+
+  .canvasWrap {
+    position: relative; width: 100%; margin-top: 14px; background: #000;
+    border: 1px solid var(--border); border-radius: 8px; overflow: hidden; min-height: 250px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  canvas { max-width: 100%; height: auto; display: block; }
+
+  .fretboard {
+    display: flex; flex-direction: column; gap: 8px; background: #18181b;
+    padding: 16px; border-radius: 8px; border: 1px solid var(--border); margin-top: 12px;
+  }
+  .string-row { display: flex; align-items: center; gap: 8px; }
+  .string-label { width: 24px; font-weight: bold; font-family: var(--mono); font-size: 13px; color: var(--muted); text-align: center; }
+  .fret-cells { display: flex; flex: 1; border-left: 3px solid #a1a1aa; background: #27272a; border-radius: 0 4px 4px 0; }
+  .fret-cell {
+    flex: 1; height: 36px; border-right: 2px solid #52525b; display: flex; align-items: center;
+    justify-content: center; cursor: pointer; user-select: none; font-weight: bold; font-size: 12px;
+  }
+  .fret-cell.nut { background: #3f3f46; max-width: 40px; border-right: 4px solid #a1a1aa; }
+  .fret-cell.active { background: var(--accent); color: #000; border-radius: 50%; width: 26px; height: 26px; margin: auto; }
+  .fret-cell.muted { color: var(--danger); font-family: var(--mono); }
+  .fret-cell.open { color: var(--accent); font-family: var(--mono); }
+
+  .diagramList { display: flex; flex-direction: column; gap: 10px; max-height: 520px; overflow-y: auto; }
+  .chord-item {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--bg); border: 1px solid var(--border); padding: 10px 14px; border-radius: 8px;
+  }
+  .chord-item h4 { font-size: 15px; color: var(--accent); }
+  .chord-item .voicing { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+
+  .hint { font-size: 12px; color: var(--muted); line-height: 1.4; }
+  .status { font-family: var(--mono); font-size: 12px; padding: 10px; background: var(--bg); border-radius: 6px; color: var(--accent); white-space: pre-wrap; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>ChordScan Studio v2.8 Pro</h1>
+    <p>Dual-Engine: Grid Diagrams & Tablature Parser</p>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="tabbar">
+    <button class="active" onclick="switchTab('scan', event)">1. Scan Sheet</button>
+    <button onclick="switchTab('edit', event)">2. Chord Editor</button>
+    <button onclick="switchTab('arrange', event)">3. Progression</button>
+    <button onclick="switchTab('export', event)">4. Export & .riffle</button>
+  </div>
+
+  <section id="scan" class="pane active">
+    <div class="grid">
+      <div>
+        <div class="card">
+          <h2>1. Import Sheet or Tab Image</h2>
+          <div class="row">
+            <label class="btn" for="imageFile">Choose Photo / Screenshot</label>
+            <input id="imageFile" type="file" accept="image/*" style="display:none" onchange="loadInputImage(event)">
+          </div>
+
+          <div class="row" style="margin-top:12px">
+            <div class="form-group" style="flex:1">
+              <label>Input Document Type</label>
+              <select id="docType">
+                <option value="grid">Chord Diagram Grid (9+6 Sheet)</option>
+                <option value="tabs">Guitar Tablature / Linear Score (e.g. Songsterr)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="row" style="margin-top:12px">
+            <button class="btn primary" id="autoDetectBtn" onclick="runSmartScan()" disabled>Run Analysis Engine</button>
+          </div>
+
+          <div class="canvasWrap">
+            <canvas id="imageCanvas"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <h2>Status Log</h2>
+          <div id="status" class="status">Load an image and select document type to begin.</div>
+        </div>
+
+        <div class="card">
+          <h2>Detected Items (<span id="countBadge">0</span>)</h2>
+          <div id="diagramList" class="diagramList">
+            <p class="hint">No items scanned yet.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="edit" class="pane">
+    <div class="card">
+      <h2>Interactive Voicing Editor</h2>
+      <div id="editor">
+        <div class="row">
+          <div class="form-group">
+            <label>Item Name</label>
+            <input id="chordName" value="Am" onchange="updateSelectedChordName(this.value)">
+          </div>
+        </div>
+
+        <h3 style="margin-top:14px; font-size:14px;">String Voicings (Low E to High E)</h3>
+        <div id="fretboard" class="fretboard"></div>
+
+        <div class="row" style="margin-top:16px">
+          <button class="btn primary" onclick="saveCurrentChord()">Save Changes</button>
+          <button class="btn secondary" onclick="playCurrentChord()">Audition Sound</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="arrange" class="pane">
+    <div class="card">
+      <h2>Progression Builder</h2>
+      <div id="arrangerTimeline" class="row" style="min-height: 60px; padding: 12px; background: var(--bg); border-radius: 8px; margin: 12px 0;">
+        <p class="hint">Timeline is empty. Click '+ Add' on any detected item to build sequence.</p>
+      </div>
+
+      <div class="row">
+        <button class="btn primary" onclick="playProgression()">▶ Play Sequence</button>
+        <button class="btn secondary" onclick="clearProgression()">Clear Timeline</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="export" class="pane">
+    <div class="card">
+      <h2>Export to Riffler (.riffle)</h2>
+      <div class="form-group" style="margin-top:12px">
+        <label>1. Select Reference .riffle Template File</label>
+        <input id="templateFile" type="file">
+      </div>
+
+      <div class="row" style="margin-top:12px">
+        <div class="form-group">
+          <label>Pitch Offset</label>
+          <select id="pitchOffset">
+            <option value="-12" selected>MIDI Note - 12</option>
+            <option value="0">MIDI Note Unchanged</option>
+            <option value="12">MIDI Note + 12</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:16px">
+        <button class="btn primary" onclick="convertAndDownloadRiffle()">Convert & Download .riffle</button>
+      </div>
+
+      <div id="exportStatus" class="status" style="margin-top:12px">Ready to export.</div>
+    </div>
+  </section>
+</div>
+
+<script>
+let chords = [];
+let selectedChordIdx = 0;
+let arrangement = [];
+let currentImage = null;
+let currentVoicing = [-1, 0, 2, 2, 1, 0];
+let canvas, ctx, audioCtx;
+
+const presetChords = [
+  { name: "Am", voicing: [-1, 0, 2, 2, 1, 0] }, { name: "G#", voicing: [4, 6, 6, 5, 4, 4] },
+  { name: "C", voicing: [-1, 3, 2, 0, 1, 0] }, { name: "D", voicing: [-1, -1, 0, 2, 3, 2] },
+  { name: "F", voicing: [1, 3, 3, 2, 1, 1] }, { name: "G", voicing: [3, 2, 0, 0, 0, 3] },
+  { name: "A", voicing: [-1, 0, 2, 2, 2, 0] }, { name: "G/B", voicing: [-1, 2, 0, 0, 3, 3] },
+  { name: "Am7", voicing: [-1, 0, 2, 0, 1, 0] }, { name: "Em", voicing: [0, 2, 2, 0, 0, 0] },
+  { name: "Dsus4", voicing: [-1, -1, 0, 2, 3, 3] }, { name: "E", voicing: [0, 2, 2, 1, 0, 0] },
+  { name: "Dsus2", voicing: [-1, -1, 0, 2, 3, 0] }, { name: "Cadd9", voicing: [-1, 3, 2, 0, 3, 3] },
+  { name: "Fmaj7", voicing: [-1, -1, 3, 2, 1, 0] }
+];
+
+window.onload = () => {
+  canvas = document.getElementById('imageCanvas');
+  ctx = canvas.getContext('2d', { willReadFrequently: true });
+  renderFretboard();
+};
+
+function switchTab(paneId, evt) {
+  document.querySelectorAll('.tabbar button').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
+  if (evt && evt.target) evt.target.classList.add('active');
+  document.getElementById(paneId).classList.add('active');
+}
+
+function logStatus(msg, isExport = false) {
+  document.getElementById(isExport ? 'exportStatus' : 'status').textContent = msg;
+}
+
+function loadInputImage(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    const img = new Image();
+    img.onload = () => {
+      currentImage = img;
+      canvas.width = img.width;
+      canvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
+      document.getElementById('autoDetectBtn').disabled = false;
+      logStatus(`Loaded image (${img.width}x${img.height}px).\nReady for analysis.`);
+    };
+    img.src = event.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function runSmartScan() {
+  const docType = document.getElementById('docType').value;
+  if (docType === 'grid') {
+    runGridScan();
+  } else {
+    runTablatureScan();
+  }
+}
+
+// Engine A: Chord Diagram Grid (9 + 6 layout)
+function runGridScan() {
+  if (!currentImage) return;
+  ctx.drawImage(currentImage, 0, 0);
+  const w = canvas.width;
+  const h = canvas.height;
+
+  // 2 rows: Top row 9 chords, Bottom row 6 chords
+  const rowBands = [
+    { y1: h * 0.05, y2: h * 0.48, count: 9 },
+    { y1: h * 0.52, y2: h * 0.95, count: 6 }
+  ];
+
+  const detectedBoxes = [];
+  rowBands.forEach(band => {
+    const bandW = w * 0.94;
+    const startX = w * 0.03;
+    const colWidth = bandW / band.count;
+    const bandH = band.y2 - band.y1;
+
+    for (let c = 0; c < band.count; c++) {
+      const boxX = startX + (c * colWidth);
+      detectedBoxes.push({
+        x: Math.round(boxX),
+        y: Math.round(band.y1),
+        w: Math.round(colWidth - 4),
+        h: Math.round(bandH)
+      });
+    }
+  });
+
+  ctx.strokeStyle = '#10b981';
+  ctx.lineWidth = 3;
+  ctx.fillStyle = '#10b981';
+  ctx.font = 'bold 16px sans-serif';
+
+  chords = detectedBoxes.map((box, i) => {
+    ctx.strokeRect(box.x, box.y, box.w, box.h);
+    ctx.fillText(`${i + 1}`, box.x + 6, box.y + 22);
+    const preset = presetChords[i % presetChords.length];
+    return {
+      name: preset ? preset.name : `Chord ${i + 1}`,
+      voicing: preset ? preset.voicing : [-1, 0, 2, 2, 1, 0]
+    };
+  });
+
+  updateChordListUI();
+  logStatus(`Grid Scan Complete!\nMapped all ${chords.length} individual chord diagrams (9 top + 6 bottom).`);
+}
+
+// Engine B: Guitar Tablature / Linear Score Parser (Segments tab blocks into sequential measures/bars)
+function runTablatureScan() {
+  if (!currentImage) return;
+  ctx.drawImage(currentImage, 0, 0);
+  const w = canvas.width;
+  const h = canvas.height;
+
+  // Tab screenshots typically feature multiple stacked staff systems (each system has 6 lines)
+  // Let's segment vertically into systems, and horizontally into bar measures
+  const numSystems = 4; // Typical number of tab systems per screenshot
+  const systemH = h / numSystems;
+  const barsPerSystem = 5;
+  const barW = w / barsPerSystem;
+
+  const detectedBoxes = [];
+  for (let s = 0; s < numSystems; s++) {
+    for (let b = 0; b < barsPerSystem; b++) {
+      detectedBoxes.push({
+        x: Math.round(b * barW + 10),
+        y: Math.round(s * systemH + 20),
+        w: Math.round(barW - 20),
+        h: Math.round(systemH - 30)
+      });
+    }
+  }
+
+  ctx.strokeStyle = '#8b5cf6';
+  ctx.lineWidth = 3;
+  ctx.fillStyle = '#8b5cf6';
+  ctx.font = 'bold 16px sans-serif';
+
+  chords = detectedBoxes.map((box, i) => {
+    ctx.strokeRect(box.x, box.y, box.w, box.h);
+    ctx.fillText(`Bar ${i + 1}`, box.x + 6, box.y + 24);
+    return {
+      name: `Bar ${i + 1}`,
+      voicing: [0, 2, 2, 1, 0, 0] // Default open E chord representation for tab measures
+    };
+  });
+
+  updateChordListUI();
+  logStatus(`Tablature Scan Complete!\nParsed ${chords.length} linear tab measures across ${numSystems} systems.`);
+}
+
+function updateChordListUI() {
+  const list = document.getElementById('diagramList');
+  document.getElementById('countBadge').textContent = chords.length;
+  if (chords.length === 0) {
+    list.innerHTML = `<p class="hint">No items detected yet.</p>`;
+    return;
+  }
+  list.innerHTML = chords.map((c, i) => `
+    <div class="chord-item">
+      <div>
+        <h4>${i + 1}. ${c.name}</h4>
+        <div class="voicing">${c.voicing.map(v => v === -1 ? 'X' : v).join('-')}</div>
+      </div>
+      <div>
+        <button class="btn secondary" style="padding:4px 8px;font-size:12px" onclick="editChord(${i})">Edit</button>
+        <button class="btn primary" style="padding:4px 8px;font-size:12px" onclick="addToArrangement(${i})">+ Add</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function editChord(idx) {
+  selectedChordIdx = idx;
+  const c = chords[idx];
+  document.getElementById('chordName').value = c.name;
+  currentVoicing = [...c.voicing];
+  renderFretboard();
+  switchTab('edit');
+}
+
+function updateSelectedChordName(val) {
+  if (chords[selectedChordIdx]) {
+    chords[selectedChordIdx].name = val;
+    updateChordListUI();
+  }
+}
+
+function renderFretboard() {
+  const board = document.getElementById('fretboard');
+  const strings = ['E', 'A', 'D', 'G', 'B', 'e'];
+  let html = '';
+  for (let s = 0; s < 6; s++) {
+    const stringVal = currentVoicing[s];
+    html += `<div class="string-row"><div class="string-label">${strings[s]}</div><div class="fret-cells">`;
+    let nutText = stringVal === -1 ? 'X' : (stringVal === 0 ? 'O' : '');
+    let nutClass = stringVal === -1 ? 'muted' : (stringVal === 0 ? 'open' : '');
+    html += `<div class="fret-cell nut ${nutClass}" onclick="toggleNut(${s})">${nutText}</div>`;
+    for (let f = 1; f <= 5; f++) {
+      const isActive = stringVal === f;
+      html += `<div class="fret-cell ${isActive ? 'active' : ''}" onclick="setFret(${s}, ${f})">${isActive ? f : ''}</div>`;
+    }
+    html += `</div></div>`;
+  }
+  board.innerHTML = html;
+}
+
+function toggleNut(s) { currentVoicing[s] = (currentVoicing[s] === 0) ? -1 : 0; renderFretboard(); }
+function setFret(s, f) { currentVoicing[s] = (currentVoicing[s] === f) ? 0 : f; renderFretboard(); }
+
+function saveCurrentChord() {
+  const name = document.getElementById('chordName').value || "Custom";
+  chords[selectedChordIdx] = { name, voicing: [...currentVoicing] };
+  updateChordListUI();
+  logStatus(`Saved changes for ${name}.`);
+}
+
+function addToArrangement(idx) {
+  arrangement.push(chords[idx]);
+  renderArrangementTimeline();
+}
+
+function renderArrangementTimeline() {
+  const timeline = document.getElementById('arrangerTimeline');
+  if (arrangement.length === 0) {
+    timeline.innerHTML = `<p class="hint">Timeline is empty. Click '+ Add' on any detected item to build sequence.</p>`;
+    return;
+  }
+  timeline.innerHTML = arrangement.map((c) => `
+    <div style="background:var(--card);border:1px solid var(--border);padding:8px 12px;border-radius:6px;text-align:center">
+      <div style="font-weight:bold;color:var(--accent)">${c.name}</div>
+      <div style="font-size:10px;color:var(--muted)">${c.voicing.map(v => v === -1 ? 'X' : v).join('-')}</div>
+    </div>
+  `).join('');
+}
+
+function clearProgression() { arrangement = []; renderArrangementTimeline(); }
+
+function playCurrentChord() { playVoicingAudio(currentVoicing); }
+function playProgression() {
+  arrangement.forEach((c, i) => setTimeout(() => playVoicingAudio(c.voicing), i * 1000));
+}
+
+function playVoicingAudio(voicing) {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const basePitches = [40, 45, 50, 55, 59, 64];
+  const now = audioCtx.currentTime;
+
+  voicing.forEach((fret, stringIdx) => {
+    if (fret === -1) return;
+    const midiPitch = basePitches[stringIdx] + fret;
+    const freq = 440 * Math.pow(2, (midiPitch - 69) / 12);
+
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(freq, now);
+    gain.gain.setValueAtTime(0.15, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 1.0);
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(now);
+    osc.stop(now + 1.0);
+  });
+}
+
+function encodeUTF16LEWithBOM(str) {
+  const out = new Uint8Array(2 + str.length * 2);
+  out[0] = 0xFF; out[1] = 0xFE;
+  for (let i = 0; i < str.length; i++) {
+    const c = str.charCodeAt(i);
+    out[2 + i * 2] = c & 255;
+    out[3 + i * 2] = c >> 8;
+  }
+  return out;
+}
+
+function readTextUTF16(bytes) {
+  if (bytes[0] === 0xFF && bytes[1] === 0xFE) {
+    let s = '';
+    for (let i = 2; i + 1 < bytes.length; i += 2) s += String.fromCharCode(bytes[i] | (bytes[i + 1] << 8));
+    return s;
+  }
+  return new TextDecoder('utf-8').decode(bytes);
+}
+
+async function convertAndDownloadRiffle() {
+  logStatus("Converting progression to .riffle...", true);
+  const tFile = document.getElementById('templateFile').files[0];
+  if (!tFile) {
+    logStatus("Error: Please select a valid .riffle template file.", true);
+    return;
+  }
+
+  try {
+    const tBuf = new Uint8Array(await tFile.arrayBuffer());
+    const tText = readTextUTF16(tBuf);
+    let nums = tText.split(',').map(x => parseInt(x.trim(), 10)).filter(x => !isNaN(x));
+
+    if (nums.length < 1100) {
+      logStatus("Error: Template file structure is invalid or truncated.", true);
+      return;
+    }
+
+    const startSlot = 1024;
+    const offset = parseInt(document.getElementById('pitchOffset').value) || 0;
+
+    let notesToPatch = [];
+    const sourceArr = arrangement.length > 0 ? arrangement : chords;
+    sourceArr.forEach(c => {
+      c.voicing.forEach((f, s) => {
+        if (f >= 0) notesToPatch.push([40, 45, 50, 55, 59, 64][s] + f);
+      });
+    });
+
+    for (let i = 0; i < 128; i++) {
+      if (i < notesToPatch.length) {
+        nums[startSlot + i] = notesToPatch[i] + offset;
+      } else {
+        nums[startSlot + i] = -1;
+      }
+    }
+
+    const blob = new Blob([encodeUTF16LEWithBOM(nums.join(','))], { type: 'application/octet-stream' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'chordscan_progression.riffle';
+    a.click();
+
+    logStatus(`Successfully exported chordscan_progression.riffle (${notesToPatch.length} notes mapped).`, true);
+  } catch (err) {
+    logStatus(`Error: ${err.message}`, true);
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,1019 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Remix Studio">
+<meta name="theme-color" content="#0b0f17">
+<title>Remix Studio</title>
+
+<!--
+  REMIX STUDIO — single-file, client-side audio re-arranger for iPad (Safari / Chrome / Home Screen)
+
+  Pipeline
+    1. Decode   : File -> ArrayBuffer -> AudioContext.decodeAudioData (works for audio AND the audio track of MP4/MOV)
+    2. Analyse  : energy / brightness / bass envelopes -> onset curve -> autocorrelation BPM estimate
+                  -> comb-filter refinement of tempo + beat phase  (all plain JS on the decoded samples)
+    3. Slice    : beat-aligned chunks of N bars (4/4 assumed), each given features + a label
+                  (Intro / Verse / Build / Chorus / Break / Outro)
+    4. Recompose: rule-based ordering (smooth flow, crescendo, mountain, push & pull, shuffle) using a
+                  compatibility score (energy, brightness, rhythmic density, boundary loudness)
+    5. Play     : AudioBufferSourceNodes scheduled on the AudioContext with short crossfades
+    6. Export   : same schedule rendered through an OfflineAudioContext -> 16-bit PCM WAV (inline encoder)
+
+  Styling uses plain CSS (no CDN) so the page also works fully offline once it is saved on the iPad.
+-->
+
+<style>
+  :root{
+    --bg:#0b0f17; --panel:#121826; --panel2:#19223a; --line:#26324f;
+    --text:#e8edf7; --muted:#8b98b3; --accent:#7c9cff; --accent2:#c084fc;
+    --good:#34d399; --warn:#fbbf24; --bad:#f87171; --radius:18px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  [hidden]{display:none!important}
+  html,body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,Segoe UI,Roboto,sans-serif;
+    font-size:16px;line-height:1.45;-webkit-text-size-adjust:100%;touch-action:manipulation}
+  body{min-height:100vh;min-height:100dvh;
+    padding:max(14px,env(safe-area-inset-top)) max(14px,env(safe-area-inset-right))
+            max(28px,env(safe-area-inset-bottom)) max(14px,env(safe-area-inset-left));
+    background:radial-gradient(1100px 600px at 10% -10%,#1b2450 0,transparent 60%),
+               radial-gradient(900px 500px at 100% 0,#3a1b55 0,transparent 55%),var(--bg);
+    background-attachment:fixed}
+  #app{max-width:1240px;margin:0 auto}
+  header{display:flex;align-items:center;gap:14px;margin:6px 2px 14px}
+  .logo{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;font-size:26px;
+    background:linear-gradient(135deg,#6d8bff,#b46bff);box-shadow:0 8px 24px rgba(124,156,255,.35)}
+  h1{font-size:24px;margin:0;letter-spacing:.2px}
+  .tag{color:var(--muted);font-size:14px;margin-top:2px}
+  h2{font-size:17px;margin:0 0 10px;display:flex;align-items:center;gap:8px}
+  h2 small{font-weight:500;color:var(--muted);font-size:13px}
+
+  /* ---------- status bar ---------- */
+  .status{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;border-radius:14px;margin-bottom:14px;
+    background:var(--panel);border:1px solid var(--line);font-size:15px;position:sticky;top:max(6px,env(safe-area-inset-top));z-index:20;
+    backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+  .status .dot{flex:none;width:10px;height:10px;border-radius:50%;margin-top:7px;background:var(--accent)}
+  .status.ok .dot{background:var(--good)} .status.warn .dot{background:var(--warn)} .status.error .dot{background:var(--bad)}
+  .status.error{border-color:#7f2d34;background:#2a1519} .status.warn{border-color:#6b5a1c}
+
+  .card{background:linear-gradient(180deg,var(--panel),#0f1522);border:1px solid var(--line);
+    border-radius:var(--radius);padding:16px;margin-bottom:14px}
+  .muted{color:var(--muted)} .small{font-size:13px}
+
+  /* ---------- buttons & controls ---------- */
+  .btn{appearance:none;-webkit-appearance:none;border:1px solid var(--line);background:var(--panel2);color:var(--text);
+    font-family:inherit;font-weight:600;font-size:16px;min-height:48px;min-width:48px;padding:0 18px;border-radius:14px;
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;
+    transition:transform .08s,background .15s,opacity .15s;user-select:none;-webkit-user-select:none}
+  .btn:active{transform:scale(.96)}
+  .btn.primary{background:linear-gradient(135deg,#6d8bff,#a46bff);border-color:transparent;color:#fff}
+  .btn.good{background:linear-gradient(135deg,#0ea5a4,#10b981);border-color:transparent;color:#fff}
+  .btn.ghost{background:transparent}
+  .btn.sm{min-height:44px;padding:0 14px;font-size:15px}
+  .btn:disabled{opacity:.38;pointer-events:none}
+  .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  .row.between{justify-content:space-between}
+  .field{margin-bottom:14px} .field:last-child{margin-bottom:0}
+  .field>label,.lab{display:block;font-size:13px;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.6px}
+  .seg{display:flex;flex-wrap:wrap;gap:8px}
+  .seg button{flex:1 1 auto;min-width:64px;min-height:48px;padding:0 14px;border-radius:14px;border:1px solid var(--line);
+    background:var(--panel2);color:var(--text);font-family:inherit;font-weight:600;font-size:15px;cursor:pointer}
+  .seg button.on{background:linear-gradient(135deg,#6d8bff,#a46bff);border-color:transparent;color:#fff}
+  select,input[type=number]{font-family:inherit;font-size:17px;min-height:48px;border-radius:14px;border:1px solid var(--line);
+    background:var(--panel2);color:var(--text);padding:0 12px}
+  input[type=number]{width:104px;text-align:center;font-weight:700;-moz-appearance:textfield}
+  select{width:100%}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:44px;background:transparent;margin:0}
+  input[type=range]::-webkit-slider-runnable-track{height:8px;border-radius:99px;background:var(--line)}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:30px;height:30px;border-radius:50%;background:#fff;margin-top:-11px;box-shadow:0 2px 10px rgba(0,0,0,.55)}
+  input[type=range]::-moz-range-track{height:8px;border-radius:99px;background:var(--line)}
+  input[type=range]::-moz-range-thumb{width:30px;height:30px;border:0;border-radius:50%;background:#fff}
+
+  /* ---------- upload ---------- */
+  .drop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;cursor:pointer;
+    min-height:170px;border:2px dashed #3a4a73;border-radius:var(--radius);padding:22px;transition:border-color .2s,background .2s}
+  .drop.drag,.drop:active{border-color:var(--accent);background:rgba(124,156,255,.08)}
+  .drop .big{font-size:40px;line-height:1}
+  .drop .t{font-size:19px;font-weight:700}
+  .drop.compact{min-height:72px;flex-direction:row;gap:12px;padding:12px}
+  .drop.compact .big{font-size:26px} .drop.compact .t{font-size:16px} .drop.compact .s{display:none}
+  .vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+  /* ---------- progress ---------- */
+  .spinner{flex:none;width:28px;height:28px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .bar{height:10px;background:var(--line);border-radius:99px;overflow:hidden;margin-top:12px;position:relative}
+  .bar>i{display:block;height:100%;width:0;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .15s}
+  .bar.indet>i{width:38%;animation:slide 1.1s ease-in-out infinite}
+  @keyframes slide{0%{margin-left:-38%}100%{margin-left:100%}}
+
+  /* ---------- workspace layout (portrait: single column, landscape/wide: two columns) ---------- */
+  #workspace{display:grid;gap:0 16px;grid-template-columns:minmax(0,1fr);
+    grid-template-areas:"info" "settings" "timeline" "remix" "sections"}
+  #workspace.disabled{opacity:.5;pointer-events:none}
+  .a-info{grid-area:info}.a-settings{grid-area:settings}.a-timeline{grid-area:timeline}.a-remix{grid-area:remix}.a-sections{grid-area:sections}
+  @media (min-width:960px){
+    #workspace{grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);
+      grid-template-areas:"info remix" "settings remix" "timeline remix" "sections remix";grid-template-rows:auto auto auto 1fr}
+    .a-remix{align-self:start;position:sticky;top:76px}
+  }
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .pill{background:var(--panel2);border:1px solid var(--line);border-radius:99px;padding:6px 12px;font-size:14px}
+  .pill b{color:#fff}
+
+  /* ---------- canvases ---------- */
+  .cwrap{position:relative;border-radius:14px;overflow:hidden;background:#0a0e18;border:1px solid var(--line);margin-bottom:12px}
+  canvas{display:block;width:100%;cursor:pointer;touch-action:manipulation}
+  .playhead{position:absolute;top:0;bottom:0;width:2px;background:#fff;box-shadow:0 0 10px #fff;left:0;pointer-events:none;display:none}
+
+  /* ---------- sections grid ---------- */
+  .grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(210px,1fr))}
+  .sec{--c:#888;border:1px solid var(--line);border-left:6px solid var(--c);background:var(--panel2);border-radius:14px;padding:10px 12px}
+  .sec.off{opacity:.5}
+  .sec.sel{outline:2px solid #fff;outline-offset:1px}
+  .sec .top{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+  .sec .nm{font-weight:700} .sec .tm{font-size:12px;color:var(--muted);white-space:nowrap}
+  .meter{height:6px;background:#0b1020;border-radius:99px;margin:8px 0 10px;overflow:hidden}
+  .meter i{display:block;height:100%;background:var(--c)}
+  .sec .acts{display:flex;gap:8px}
+  .sec .acts .btn{flex:1;padding:0 8px}
+
+  /* ---------- arrangement chips ---------- */
+  .chip{--c:#888;flex:1 1 118px;max-width:200px;min-height:56px;text-align:left;border:1px solid var(--line);border-top:5px solid var(--c);
+    background:var(--panel2);color:var(--text);border-radius:12px;padding:6px 10px;font-family:inherit;cursor:pointer}
+  .chip .n{font-size:12px;color:var(--muted)} .chip .l{font-weight:700;font-size:15px}
+  .chip .m{font-size:12px}
+  .chip.sel{outline:2px solid #fff}
+  .chip.playing{background:#27346a;border-color:var(--accent)}
+  .hint{color:var(--muted);font-size:14px;padding:6px 2px}
+  audio{width:100%;margin-top:8px}
+  .kv{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <div class="logo">🎛️</div>
+    <div>
+      <h1>Remix Studio</h1>
+      <div class="tag">Upload a track · find sections that fit together · recompose · export WAV</div>
+    </div>
+  </header>
+
+  <!-- Persistent status line: tells the user what is happening at every step -->
+  <div id="status" class="status info" role="status" aria-live="polite">
+    <span class="dot"></span><span id="statusText">Ready — choose an audio or video file to begin.</span>
+  </div>
+
+  <!-- Upload -->
+  <section class="card" id="uploadCard">
+    <label id="dropZone" class="drop" for="fileInput" tabindex="0">
+      <span class="big">📂</span>
+      <span class="t" id="dropTitle">Tap to choose a file</span>
+      <span class="s muted" id="dropSub">or drag &amp; drop here<br>MP3 · WAV · M4A · MP4 · MOV (the audio track is extracted automatically)</span>
+    </label>
+    <input class="vh" id="fileInput" type="file" accept="audio/*,video/*,.mp3,.wav,.m4a,.aac,.mp4,.mov,.m4v,.caf">
+  </section>
+
+  <!-- Analysis / busy progress -->
+  <section class="card" id="progressCard" hidden>
+    <div class="row"><div class="spinner"></div>
+      <div style="flex:1"><b id="progStage">Working…</b></div>
+      <span class="muted" id="progPct"></span></div>
+    <div class="bar" id="progBar"><i id="progFill"></i></div>
+  </section>
+
+  <main id="workspace" hidden>
+
+    <section class="card a-info">
+      <div class="chips">
+        <span class="pill">🎵 <b id="infoFile">—</b></span>
+        <span class="pill">⏱ <b id="infoDur">—</b></span>
+        <span class="pill">🥁 <b id="infoBpm">—</b> BPM</span>
+        <span class="pill">🧩 <b id="infoSecs">—</b> sections</span>
+      </div>
+    </section>
+
+    <section class="card a-settings">
+      <h2>⚙️ Analysis settings <small>changes re-slice instantly</small></h2>
+      <div class="field">
+        <label>Section length</label>
+        <div class="seg" id="barsSeg">
+          <button data-bars="1">1 bar</button><button data-bars="2">2 bars</button>
+          <button data-bars="4">4 bars</button><button data-bars="8">8 bars</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Tempo (BPM) — auto-detected, tap to override</label>
+        <div class="row">
+          <button class="btn" id="bpmMinus" aria-label="Decrease BPM">−</button>
+          <input type="number" id="bpmInput" inputmode="decimal" min="50" max="220" step="0.1" aria-label="BPM">
+          <button class="btn" id="bpmPlus" aria-label="Increase BPM">+</button>
+          <button class="btn ghost" id="bpmAuto">Auto</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Crossfade at joins: <span id="fadeVal">24</span> ms</label>
+        <input type="range" id="fadeRange" min="0" max="250" step="2" value="24">
+      </div>
+    </section>
+
+    <section class="card a-timeline">
+      <h2>🌊 Original &amp; detected sections <small>tap a block to preview it</small></h2>
+      <div class="cwrap"><canvas id="cvOrig"></canvas><div class="playhead" id="phOrig"></div></div>
+      <div class="row">
+        <button class="btn primary" id="btnPlayOrig">▶ Play original</button>
+        <span class="muted small">Colour = role · bright = included in remix · faded = skipped</span>
+      </div>
+    </section>
+
+    <section class="card a-remix">
+      <h2>✨ Recompose</h2>
+      <div class="field">
+        <label>Arrangement style</label>
+        <div class="seg" id="stratSeg"></div>
+        <div class="hint" id="stratDesc"></div>
+      </div>
+      <div class="field">
+        <label>Length</label>
+        <select id="targetSel">
+          <option value="0">Use each selected section once</option>
+          <option value="4">4 sections</option><option value="6">6 sections</option>
+          <option value="8">8 sections</option><option value="12">12 sections</option>
+          <option value="16">16 sections</option>
+        </select>
+      </div>
+      <div class="row" style="margin-bottom:12px">
+        <button class="btn primary" id="btnRecompose" style="flex:1">🎲 Recompose</button>
+        <button class="btn good" id="btnPlayRemix" style="flex:1">▶ Play remix</button>
+      </div>
+
+      <div class="cwrap"><canvas id="cvArr"></canvas><div class="playhead" id="phArr"></div></div>
+      <div class="row between" style="margin-bottom:8px">
+        <b id="arrTotal" class="muted small">No arrangement yet</b>
+        <span class="muted small">Tap a block to select &amp; preview</span>
+      </div>
+      <div class="chips" id="chipBox"></div>
+      <div class="row" style="margin:12px 0">
+        <button class="btn sm" id="btnLeft">◀ Earlier</button>
+        <button class="btn sm" id="btnRight">Later ▶</button>
+        <button class="btn sm" id="btnDup">⧉ Duplicate</button>
+        <button class="btn sm" id="btnDel">🗑 Remove</button>
+      </div>
+
+      <button class="btn primary" id="btnExport" style="width:100%">💾 Export audio (WAV)</button>
+      <div id="exportCard" hidden style="margin-top:14px">
+        <div class="lab">Your remix is ready</div>
+        <div class="kv muted small" id="exportInfo"></div>
+        <audio id="exportAudio" controls playsinline></audio>
+        <div class="row" style="margin-top:10px">
+          <a class="btn good" id="dlLink" style="text-decoration:none">⬇ Download WAV</a>
+          <button class="btn" id="shareBtn" hidden>📤 Share / Save to Files</button>
+        </div>
+        <div class="hint">On iPad: tap Download, then choose “Download” in Safari — the file lands in Files → Downloads. “Share” lets you pick “Save to Files” directly.</div>
+      </div>
+    </section>
+
+    <section class="card a-sections">
+      <h2>🧩 Sections <small>▶ preview · ＋ add to remix · ✓ include when recomposing</small></h2>
+      <div class="grid" id="secGrid"></div>
+    </section>
+  </main>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* =========================================================================
+   Helpers & global state
+   ========================================================================= */
+const $ = id => document.getElementById(id);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const fmt = s => { s = Math.max(0, s); const m = Math.floor(s / 60); return m + ':' + String(Math.floor(s % 60)).padStart(2, '0'); };
+// Yield to the browser so spinners / progress bars can repaint during heavy loops.
+const tick = () => new Promise(r => { let d = false; const f = () => { if (!d) { d = true; r(); } }; requestAnimationFrame(f); setTimeout(f, 50); });
+
+const STRATEGIES = [
+  { id: 'flow',      name: 'Smooth flow', desc: 'Chains the sections that match each other most closely (energy, tone, rhythm, loudness at the join).' },
+  { id: 'crescendo', name: 'Crescendo',   desc: 'Quiet to loud — builds steadily from the calmest section to the most intense.' },
+  { id: 'mountain',  name: 'Mountain',    desc: 'Starts soft, climbs to the peak in the middle, then winds back down.' },
+  { id: 'alternate', name: 'Push & pull', desc: 'Alternates low-energy and high-energy sections for a breathing, rhythmic feel.' },
+  { id: 'shuffle',   name: 'Shuffle',     desc: 'Random order — happy accidents. Press Recompose again for a new one.' }
+];
+const KIND_COLORS = { Intro:'#60a5fa', Verse:'#2dd4bf', Build:'#fbbf24', Chorus:'#f472b6', Break:'#a78bfa', Outro:'#94a3b8', Silence:'#475569' };
+
+const S = {
+  ctx: null, buffer: null, fileName: '', env: null,
+  bpm: 120, bpmAuto: true, auto: { bpm: 120, phase: 0 }, firstBeat: 0, bars: 4,
+  sections: [], arrangement: [], selChip: -1, selSec: -1,
+  strategy: 'flow', target: 0, fadeMs: 24,
+  play: null, busy: false, exportUrl: null
+};
+
+/* =========================================================================
+   Status + progress UI
+   ========================================================================= */
+function setStatus(msg, kind = 'info') { $('status').className = 'status ' + kind; $('statusText').textContent = msg; }
+function showProgress(stage, frac) {
+  $('progressCard').hidden = false; $('progStage').textContent = stage;
+  if (frac == null) { $('progBar').classList.add('indet'); $('progFill').style.width = ''; $('progPct').textContent = ''; }
+  else { $('progBar').classList.remove('indet'); $('progFill').style.width = (frac * 100).toFixed(0) + '%'; $('progPct').textContent = Math.round(frac * 100) + '%'; }
+}
+function hideProgress() { $('progressCard').hidden = true; }
+function setBusy(b) { S.busy = b; $('workspace').classList.toggle('disabled', b); }
+
+/* =========================================================================
+   AudioContext + iOS unlock
+   iOS only lets audio start from a user gesture, so we create/resume the context
+   on the first touch and also play a silent <audio> element, which switches the
+   iOS audio session to "playback" (so sound isn't silenced by the mute setting).
+   ========================================================================= */
+function getCtx() {
+  if (!S.ctx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) throw new Error('This browser does not support the Web Audio API.');
+    S.ctx = new AC();
+  }
+  return S.ctx;
+}
+async function ensureAudio() {
+  const ctx = getCtx();
+  if (ctx.state !== 'running') { try { await ctx.resume(); } catch (e) { /* handled below */ } }
+  if (ctx.state !== 'running') throw new Error('Audio is locked by the browser. Tap Play again.');
+  return ctx;
+}
+let unlocked = false;
+function unlockAudio() {
+  if (unlocked) return;
+  try {
+    const ctx = getCtx(); ctx.resume();
+    const b = ctx.createBuffer(1, 1, 22050), s = ctx.createBufferSource(); s.buffer = b; s.connect(ctx.destination); s.start(0);
+    // silent 0.1s WAV through an <audio> element
+    const n = 2205, ab = new ArrayBuffer(44 + n * 2), dv = new DataView(ab);
+    const w = (o, t) => { for (let i = 0; i < t.length; i++) dv.setUint8(o + i, t.charCodeAt(i)); };
+    w(0,'RIFF'); dv.setUint32(4,36+n*2,true); w(8,'WAVE'); w(12,'fmt '); dv.setUint32(16,16,true); dv.setUint16(20,1,true);
+    dv.setUint16(22,1,true); dv.setUint32(24,22050,true); dv.setUint32(28,44100,true); dv.setUint16(32,2,true); dv.setUint16(34,16,true);
+    w(36,'data'); dv.setUint32(40,n*2,true);
+    const a = new Audio(URL.createObjectURL(new Blob([ab], { type: 'audio/wav' })));
+    a.setAttribute('playsinline', ''); const p = a.play(); if (p && p.catch) p.catch(() => {});
+    unlocked = true;
+    ['touchend', 'click'].forEach(ev => document.removeEventListener(ev, unlockAudio));
+  } catch (e) { /* will retry on next gesture */ }
+}
+['touchend', 'click'].forEach(ev => document.addEventListener(ev, unlockAudio, { passive: true }));
+
+/* =========================================================================
+   File loading + decoding
+   ========================================================================= */
+function readFile(file) {
+  if (file.arrayBuffer) return file.arrayBuffer();               // modern Safari
+  return new Promise((res, rej) => {                              // older fallback
+    const r = new FileReader(); r.onload = () => res(r.result);
+    r.onerror = () => rej(r.error || new Error('File read failed')); r.readAsArrayBuffer(file);
+  });
+}
+// Supports both the promise and legacy callback forms of decodeAudioData (old iOS Safari).
+function decodeAudio(ctx, ab) {
+  return new Promise((res, rej) => {
+    let p; try { p = ctx.decodeAudioData(ab, res, rej); } catch (e) { rej(e); return; }
+    if (p && p.then) p.then(res, rej);
+  });
+}
+
+async function handleFile(file) {
+  if (!file || S.busy) return;
+  setBusy(true); stopPlayback(); clearExport();
+  try {
+    setStatus(`Reading “${file.name}” (${(file.size / 1048576).toFixed(1)} MB)…`);
+    showProgress('Reading file…', 0.03);
+    if (file.size > 300 * 1048576) setStatus('Large file — decoding may be slow or run out of memory on an iPad.', 'warn');
+    await tick();
+    const ab = await readFile(file);
+
+    showProgress('Decoding audio track…', null);
+    setStatus('Decoding audio (for video files only the audio track is used)…');
+    await tick();
+    const ctx = getCtx();
+    let buf;
+    try { buf = await decodeAudio(ctx, ab); }
+    catch (e) {
+      throw new Error('Could not decode this file. iPad browsers handle MP3, WAV, AAC/M4A and the audio of H.264 MP4/MOV best — try converting the file, or a shorter one.');
+    }
+    if (!buf || buf.duration < 3) throw new Error('This clip is under 3 seconds — too short to split into sections.');
+
+    S.buffer = buf; S.fileName = file.name;
+    S.env = await computeEnvelope(buf, p => showProgress('Measuring energy & rhythm…', 0.10 + p * 0.55));
+    showProgress('Estimating tempo…', 0.68); setStatus('Estimating tempo…'); await tick();
+    const bpm0 = estimateTempo(S.env);
+    showProgress('Aligning beat grid…', 0.72); setStatus('Aligning beat grid…');
+    const g = await refineGrid(S.env, bpm0, false, p => showProgress('Aligning beat grid…', 0.72 + p * 0.22));
+    S.auto = { bpm: g.bpm, phase: g.phase };
+    S.bpm = g.bpm; S.firstBeat = g.phase; S.bpmAuto = true;
+    S.bars = autoBars();
+
+    showProgress('Finding sections that fit together…', 0.96); setStatus('Finding sections…'); await tick();
+    buildSections();
+    if (!S.sections.length) throw new Error('No usable sections were found. Try a longer file or a smaller section length.');
+
+    S.arrangement = []; S.selChip = -1; S.selSec = -1;
+    $('workspace').hidden = false;
+    $('dropZone').classList.add('compact'); $('dropTitle').textContent = 'Load a different file';
+    syncControls(); renderSections(); recompose(true); redrawAll();
+    hideProgress();
+    setStatus(`Done — ${S.sections.length} sections at ~${S.bpm.toFixed(1)} BPM. Tap a block to preview, or press Recompose.`, 'ok');
+  } catch (err) {
+    console.error(err); hideProgress(); setStatus(err.message || String(err), 'error');
+  } finally { setBusy(false); }
+}
+
+/* =========================================================================
+   ANALYSIS
+   ========================================================================= */
+
+/**
+ * Walk the samples once and build per-frame (512 samples) curves:
+ *   rms    – overall loudness
+ *   bass   – loudness of a simple one-pole low-pass (~150 Hz) → kick drum / bass hits
+ *   bright – sqrt(diff-energy / energy): a cheap "spectral brightness" / noisiness measure
+ *   onset  – positive change of log-loudness (full band + bass), minus a local average
+ */
+async function computeEnvelope(buf, onProg) {
+  const sr = buf.sampleRate, hop = 512, nch = buf.numberOfChannels, nF = Math.floor(buf.length / hop);
+  const rate = sr / hop;
+  const ch = []; for (let c = 0; c < nch; c++) ch.push(buf.getChannelData(c));
+  const rms = new Float32Array(nF), bass = new Float32Array(nF), bright = new Float32Array(nF);
+  const a = 1 - Math.exp(-2 * Math.PI * 150 / sr);
+  let lp = 0, prev = 0, last = performance.now(), maxRms = 1e-6;
+  for (let f = 0; f < nF; f++) {
+    let e = 0, d = 0, b = 0; const base = f * hop;
+    for (let i = 0; i < hop; i++) {
+      let x = ch[0][base + i];
+      for (let c = 1; c < nch; c++) x += ch[c][base + i];
+      x /= nch;
+      e += x * x; const dx = x - prev; d += dx * dx; prev = x;
+      lp += a * (x - lp); b += lp * lp;
+    }
+    rms[f] = Math.sqrt(e / hop); bass[f] = Math.sqrt(b / hop); bright[f] = Math.sqrt(d / (e + 1e-9));
+    if (rms[f] > maxRms) maxRms = rms[f];
+    if ((f & 1023) === 0 && performance.now() - last > 30) { onProg(f / nF); await tick(); last = performance.now(); }
+  }
+  // Onset strength: positive log-energy flux (scale-invariant), then subtract a local mean.
+  const k = 20 / maxRms, raw = new Float32Array(nF);
+  let pr = Math.log1p(k * rms[0]), pb = Math.log1p(k * bass[0]);
+  for (let f = 1; f < nF; f++) {
+    const lr = Math.log1p(k * rms[f]), lb = Math.log1p(k * bass[f]);
+    raw[f] = Math.max(0, lr - pr) + Math.max(0, lb - pb); pr = lr; pb = lb;
+  }
+  const w = Math.max(2, Math.round(rate * 0.35)), pre = new Float64Array(nF + 1);
+  for (let i = 0; i < nF; i++) pre[i + 1] = pre[i] + raw[i];
+  const onset = new Float32Array(nF);
+  for (let f = 0; f < nF; f++) {
+    const lo = Math.max(0, f - w), hi = Math.min(nF, f + w + 1);
+    onset[f] = Math.max(0, raw[f] - 1.1 * (pre[hi] - pre[lo]) / (hi - lo));
+  }
+  onProg(1);
+  return { sr, hop, rate, nF, rms, bass, bright, onset, maxRms };
+}
+
+/** Coarse tempo: autocorrelation of the onset curve, weighted toward musically common tempi. */
+function estimateTempo(env) {
+  const o = env.onset, N = o.length, rate = env.rate;
+  const lagMin = Math.floor(rate * 60 / 200), lagMax = Math.ceil(rate * 60 / 60);
+  let best = -1, bestBpm = 120;
+  if (N < lagMax * 3) return 120;
+  for (let lag = lagMin; lag <= lagMax; lag++) {
+    let s = 0; for (let i = 0; i + lag < N; i++) s += o[i] * o[i + lag];
+    s /= (N - lag);
+    const bpm = 60 * rate / lag;
+    const prior = Math.exp(-0.5 * Math.pow(Math.log2(bpm / 125) / 0.75, 2));   // favour ~125 BPM, avoids octave errors
+    if (s * prior > best) { best = s * prior; bestBpm = bpm; }
+  }
+  return bestBpm;
+}
+
+/**
+ * Fine tempo + beat phase: slide a comb of beat positions over the onset curve and keep the best fit.
+ * fixed=true → BPM is user-supplied; only the phase is searched.
+ */
+async function refineGrid(env, bpm0, fixed, onProg) {
+  const o = env.onset, N = o.length, rate = env.rate;
+  const cands = [];
+  if (fixed) cands.push(bpm0); else for (let b = bpm0 * 0.96; b <= bpm0 * 1.04; b += 0.05) cands.push(b);
+  let best = -1, bestBpm = bpm0, bestPh = 0, last = performance.now();
+  for (let ci = 0; ci < cands.length; ci++) {
+    const bpm = cands[ci], period = 60 * rate / bpm, nb = Math.floor(N / period);
+    if (nb < 2) continue;
+    for (let ph = 0; ph < period; ph += 1) {
+      let s = 0;
+      for (let k = 0; k < nb; k++) {
+        const idx = Math.round(ph + k * period); if (idx >= N - 1) break;
+        s += o[idx] + (idx > 0 ? 0.5 * (o[idx - 1] + o[idx + 1]) : 0);
+      }
+      s /= nb;
+      if (s > best) { best = s; bestBpm = bpm; bestPh = ph; }
+    }
+    if (performance.now() - last > 30) { onProg(ci / cands.length); await tick(); last = performance.now(); }
+  }
+  // Cut just *before* the transient (8 ms) so the attack of each section is preserved.
+  return { bpm: bestBpm, phase: Math.max(0, bestPh / rate - 0.008) };
+}
+
+/** Choose the longest section length that still yields at least 6 sections. */
+function autoBars() {
+  const beat = 60 / S.bpm;
+  for (const b of [8, 4, 2, 1]) if (Math.floor((S.buffer.duration - S.firstBeat) / (beat * 4 * b)) >= 6) return b;
+  return 1;
+}
+
+/** Slice the track on the beat grid and describe every slice. */
+function buildSections() {
+  const env = S.env, buf = S.buffer, rate = env.rate, beat = 60 / S.bpm, secLen = beat * 4 * S.bars, dur = buf.duration;
+  const spans = [];
+  for (let t = S.firstBeat; t < dur - 0.25; t += secLen) {
+    const end = Math.min(t + secLen, dur);
+    if (end - t < secLen * 0.5 && spans.length) break;      // drop a tiny leftover at the end
+    spans.push({ start: t, end });
+  }
+  const mean = (arr, a, b) => { let s = 0; for (let i = a; i < b; i++) s += arr[i]; return b > a ? s / (b - a) : 0; };
+  const feats = spans.map((sp, i) => {
+    const a = Math.floor(sp.start * rate), b = Math.max(a + 1, Math.min(env.nF, Math.ceil(sp.end * rate))), mid = (a + b) >> 1;
+    const bf = Math.max(1, Math.round(beat * rate));
+    const e = mean(env.rms, a, b), e1 = mean(env.rms, a, mid), e2 = mean(env.rms, mid, b);
+    let on = 0; for (let j = a; j < b; j++) on += env.onset[j];
+    return { id: i, start: sp.start, end: sp.end, dur: sp.end - sp.start, rawE: e, bright: mean(env.bright, a, b),
+      density: on / (sp.end - sp.start), slope: e1 > 0 ? e2 / e1 : 1,
+      startLevel: mean(env.rms, a, Math.min(b, a + bf)) / env.maxRms, endLevel: mean(env.rms, Math.max(a, b - bf), b) / env.maxRms, enabled: true };
+  });
+  // Normalise features to 0..1 across the track
+  const norm = (key, out, f = v => v) => {
+    let mn = Infinity, mx = -Infinity; feats.forEach(s => { const v = f(s[key]); mn = Math.min(mn, v); mx = Math.max(mx, v); });
+    feats.forEach(s => { s[out] = mx > mn ? (f(s[key]) - mn) / (mx - mn) : 0.5; });
+  };
+  norm('rawE', 'energy', v => 20 * Math.log10(v + 1e-6)); norm('bright', 'brightN'); norm('density', 'densityN');
+  // Role labels: rank by energy; tertiles → Break / Verse / Chorus, plus positional & slope rules
+  const ranked = [...feats].sort((a, b) => a.energy - b.energy), rank = new Map(); ranked.forEach((s, i) => rank.set(s.id, i / Math.max(1, feats.length - 1)));
+  const count = {};
+  feats.forEach((s, i) => {
+    const r = rank.get(s.id); let kind = r >= 0.67 ? 'Chorus' : r <= 0.33 ? 'Break' : 'Verse';
+    if (kind === 'Verse' && s.slope > 1.25) kind = 'Build';
+    if (i === 0 && kind !== 'Chorus') kind = 'Intro';
+    if (i === feats.length - 1 && i > 0 && kind !== 'Chorus') kind = 'Outro';
+    if (s.rawE / env.maxRms < 0.03) { kind = 'Silence'; s.enabled = false; }
+    s.kind = kind; count[kind] = (count[kind] || 0) + 1;
+    s.label = (kind === 'Intro' || kind === 'Outro') ? kind : `${kind} ${count[kind]}`;
+    s.color = KIND_COLORS[kind];
+  });
+  S.sections = feats;
+}
+
+/** Compatibility 0..1 of "b follows a": similar energy/tone/rhythm, matching loudness at the join. */
+function compat(a, b) {
+  const dE = a.energy - b.energy, dB = a.brightN - b.brightN, dD = a.densityN - b.densityN;
+  const feat = Math.sqrt((1.2 * dE * dE + 0.6 * dB * dB + 0.8 * dD * dD) / 2.6);
+  const join = Math.min(1, Math.abs(a.endLevel - b.startLevel) * 3);
+  let cost = 0.65 * feat + 0.35 * join;
+  if (b.id === a.id + 1) cost *= 0.25;                 // sections that were already neighbours always fit
+  return clamp(1 - cost, 0, 1);
+}
+
+/* =========================================================================
+   RECOMPOSITION
+   ========================================================================= */
+const shuffle = arr => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+function orderPool(pool, strategy) {
+  const byE = [...pool].sort((a, b) => a.energy - b.energy || a.id - b.id);
+  switch (strategy) {
+    case 'crescendo': return byE;
+    case 'mountain': {
+      const front = [], back = []; byE.forEach((s, i) => (i % 2 === 0 ? front : back).push(s));
+      return front.concat(back.reverse());
+    }
+    case 'alternate': {
+      const h = Math.ceil(byE.length / 2), lo = shuffle(byE.slice(0, h)), hi = shuffle(byE.slice(h)), out = [];
+      for (let i = 0; i < Math.max(lo.length, hi.length); i++) { if (lo[i]) out.push(lo[i]); if (hi[i]) out.push(hi[i]); }
+      return out;
+    }
+    case 'shuffle': return shuffle(pool);
+    case 'flow':
+    default: {
+      const left = new Set(pool); const out = [];
+      let cur = shuffle(byE.slice(0, Math.min(2, byE.length)))[0]; out.push(cur); left.delete(cur);
+      while (left.size) {
+        const scored = [...left].map(s => ({ s, c: compat(cur, s) })).sort((x, y) => y.c - x.c);
+        const pick = (scored.length > 1 && Math.random() < 0.28) ? scored[1].s : scored[0].s;   // a little variety each run
+        out.push(pick); left.delete(pick); cur = pick;
+      }
+      return out;
+    }
+  }
+}
+function fitLength(ordered, N) {
+  if (N <= 0 || !ordered.length) return ordered;
+  if (N > ordered.length) return Array.from({ length: N }, (_, i) => ordered[i % ordered.length]);
+  if (N === 1) return [ordered[0]];
+  return Array.from({ length: N }, (_, i) => ordered[Math.round(i * (ordered.length - 1) / (N - 1))]);
+}
+function recompose(silent) {
+  stopPlayback();
+  const pool = S.sections.filter(s => s.enabled);
+  if (!pool.length) { S.arrangement = []; renderArrangement(); if (!silent) setStatus('Switch on at least one section (✓) first.', 'warn'); return; }
+  const ordered = fitLength(orderPool(pool, S.strategy), S.target);
+  S.arrangement = ordered.map(s => s.id); S.selChip = -1; renderArrangement();
+  if (!silent) setStatus(`Recomposed ${S.arrangement.length} sections (${STRATEGIES.find(x => x.id === S.strategy).name}). Press Play remix to listen.`, 'ok');
+}
+const arrTotalSecs = () => S.arrangement.reduce((a, id) => a + S.sections[id].dur, 0);
+
+/* =========================================================================
+   PLAYBACK  (shared scheduling plan is used by live playback AND export)
+   ========================================================================= */
+/**
+ * Turn a list of {start,end} segments into a timeline plan.
+ * Each segment may read a little *before/after* its own range (half the crossfade each side)
+ * so neighbours overlap and fade through each other instead of clicking.
+ */
+function planSegments(buf, segs, xfade) {
+  const half = xfade / 2; let T = 0; const plan = [];
+  segs.forEach((s, i) => {
+    const dur = s.end - s.start, last = i === segs.length - 1;
+    const pre = i > 0 ? Math.min(half, s.start) : 0, post = !last ? Math.min(half, buf.duration - s.end) : 0;
+    let fin = Math.max(i > 0 ? pre + half : 0, 0.004), fout = Math.max(!last ? half + post : 0.03, 0.004);
+    const len = pre + dur + post; if (fin + fout > len) fin = fout = len / 2;
+    plan.push({ pos: T, startAt: T - pre, offset: s.start - pre, len, fin, fout }); T += dur;
+  });
+  return { plan, total: T };
+}
+function schedulePlan(ctx, dest, buf, plan, t0) {
+  return plan.map(p => {
+    const src = ctx.createBufferSource(); src.buffer = buf;
+    const g = ctx.createGain(), st = t0 + p.startAt;
+    g.gain.setValueAtTime(0, st); g.gain.linearRampToValueAtTime(1, st + p.fin);
+    g.gain.setValueAtTime(1, st + p.len - p.fout); g.gain.linearRampToValueAtTime(0, st + p.len);
+    src.connect(g); g.connect(dest); src.start(st, p.offset, p.len); return src;
+  });
+}
+
+/** kind: 'orig' | 'section' | 'remix' */
+async function startPlayback(kind, arg) {
+  try {
+    const ctx = await ensureAudio(); stopPlayback();
+    const buf = S.buffer; if (!buf) return;
+    const master = ctx.createGain(); master.connect(ctx.destination);
+    const t0 = ctx.currentTime + 0.08; let nodes, total, plan = null, secStart = 0, id = null;
+    if (kind === 'orig') {
+      const src = ctx.createBufferSource(); src.buffer = buf; src.connect(master); src.start(t0, 0); nodes = [src]; total = buf.duration;
+      setStatus('Playing the original…');
+    } else if (kind === 'section') {
+      const sec = arg.sec; id = sec.id; secStart = sec.start;
+      const r = planSegments(buf, [sec], 0); plan = r.plan; total = r.total; nodes = schedulePlan(ctx, master, buf, plan, t0);
+      setStatus(`Previewing ${sec.label} (${sec.dur.toFixed(1)} s)…`);
+    } else {
+      if (!S.arrangement.length) { setStatus('Nothing to play yet — press Recompose first.', 'warn'); return; }
+      const r = planSegments(buf, S.arrangement.map(i => S.sections[i]), S.fadeMs / 1000); plan = r.plan; total = r.total;
+      nodes = schedulePlan(ctx, master, buf, plan, t0);
+      setStatus(`Playing remix — ${S.arrangement.length} sections, ${fmt(total)}…`);
+    }
+    S.play = { kind, id, ctx, master, nodes, t0, total, plan, secStart, chip: -1 };
+    updateTransportUI(); requestAnimationFrame(tickPlay);
+  } catch (err) { console.error(err); setStatus(err.message || String(err), 'error'); stopPlayback(); }
+}
+function stopPlayback() {
+  const p = S.play; if (!p) return; S.play = null;
+  try {
+    const now = p.ctx.currentTime; p.master.gain.cancelScheduledValues(now);
+    p.master.gain.setValueAtTime(p.master.gain.value, now); p.master.gain.linearRampToValueAtTime(0, now + 0.03);
+    p.nodes.forEach(n => { try { n.stop(now + 0.04); } catch (e) {} });
+    setTimeout(() => { try { p.master.disconnect(); } catch (e) {} }, 120);
+  } catch (e) {}
+  $('phOrig').style.display = 'none'; $('phArr').style.display = 'none';
+  updateTransportUI();
+}
+function tickPlay() {
+  const p = S.play; if (!p) return;
+  const el = Math.max(0, p.ctx.currentTime - p.t0);
+  if (el >= p.total + 0.05) { stopPlayback(); setStatus('Playback finished.', 'ok'); return; }
+  const dur = S.buffer.duration;
+  if (p.kind === 'orig' || p.kind === 'section') {
+    const pos = (p.kind === 'orig' ? el : p.secStart + el) / dur;
+    const ph = $('phOrig'); ph.style.display = 'block'; ph.style.left = (clamp(pos, 0, 1) * 100) + '%';
+  } else {
+    const ph = $('phArr'); ph.style.display = 'block'; ph.style.left = (clamp(el / p.total, 0, 1) * 100) + '%';
+    let idx = 0; for (let i = 0; i < p.plan.length; i++) if (p.plan[i].pos <= el) idx = i;
+    if (idx !== p.chip) { p.chip = idx; document.querySelectorAll('#chipBox .chip').forEach((c, i) => c.classList.toggle('playing', i === idx)); }
+  }
+  requestAnimationFrame(tickPlay);
+}
+const isPlaying = (kind, id) => S.play && S.play.kind === kind && (id == null || S.play.id === id);
+function togglePreviewSection(sec) { isPlaying('section', sec.id) ? (stopPlayback(), setStatus('Stopped.')) : startPlayback('section', { sec }); }
+
+/* =========================================================================
+   EXPORT  (OfflineAudioContext → WAV)
+   ========================================================================= */
+function renderOffline(oc) {
+  return new Promise((res, rej) => {
+    oc.oncomplete = e => res(e.renderedBuffer);                       // legacy Safari
+    let p; try { p = oc.startRendering(); } catch (e) { rej(e); return; }
+    if (p && p.then) p.then(res, rej);
+  });
+}
+/** Fallback if OfflineAudioContext fails (e.g. memory): mix the same plan manually in JS. */
+function mixManual(buf, plan, total) {
+  const sr = buf.sampleRate, n = Math.ceil(total * sr) + 1, L = new Float32Array(n), R = new Float32Array(n);
+  const c0 = buf.getChannelData(0), c1 = buf.numberOfChannels > 1 ? buf.getChannelData(1) : c0;
+  plan.forEach(p => {
+    const o = Math.round(p.startAt * sr), so = Math.round(p.offset * sr), ln = Math.round(p.len * sr), fi = p.fin * sr, fo = p.fout * sr;
+    for (let i = 0; i < ln; i++) {
+      const d = o + i, s = so + i; if (d < 0 || d >= n || s < 0 || s >= buf.length) continue;
+      const g = i < fi ? i / fi : (i > ln - fo ? (ln - i) / fo : 1);
+      L[d] += c0[s] * g; R[d] += c1[s] * g;
+    }
+  });
+  return [L, R];
+}
+async function encodeWav(chData, sr, onProg) {
+  const nch = chData.length, len = chData[0].length, bytes = len * nch * 2, ab = new ArrayBuffer(44 + bytes), dv = new DataView(ab);
+  const w = (o, t) => { for (let i = 0; i < t.length; i++) dv.setUint8(o + i, t.charCodeAt(i)); };
+  w(0,'RIFF'); dv.setUint32(4,36+bytes,true); w(8,'WAVE'); w(12,'fmt '); dv.setUint32(16,16,true); dv.setUint16(20,1,true);
+  dv.setUint16(22,nch,true); dv.setUint32(24,sr,true); dv.setUint32(28,sr*nch*2,true); dv.setUint16(32,nch*2,true); dv.setUint16(34,16,true);
+  w(36,'data'); dv.setUint32(40,bytes,true);
+  // Overlapping crossfades can push peaks above 1.0 — scale down slightly if so.
+  let peak = 0; for (const c of chData) for (let i = 0; i < len; i += 7) { const v = Math.abs(c[i]); if (v > peak) peak = v; }
+  const gain = peak > 0.99 ? 0.98 / peak : 1;
+  const pcm = new Int16Array(ab, 44);       // iPad browsers are little-endian, matching WAV
+  let o = 0, last = performance.now();
+  for (let i = 0; i < len; i++) {
+    for (let c = 0; c < nch; c++) { const x = clamp(chData[c][i] * gain, -1, 1); pcm[o++] = x < 0 ? x * 32768 : x * 32767; }
+    if ((i & 0xFFFFF) === 0 && performance.now() - last > 30) { onProg(i / len); await tick(); last = performance.now(); }
+  }
+  return new Blob([ab], { type: 'audio/wav' });
+}
+function clearExport() {
+  if (S.exportUrl) { URL.revokeObjectURL(S.exportUrl); S.exportUrl = null; }
+  $('exportCard').hidden = true; try { $('exportAudio').removeAttribute('src'); } catch (e) {}
+}
+async function exportAudio() {
+  if (S.busy) return;
+  if (!S.arrangement.length) { setStatus('Nothing to export — press Recompose first.', 'warn'); return; }
+  stopPlayback(); clearExport(); setBusy(true);
+  try {
+    const buf = S.buffer, sr = buf.sampleRate, segs = S.arrangement.map(i => S.sections[i]);
+    const { plan, total } = planSegments(buf, segs, S.fadeMs / 1000), frames = Math.ceil(total * sr) + 1;
+    showProgress('Rendering your remix…', null); setStatus(`Rendering ${segs.length} sections (${fmt(total)}) offline…`); await tick();
+    if (frames * 8 > 450 * 1048576) throw new Error('This arrangement is too long to render on a mobile device — choose fewer sections.');
+    let chans;
+    try {
+      const OC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+      if (!OC) throw new Error('OfflineAudioContext unavailable');
+      const oc = new OC(2, frames, sr);
+      schedulePlan(oc, oc.destination, buf, plan, 0);
+      const out = await renderOffline(oc); chans = [out.getChannelData(0), out.getChannelData(1)];
+    } catch (e) {
+      console.warn('Offline render failed, mixing manually:', e); setStatus('Offline renderer unavailable — mixing manually…', 'warn'); await tick();
+      chans = mixManual(buf, plan, total);
+    }
+    showProgress('Encoding WAV…', 0); setStatus('Encoding WAV file…');
+    const blob = await encodeWav(chans, sr, p => showProgress('Encoding WAV…', p));
+    const base = (S.fileName.replace(/\.[^.]+$/, '') || 'track').replace(/[^\w\- ]+/g, '_'), name = base + ' - remix.wav';
+    S.exportUrl = URL.createObjectURL(blob);
+    const a = $('dlLink'); a.href = S.exportUrl; a.download = name;
+    $('exportAudio').src = S.exportUrl;
+    $('exportInfo').innerHTML = `<span class="pill">${name}</span><span class="pill">${fmt(total)}</span><span class="pill">${(blob.size / 1048576).toFixed(1)} MB</span><span class="pill">${sr} Hz stereo 16-bit</span>`;
+    const sb = $('shareBtn'); sb.hidden = true;
+    try {
+      const file = new File([blob], name, { type: 'audio/wav' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        sb.hidden = false;
+        sb.onclick = async () => { try { await navigator.share({ files: [file], title: name }); } catch (e) { if (e.name !== 'AbortError') setStatus('Sharing failed: ' + e.message, 'warn'); } };
+      }
+    } catch (e) {}
+    $('exportCard').hidden = false; $('exportCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    hideProgress(); setStatus('Export ready — tap “Download WAV” or “Share / Save to Files”.', 'ok');
+  } catch (err) {
+    console.error(err); hideProgress();
+    setStatus((err.message || String(err)) + (/memory|alloc/i.test(String(err)) ? ' (out of memory — try fewer sections)' : ''), 'error');
+  } finally { setBusy(false); }
+}
+
+/* =========================================================================
+   DRAWING
+   ========================================================================= */
+function fitCanvas(c, h) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 3), w = Math.max(100, c.parentElement.clientWidth);
+  c.style.width = w + 'px'; c.style.height = h + 'px'; c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
+  const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); return { g, w, h };
+}
+/** min/max amplitude per bin over [t0,t1] (channel 0, strided for speed) */
+function computePeaks(buf, t0, t1, bins) {
+  const ch = buf.getChannelData(0), sr = buf.sampleRate, a = Math.max(0, Math.floor(t0 * sr)), b = Math.min(buf.length, Math.floor(t1 * sr));
+  const out = new Float32Array(bins * 2), spb = (b - a) / bins, step = Math.max(1, Math.floor(spb / 48));
+  for (let i = 0; i < bins; i++) {
+    const s = a + Math.floor(i * spb), e = Math.min(b, a + Math.floor((i + 1) * spb)); let mn = 0, mx = 0;
+    for (let j = s; j < e; j += step) { const v = ch[j]; if (v < mn) mn = v; if (v > mx) mx = v; }
+    out[i * 2] = mn; out[i * 2 + 1] = mx;
+  }
+  return out;
+}
+function drawWave(g, peaks, x, w, midY, halfH) {
+  const bins = peaks.length / 2; let mx = 0.001; for (let i = 0; i < peaks.length; i++) mx = Math.max(mx, Math.abs(peaks[i]));
+  const sc = halfH / mx * 0.92, bw = w / bins; g.fillStyle = 'rgba(232,237,247,.82)';
+  for (let i = 0; i < bins; i++) { const mn = peaks[i * 2] * sc, ma = peaks[i * 2 + 1] * sc; g.fillRect(x + i * bw, midY - ma, Math.max(1, bw - 0.4), Math.max(1, ma - mn)); }
+}
+function drawOriginal() {
+  if (!S.buffer) return;
+  const { g, w, h } = fitCanvas($('cvOrig'), 150), dur = S.buffer.duration; g.clearRect(0, 0, w, h);
+  S.sections.forEach(s => {
+    const x1 = s.start / dur * w, x2 = s.end / dur * w;
+    g.globalAlpha = s.enabled ? 0.30 : 0.09; g.fillStyle = s.color; g.fillRect(x1, 0, x2 - x1, h);
+    g.globalAlpha = s.enabled ? 1 : 0.4; g.fillRect(x1, 0, x2 - x1, 5); g.globalAlpha = 1;
+    g.fillStyle = 'rgba(255,255,255,.2)'; g.fillRect(x1, 0, 1, h);
+  });
+  drawWave(g, computePeaks(S.buffer, 0, dur, Math.max(60, Math.floor(w / 2))), 0, w, h / 2 + 6, (h - 34) / 2);
+  g.font = '600 11px -apple-system,system-ui,sans-serif';
+  S.sections.forEach(s => {
+    const x1 = s.start / dur * w, x2 = s.end / dur * w;
+    if (x2 - x1 > 44) { g.save(); g.beginPath(); g.rect(x1, 0, x2 - x1, h); g.clip(); g.fillStyle = '#fff'; g.fillText(s.label, x1 + 6, 19); g.restore(); }
+  });
+  const sel = S.sections[S.selSec];
+  if (sel) { g.strokeStyle = '#fff'; g.lineWidth = 2; g.strokeRect(sel.start / dur * w + 1, 1, (sel.end - sel.start) / dur * w - 2, h - 2); }
+}
+function drawArrangement() {
+  const { g, w, h } = fitCanvas($('cvArr'), 110); g.clearRect(0, 0, w, h);
+  if (!S.buffer || !S.arrangement.length) {
+    g.fillStyle = '#8b98b3'; g.font = '14px -apple-system,system-ui,sans-serif'; g.textAlign = 'center';
+    g.fillText('Press “Recompose” to build an arrangement', w / 2, h / 2 + 5); return;
+  }
+  const total = arrTotalSecs(); let x = 0;
+  S.arrangement.forEach((id, i) => {
+    const s = S.sections[id], bw = s.dur / total * w;
+    g.globalAlpha = 0.30; g.fillStyle = s.color; g.fillRect(x, 0, bw, h); g.globalAlpha = 1; g.fillRect(x, 0, bw, 5);
+    drawWave(g, computePeaks(S.buffer, s.start, s.end, Math.max(8, Math.floor(bw / 2))), x, bw, h / 2 + 5, (h - 28) / 2);
+    g.fillStyle = 'rgba(255,255,255,.28)'; g.fillRect(x, 0, 1, h);
+    if (bw > 26) { g.fillStyle = '#fff'; g.font = '600 11px -apple-system,system-ui,sans-serif'; g.textAlign = 'left'; g.fillText(String(i + 1), x + 5, 19); }
+    if (i === S.selChip) { g.strokeStyle = '#fff'; g.lineWidth = 2; g.strokeRect(x + 1, 1, bw - 2, h - 2); }
+    x += bw;
+  });
+}
+const redrawAll = () => { drawOriginal(); drawArrangement(); };
+
+/* =========================================================================
+   UI RENDERING
+   ========================================================================= */
+function renderSections() {
+  $('secGrid').innerHTML = S.sections.map(s => `
+    <div class="sec ${s.enabled ? '' : 'off'} ${s.id === S.selSec ? 'sel' : ''}" data-id="${s.id}" style="--c:${s.color}">
+      <div class="top"><span class="nm">${s.label}</span><span class="tm">${fmt(s.start)}–${fmt(s.end)}</span></div>
+      <div class="meter" title="Energy"><i style="width:${Math.round(8 + s.energy * 92)}%"></i></div>
+      <div class="acts">
+        <button class="btn sm" data-act="play" aria-label="Preview">▶</button>
+        <button class="btn sm" data-act="add" aria-label="Add to remix">＋</button>
+        <button class="btn sm" data-act="toggle" aria-pressed="${s.enabled}">${s.enabled ? '✓' : '✕'}</button>
+      </div>
+    </div>`).join('');
+  $('infoSecs').textContent = S.sections.length;
+  updateTransportUI();
+}
+function renderArrangement() {
+  const box = $('chipBox'); box.innerHTML = '';
+  S.arrangement.forEach((id, i) => {
+    const s = S.sections[id], c = i > 0 ? Math.round(compat(S.sections[S.arrangement[i - 1]], s) * 100) : null;
+    const b = document.createElement('button'); b.className = 'chip' + (i === S.selChip ? ' sel' : ''); b.style.setProperty('--c', s.color); b.dataset.i = i;
+    b.innerHTML = `<div class="n">#${i + 1} · ${s.dur.toFixed(1)}s</div><div class="l">${s.label}</div>` +
+      (c == null ? '<div class="m muted">start</div>' : `<div class="m" style="color:${c >= 75 ? 'var(--good)' : c >= 50 ? 'var(--warn)' : 'var(--bad)'}">fit ${c}%</div>`);
+    box.appendChild(b);
+  });
+  $('arrTotal').textContent = S.arrangement.length ? `${S.arrangement.length} sections · ${fmt(arrTotalSecs())}` : 'No arrangement yet';
+  drawArrangement(); updateTransportUI();
+}
+function updateTransportUI() {
+  $('btnPlayOrig').textContent = isPlaying('orig') ? '■ Stop' : '▶ Play original';
+  $('btnPlayRemix').textContent = isPlaying('remix') ? '■ Stop' : '▶ Play remix';
+  $('btnPlayRemix').disabled = !S.arrangement.length; $('btnExport').disabled = !S.arrangement.length;
+  const has = S.selChip >= 0;
+  $('btnLeft').disabled = !has || S.selChip === 0; $('btnRight').disabled = !has || S.selChip >= S.arrangement.length - 1;
+  $('btnDup').disabled = !has; $('btnDel').disabled = !has;
+  document.querySelectorAll('#secGrid .sec').forEach(el => {
+    const b = el.querySelector('[data-act=play]'); if (b) b.textContent = isPlaying('section', +el.dataset.id) ? '■' : '▶';
+  });
+}
+function syncControls() {
+  $('infoFile').textContent = S.fileName.length > 34 ? S.fileName.slice(0, 31) + '…' : S.fileName;
+  $('infoDur').textContent = fmt(S.buffer.duration); $('infoBpm').textContent = S.bpm.toFixed(1); $('bpmInput').value = S.bpm.toFixed(1);
+  $('bpmAuto').classList.toggle('primary', S.bpmAuto);
+  document.querySelectorAll('#barsSeg button').forEach(b => b.classList.toggle('on', +b.dataset.bars === S.bars));
+  document.querySelectorAll('#stratSeg button').forEach(b => b.classList.toggle('on', b.dataset.s === S.strategy));
+  $('stratDesc').textContent = STRATEGIES.find(x => x.id === S.strategy).desc;
+}
+function selectSection(id) {
+  S.selSec = id; document.querySelectorAll('#secGrid .sec').forEach(el => el.classList.toggle('sel', +el.dataset.id === id)); drawOriginal();
+}
+
+/* =========================================================================
+   Re-slicing when tempo / bar length changes (debounced)
+   ========================================================================= */
+let rbTimer = null, rbRunning = false, rbAgain = false;
+function queueRebuild() { clearTimeout(rbTimer); setStatus('Updating sections…'); rbTimer = setTimeout(doRebuild, 300); }
+async function doRebuild() {
+  if (!S.env) return; if (rbRunning) { rbAgain = true; return; }
+  rbRunning = true;
+  try {
+    stopPlayback(); showProgress('Re-slicing track…', null); await tick();
+    if (S.bpmAuto) { S.bpm = S.auto.bpm; S.firstBeat = S.auto.phase; }
+    else { const g = await refineGrid(S.env, S.bpm, true, () => {}); S.firstBeat = g.phase; }
+    buildSections();
+    if (!S.sections.length) throw new Error('No sections at these settings — try a shorter section length or a higher BPM.');
+    S.arrangement = []; S.selSec = -1; S.selChip = -1;
+    syncControls(); renderSections(); recompose(true); redrawAll();
+    setStatus(`${S.sections.length} sections at ${S.bpm.toFixed(1)} BPM, ${S.bars} bar${S.bars > 1 ? 's' : ''} each.`, 'ok');
+  } catch (err) { console.error(err); setStatus(err.message || String(err), 'error'); }
+  finally { rbRunning = false; hideProgress(); if (rbAgain) { rbAgain = false; doRebuild(); } }
+}
+
+/* =========================================================================
+   Event wiring
+   ========================================================================= */
+$('fileInput').addEventListener('change', e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; handleFile(f); });
+const dz = $('dropZone');
+['dragenter', 'dragover'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('drag'); }));
+['dragleave', 'drop'].forEach(ev => dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('drag'); }));
+dz.addEventListener('drop', e => { const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]; if (f) handleFile(f); });
+dz.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('fileInput').click(); } });
+// Stop the browser navigating away if a file is dropped outside the zone
+['dragover', 'drop'].forEach(ev => window.addEventListener(ev, e => e.preventDefault()));
+
+$('barsSeg').addEventListener('click', e => { const b = e.target.closest('button[data-bars]'); if (!b || S.busy) return; S.bars = +b.dataset.bars; syncControls(); queueRebuild(); });
+const setBpm = v => { v = clamp(parseFloat(v) || S.bpm, 50, 220); S.bpm = Math.round(v * 10) / 10; S.bpmAuto = false; syncControls(); queueRebuild(); };
+$('bpmMinus').addEventListener('click', () => setBpm(S.bpm - 1));
+$('bpmPlus').addEventListener('click', () => setBpm(S.bpm + 1));
+$('bpmInput').addEventListener('change', e => setBpm(e.target.value));
+$('bpmAuto').addEventListener('click', () => { S.bpmAuto = true; S.bpm = S.auto.bpm; syncControls(); queueRebuild(); });
+$('fadeRange').addEventListener('input', e => { S.fadeMs = +e.target.value; $('fadeVal').textContent = S.fadeMs; });
+
+// Strategy buttons
+$('stratSeg').innerHTML = STRATEGIES.map(s => `<button data-s="${s.id}">${s.name}</button>`).join('');
+$('stratSeg').addEventListener('click', e => { const b = e.target.closest('button[data-s]'); if (!b) return; S.strategy = b.dataset.s; syncControlsSafe(); if (S.sections.length) recompose(); });
+function syncControlsSafe() {
+  document.querySelectorAll('#stratSeg button').forEach(b => b.classList.toggle('on', b.dataset.s === S.strategy));
+  $('stratDesc').textContent = STRATEGIES.find(x => x.id === S.strategy).desc;
+}
+syncControlsSafe();
+$('targetSel').addEventListener('change', e => { S.target = +e.target.value; if (S.sections.length) recompose(); });
+$('btnRecompose').addEventListener('click', () => recompose());
+
+// Transport
+$('btnPlayOrig').addEventListener('click', () => isPlaying('orig') ? (stopPlayback(), setStatus('Stopped.')) : startPlayback('orig'));
+$('btnPlayRemix').addEventListener('click', () => isPlaying('remix') ? (stopPlayback(), setStatus('Stopped.')) : startPlayback('remix'));
+$('btnExport').addEventListener('click', exportAudio);
+
+// Tap on the original waveform → select + preview the section under the finger
+$('cvOrig').addEventListener('click', e => {
+  if (!S.buffer) return; const r = e.currentTarget.getBoundingClientRect(), t = (e.clientX - r.left) / r.width * S.buffer.duration;
+  const sec = S.sections.find(s => t >= s.start && t < s.end); if (!sec) return;
+  selectSection(sec.id); togglePreviewSection(sec);
+});
+// Section cards
+$('secGrid').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-act]'); if (!btn) return;
+  const card = btn.closest('.sec'), sec = S.sections[+card.dataset.id]; selectSection(sec.id);
+  if (btn.dataset.act === 'play') togglePreviewSection(sec);
+  else if (btn.dataset.act === 'add') { S.arrangement.push(sec.id); renderArrangement(); setStatus(`Added ${sec.label} to the end of your remix.`, 'ok'); }
+  else if (btn.dataset.act === 'toggle') {
+    sec.enabled = !sec.enabled; card.classList.toggle('off', !sec.enabled); btn.textContent = sec.enabled ? '✓' : '✕'; btn.setAttribute('aria-pressed', sec.enabled);
+    drawOriginal(); setStatus(`${sec.label} ${sec.enabled ? 'will be used' : 'will be skipped'} next time you press Recompose.`);
+  }
+});
+// Arrangement chips / canvas
+function selectChip(i, preview) {
+  S.selChip = i; document.querySelectorAll('#chipBox .chip').forEach((c, k) => c.classList.toggle('sel', k === i)); drawArrangement(); updateTransportUI();
+  if (preview && S.arrangement[i] != null) startPlayback('section', { sec: S.sections[S.arrangement[i]] });
+}
+$('chipBox').addEventListener('click', e => { const c = e.target.closest('.chip'); if (c) selectChip(+c.dataset.i, true); });
+$('cvArr').addEventListener('click', e => {
+  if (!S.arrangement.length) return; const r = e.currentTarget.getBoundingClientRect(), t = (e.clientX - r.left) / r.width * arrTotalSecs();
+  let acc = 0; for (let i = 0; i < S.arrangement.length; i++) { acc += S.sections[S.arrangement[i]].dur; if (t < acc) { selectChip(i, true); return; } }
+});
+const edit = fn => { stopPlayback(); fn(); renderArrangement(); };
+$('btnLeft').addEventListener('click',  () => edit(() => { const i = S.selChip, a = S.arrangement; if (i > 0) { [a[i - 1], a[i]] = [a[i], a[i - 1]]; S.selChip--; } }));
+$('btnRight').addEventListener('click', () => edit(() => { const i = S.selChip, a = S.arrangement; if (i >= 0 && i < a.length - 1) { [a[i + 1], a[i]] = [a[i], a[i + 1]]; S.selChip++; } }));
+$('btnDup').addEventListener('click',   () => edit(() => { const i = S.selChip; if (i >= 0) { S.arrangement.splice(i + 1, 0, S.arrangement[i]); S.selChip = i + 1; } }));
+$('btnDel').addEventListener('click',   () => edit(() => { const i = S.selChip; if (i >= 0) { S.arrangement.splice(i, 1); S.selChip = -1; } }));
+
+// Keep canvases crisp on rotation / resize
+let rzTimer = null; const onResize = () => { clearTimeout(rzTimer); rzTimer = setTimeout(redrawAll, 120); };
+window.addEventListener('resize', onResize); window.addEventListener('orientationchange', onResize);
+if (window.ResizeObserver) new ResizeObserver(onResize).observe($('app'));
+
+// Last-resort error reporting so failures are never silent
+window.addEventListener('error', e => setStatus('Unexpected error: ' + (e.message || 'see console'), 'error'));
+window.addEventListener('unhandledrejection', e => setStatus('Unexpected error: ' + ((e.reason && e.reason.message) || e.reason), 'error'));
+window.addEventListener('pagehide', stopPlayback);
+})();
+</script>
+</body>
+</html>

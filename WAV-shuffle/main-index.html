@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WAV Audio Scramble Remixer + BPM Grid & De-Clicker</title>
+    <script src="https://tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen p-6 font-sans">
+
+    <div class="max-w-4xl mx-auto space-y-6">
+        <header class="border-b border-slate-800 pb-4">
+            <h1 class="text-3xl font-extrabold text-amber-400">WAV Audio "Scramble" Remixer</h1>
+            <p class="text-xs text-slate-400 font-mono">Client-Side Algorithmic Loop Slicer, Auto-BPM Detector & Anti-Pop Binary Assembler</p>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-900 p-5 rounded-xl border border-slate-800">
+            <div class="space-y-2">
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-400">1. Load Loop</label>
+                <input type="file" id="audioFile" accept="audio/wav,audio/x-wav" class="w-full bg-slate-950 border border-slate-700 text-xs rounded p-2 focus:outline-none focus:border-amber-500">
+                <div id="fileStatus" class="text-xs font-mono text-slate-400 truncate">No file loaded.</div>
+            </div>
+
+            <div class="space-y-2">
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-400">2. BPM Grid Finder</label>
+                <div class="flex items-center gap-2">
+                    <button id="detectBpmBtn" disabled class="disabled:opacity-30 disabled:cursor-not-allowed bg-slate-800 hover:bg-slate-700 text-amber-400 font-bold py-2 px-3 rounded text-xs w-full transition border border-slate-700">
+                        Detect BPM
+                    </button>
+                </div>
+                <div id="bpmStatus" class="text-xs font-mono text-emerald-400 truncate">BPM: --</div>
+            </div>
+
+            <div class="space-y-2">
+                <label class="block text-xs font-bold uppercase tracking-wider text-slate-400">3. Slice & Envelope</label>
+                <select id="sliceCountSelect" class="w-full bg-slate-950 border border-slate-700 rounded p-1.5 text-xs focus:outline-none focus:border-amber-500">
+                    <option value="4">4 Quarter Chunks</option>
+                    <option value="8">8 Eighth-Note Slices</option>
+                    <option value="16" selected>16 Sixteenth-Note Blocks</option>
+                    <option value="32">32 Thirty-Second-Note Micros</option>
+                </select>
+                <div class="flex items-center gap-1.5 text-xs text-slate-400">
+                    <input type="checkbox" id="envelopeToggle" checked class="accent-amber-500 rounded">
+                    <label for="envelopeToggle" class="cursor-pointer select-none">5ms Anti-Pop Ramp</label>
+                </div>
+                <div class="flex gap-2">
+                    <button id="scrambleBtn" disabled class="disabled:opacity-30 disabled:cursor-not-allowed bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold py-1.5 px-2 rounded text-xs w-full transition">Scramble</button>
+                    <button id="resetBtn" disabled class="disabled:opacity-30 disabled:cursor-not-allowed bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold py-1.5 px-2 rounded text-xs w-full transition">Reset</button>
+                </div>
+            </div>
+
+            <div class="space-y-2 flex flex-col justify-between">
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">4. Output Controls</label>
+                    <div class="flex gap-2">
+                        <button id="playBtn" disabled class="disabled:opacity-30 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold py-1.5 px-3 rounded w-full transition">Play</button>
+                        <button id="stopBtn" disabled class="disabled:opacity-30 bg-rose-700 hover:bg-rose-600 text-white text-xs font-bold py-1.5 px-3 rounded w-full transition">Stop</button>
+                    </div>
+                </div>
+                <button id="exportWavBtn" disabled class="disabled:opacity-30 disabled:cursor-not-allowed bg-sky-600 hover:bg-sky-500 text-white font-bold py-2 px-3 rounded text-xs w-full transition shadow-lg shadow-sky-950/40">
+                    Export New WAV File
+                </button>
+            </div>
+        </div>
+
+        <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 space-y-2">
+            <div class="flex justify-between items-center text-xs font-mono text-slate-400">
+                <span>Visual Mapping Grid (Current Playback Sequence)</span>
+                <span id="timeMetrics">0.00s / 0.00s</span>
+            </div>
+            <div class="bg-slate-950 rounded-lg border border-slate-800 h-36 relative">
+                <canvas id="visualCanvas" class="w-full h-full"></canvas>
+            </div>
+            <div id="sequenceLog" class="bg-slate-950 p-2.5 rounded border border-slate-800 font-mono text-xs text-amber-300 truncate">
+                Sequence Matrix: <span class="text-slate-500">&lt;Awaiting slice parsing&gt;</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Document Selectors
+            const audioFileInput = document.getElementById('audioFile');
+            const detectBpmBtn = document.getElementById('detectBpmBtn');
+            const sliceCountSelect = document.getElementById('sliceCountSelect');
+            const envelopeToggle = document.getElementById('envelopeToggle');
+            const scrambleBtn = document.getElementById('scrambleBtn');
+            const resetBtn = document.getElementById('resetBtn');
+            const playBtn = document.getElementById('playBtn');
+            const stopBtn = document.getElementById('stopBtn');
+            const exportWavBtn = document.getElementById('exportWavBtn');
+            const fileStatus = document.getElementById('fileStatus');
+            const bpmStatus = document.getElementById('bpmStatus');
+            const timeMetrics = document.getElementById('timeMetrics');
+            const sequenceLog = document.getElementById('sequenceLog');
+            const visualCanvas = document.getElementById('visualCanvas');
+            const canvasCtx = visualCanvas.getContext('2d');
+
+            // Internal Audio Engine Global Contexts
+            let audioCtx = null;
+            let originalBuffer = null;   // Pristine reference array
+            let processedBuffer = null;  // Mutated array payload
+            let activePlaybackSource = null;
+            let currentSequenceMap = []; // Array keeping track of index order
+            let detectedBPM = null;
+
+            // File Upload Listener
+            audioFileInput.addEventListener('change', async (e) => {
+                const targetFile = e.target.files[0];
+                if (!targetFile) return;
+
+                if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                
+                fileStatus.textContent = "Decoding binary stream...";
+                
+                try {
+                    const arrayBuffer = await targetFile.arrayBuffer();
+                    originalBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+                    
+                    fileStatus.textContent = `Loaded: ${targetFile.name}`;
+                    timeMetrics.textContent = `0.00s / ${originalBuffer.duration.toFixed(2)}s`;
+                    
+                    // Auto detect BPM upon loading
+                    autoDetectLoopBPM();
+
+                    // Initialize clean state linear mapping
+                    resetSequenceMap();
+                    compileProcessedBuffer();
+                    
+                    // Enable Core UI actions
+                    setUIState(true);
+                } catch (err) {
+                    console.error("PCM Decoding Exception Context:", err);
+                    fileStatus.textContent = "Error: Invalid audio format.";
+                }
+            });
+
+            // --- 1. Automatic BPM Detection Engine ---
+            function autoDetectLoopBPM() {
+                if (!originalBuffer) return;
+                
+                const channelData = originalBuffer.getChannelData(0);
+                const sampleRate = originalBuffer.sampleRate;
+                const bufferLength = channelData.length;
+                
+                // Root Mean Square (RMS) energy calculation over 10ms frame windows
+                const windowSize = Math.floor(sampleRate * 0.01);
+                const stepSize = Math.floor(sampleRate * 0.005);
+                const energyPeaks = [];
+                
+                for (let i = 0; i < bufferLength - windowSize; i += stepSize) {
+                    let sum = 0;
+                    for (let j = 0; j < windowSize; j++) {
+                        sum += channelData[i + j] * channelData[i + j];
+                    }
+                    const rms = Math.sqrt(sum / windowSize);
+                    energyPeaks.push({ offset: i, energy: rms });
+                }
+
+                // Dynamic peak detection thresholding for beat transient tracking
+                const threshold = 0.12;
+                const transientOffsets = [];
+                for (let i = 1; i < energyPeaks.length - 1; i++) {
+                    if (energyPeaks[i].energy > threshold &&
+                        energyPeaks[i].energy > energyPeaks[i - 1].energy &&
+                        energyPeaks[i].energy > energyPeaks[i + 1].energy) {
+                        transientOffsets.push(energyPeaks[i].offset);
+                    }
+                }
+
+                // Compute time intervals between consecutive transient peaks
+                const intervals = [];
+                for (let i = 1; i < transientOffsets.length; i++) {
+                    const diffSec = (transientOffsets[i] - transientOffsets[i - 1]) / sampleRate;
+                    if (diffSec >= 0.25 && diffSec <= 1.2) { // Target range ~50 to 240 BPM
+                        intervals.push(diffSec);
+                    }
+                }
+
+                if (intervals.length > 0) {
+                    // Find median beat interval duration
+                    intervals.sort((a, b) => a - b);
+                    const medianInterval = intervals[Math.floor(intervals.length / 2)];
+                    let calculatedBPM = Math.round(60 / medianInterval);
+
+                    // Clamp tempo estimation to standard musical ranges (70 - 180 BPM)
+                    while (calculatedBPM < 70) calculatedBPM *= 2;
+                    while (calculatedBPM > 180) calculatedBPM /= 2;
+
+                    detectedBPM = Math.round(calculatedBPM);
+                    bpmStatus.textContent = `Detected: ~${detectedBPM} BPM`;
+                } else {
+                    // Fallback estimation using mathematical duration assuming 4-bar or 2-bar loops
+                    const duration = originalBuffer.duration;
+                    const estimatedBeats = duration > 4 ? 16 : 8;
+                    detectedBPM = Math.round((estimatedBeats / duration) * 60);
+                    bpmStatus.textContent = `Estimated: ~${detectedBPM} BPM`;
+                }
+            }
+
+            detectBpmBtn.addEventListener('click', () => {
+                autoDetectLoopBPM();
+                compileProcessedBuffer();
+            });
+
+            // Initialize Linear Sequential Mapping Matrix
+            function resetSequenceMap() {
+                const totalSliceBlocks = parseInt(sliceCountSelect.value, 10);
+                currentSequenceMap = [];
+                for (let i = 0; i < totalSliceBlocks; i++) {
+                    currentSequenceMap.push(i);
+                }
+                renderSequenceOutputString();
+            }
+
+            // Scramble Trigger: Randomize Map Order (Fisher-Yates Algorithm)
+            scrambleBtn.addEventListener('click', () => {
+                if (!originalBuffer) return;
+                
+                for (let i = currentSequenceMap.length - 1; i > 0; i--) {
+                    const randomIdx = Math.floor(Math.random() * (i + 1));
+                    const temporaryHold = currentSequenceMap[i];
+                    currentSequenceMap[i] = currentSequenceMap[randomIdx];
+                    currentSequenceMap[randomIdx] = temporaryHold;
+                }
+                
+                renderSequenceOutputString();
+                compileProcessedBuffer();
+            });
+
+            // Reset Sequence Layout
+            resetBtn.addEventListener('click', () => {
+                if (!originalBuffer) return;
+                resetSequenceMap();
+                compileProcessedBuffer();
+            });
+
+            // --- 2. Main Slicing, Anti-Pop Envelope & Reassembly Processing Engine ---
+            function compileProcessedBuffer() {
+                if (!originalBuffer || !audioCtx) return;
+
+                const sampleRate = originalBuffer.sampleRate;
+                const totalChannels = originalBuffer.numberOfChannels;
+                const totalSamplesCount = originalBuffer.length;
+                
+                const numberSlices = currentSequenceMap.length;
+                const samplesPerSlice = Math.floor(totalSamplesCount / numberSlices);
+
+                // Anti-Pop Envelope Calculation: 5ms linear fade duration
+                const applyEnvelope = envelopeToggle.checked;
+                const fadeDurationSec = 0.005; // 5 milliseconds
+                const fadeSamples = Math.min(Math.floor(sampleRate * fadeDurationSec), Math.floor(samplesPerSlice / 2));
+
+                // Create a completely new uncompressed AudioBuffer space
+                processedBuffer = audioCtx.createBuffer(totalChannels, totalSamplesCount, sampleRate);
+
+                // Process channels & assemble sliced chunks with micro-volume envelopes
+                for (let channel = 0; channel < totalChannels; channel++) {
+                    const originalChannelData = originalBuffer.getChannelData(channel);
+                    const processedChannelData = processedBuffer.getChannelData(channel);
+
+                    currentSequenceMap.forEach((targetSliceIndex, destinationSliceIndex) => {
+                        const sourceOffsetStart = targetSliceIndex * samplesPerSlice;
+                        const destOffsetStart = destinationSliceIndex * samplesPerSlice;
+
+                        for (let i = 0; i < samplesPerSlice; i++) {
+                            let sample = originalChannelData[sourceOffsetStart + i];
+
+                            // Apply Per-Slice Micro-Volume Fade Envelope (Anti-Pop/Click Filter)
+                            if (applyEnvelope) {
+                                if (i < fadeSamples) {
+                                    // Linear Fade-In ramp at chunk start
+                                    sample *= (i / fadeSamples);
+                                } else if (i >= samplesPerSlice - fadeSamples) {
+                                    // Linear Fade-Out ramp at chunk end
+                                    sample *= ((samplesPerSlice - i) / fadeSamples);
+                                }
+                            }
+
+                            processedChannelData[destOffsetStart + i] = sample;
+                        }
+                    });
+                }
+
+                // Render Canvas visualization grid
+                drawWaveformGrid(processedBuffer, numberSlices);
+            }
+
+            // Render Human-Readable String Output
+            function renderSequenceOutputString() {
+                sequenceLog.innerHTML = `Sequence Matrix: <span class="text-amber-400">[ ${currentSequenceMap.join(', ')} ]</span>`;
+            }
+
+            // Visualizer Engine: Plots Waveform Bars and Overlays Grid Slices
+            function drawWaveformGrid(audioBuffer, totalSlices) {
+                const width = visualCanvas.width = visualCanvas.parentElement.clientWidth;
+                const height = visualCanvas.height = visualCanvas.parentElement.clientHeight;
+                const channelData = audioBuffer.getChannelData(0);
+                const sampleLength = channelData.length;
+                const samplesPerPixel = Math.ceil(sampleLength / width);
+                canvasCtx.clearRect(0, 0, width, height);
+
+                // 1. Draw Waveform Bars
+                canvasCtx.fillStyle = '#64748b';
+                for (let i = 0; i < width; i++) {
+                    const seekFrame = i * samplesPerPixel;
+                    let peakValue = 0;
+                    for (let j = 0; j < samplesPerPixel && (seekFrame + j) < sampleLength; j++) {
+                        const absVal = Math.abs(channelData[seekFrame + j]);
+                        if (absVal > peakValue) peakValue = absVal;
+                    }
+                    const barHeight = peakValue * height;
+                    canvasCtx.fillRect(i, (height - barHeight) / 2, 1, barHeight);
+                }
+
+                // 2. Draw Slice Grid Lines
+                canvasCtx.strokeStyle = '#f59e0b';
+                canvasCtx.lineWidth = 1.5;
+                canvasCtx.font = '10px monospace';
+                canvasCtx.fillStyle = '#f59e0b';
+                for (let s = 1; s < totalSlices; s++) {
+                    const sliceXOffset = (width / totalSlices) * s;
+                    canvasCtx.beginPath();
+                    canvasCtx.moveTo(sliceXOffset, 0);
+                    canvasCtx.lineTo(sliceXOffset, height);
+                    canvasCtx.stroke();
+                }
+
+                // Annotate Slice Indices onto Canvas
+                for (let s = 0; s < totalSlices; s++) {
+                    const textXOffset = ((width / totalSlices) * s) + 4;
+                    canvasCtx.fillText(`#${s+1}`, textXOffset, 14);
+                }
+            }
+
+            // Streaming Playback Hooks
+            playBtn.addEventListener('click', () => {
+                if (!processedBuffer || !audioCtx) return;
+                if (activePlaybackSource) activePlaybackSource.stop();
+                activePlaybackSource = audioCtx.createBufferSource();
+                activePlaybackSource.buffer = processedBuffer;
+                activePlaybackSource.connect(audioCtx.destination);
+                activePlaybackSource.start(0);
+                playBtn.classList.add('bg-emerald-500');
+            });
+
+            stopBtn.addEventListener('click', () => {
+                if (activePlaybackSource) {
+                    activePlaybackSource.stop();
+                    activePlaybackSource = null;
+                }
+                playBtn.classList.remove('bg-emerald-500');
+            });
+
+            // Native Binary WAV File Compiler Engine (PCM RIFF Specification Formatter)
+            exportWavBtn.addEventListener('click', () => {
+                if (!processedBuffer) return;
+                const sampleRate = processedBuffer.sampleRate;
+                const numChannels = processedBuffer.numberOfChannels;
+                const totalFrames = processedBuffer.length;
+                
+                const pcmBytesPerSample = 2; // 16-bit PCM format
+                const rawDataBufferLength = totalFrames * numChannels * pcmBytesPerSample;
+                const totalFileLengthBytes = 44 + rawDataBufferLength;
+                const fileArrayBuffer = new ArrayBuffer(totalFileLengthBytes);
+                const dataView = new DataView(fileArrayBuffer);
+
+                /* Write Standard RIFF Header */
+                writeStringPointer(dataView, 0, 'RIFF');
+                dataView.setUint32(4, 36 + rawDataBufferLength, true);
+                writeStringPointer(dataView, 8, 'WAVE');
+
+                /* Write FMT sub-chunk formatting specs */
+                writeStringPointer(dataView, 12, 'fmt ');
+                dataView.setUint32(16, 16, true); // Chunk size = 16 (Standard PCM)
+                dataView.setUint16(20, 1, true);  // Format 1 = Linear PCM
+                dataView.setUint16(22, numChannels, true);
+                dataView.setUint32(24, sampleRate, true);
+                dataView.setUint32(28, sampleRate * numChannels * pcmBytesPerSample, true);
+                dataView.setUint16(32, numChannels * pcmBytesPerSample, true);
+                dataView.setUint16(34, 16, true); // 16-bit bit depth
+
+                /* Write DATA content identifier token */
+                writeStringPointer(dataView, 36, 'data');
+                dataView.setUint32(40, rawDataBufferLength, true);
+
+                /* Interleave and Write Channels PCM Data arrays */
+                let byteOffsetCursor = 44;
+                const channelDataArrays = [];
+                for (let ch = 0; ch < numChannels; ch++) {
+                    channelDataArrays.push(processedBuffer.getChannelData(ch));
+                }
+
+                for (let sampleIndex = 0; sampleIndex < totalFrames; sampleIndex++) {
+                    for (let ch = 0; ch < numChannels; ch++) {
+                        let sample = channelDataArrays[ch][sampleIndex];
+                        
+                        // Hard limiter clipping protection
+                        if (sample > 1.0) sample = 1.0;
+                        if (sample < -1.0) sample = -1.0;
+                        
+                        // Convert Float32 (-1.0 to 1.0) into Signed Int16 (-32768 to 32767)
+                        const int16PcmVal = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+                        dataView.setInt16(byteOffsetCursor, int16PcmVal, true);
+                        byteOffsetCursor += 2;
+                    }
+                }
+
+                // Create Download Link for export
+                const finalWavBlob = new Blob([fileArrayBuffer], { type: 'audio/wav' });
+                const downloadAnchor = document.createElement('a');
+                downloadAnchor.href = URL.createObjectURL(finalWavBlob);
+                downloadAnchor.download = `scramble-remix-${detectedBPM || 'audio'}bpm.wav`;
+                downloadAnchor.click();
+            });
+
+            // Helper Utility writing ASCII strings directly to Binary DataView blocks
+            function writeStringPointer(dataView, byteOffset, inputString) {
+                for (let i = 0; i < inputString.length; i++) {
+                    dataView.setUint8(byteOffset + i, inputString.charCodeAt(i));
+                }
+            }
+
+            function setUIState(enabled) {
+                detectBpmBtn.disabled = !enabled;
+                scrambleBtn.disabled = !enabled;
+                resetBtn.disabled = !enabled;
+                playBtn.disabled = !enabled;
+                stopBtn.disabled = !enabled;
+                exportWavBtn.disabled = !enabled;
+            }
+
+            sliceCountSelect.addEventListener('change', () => {
+                if (!originalBuffer) return;
+                resetSequenceMap();
+                compileProcessedBuffer();
+            });
+
+            envelopeToggle.addEventListener('change', () => {
+                if (!originalBuffer) return;
+                compileProcessedBuffer();
+            });
+        });
+    </script>
+</body>
+</html>

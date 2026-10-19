@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Lyric-to-MIDI Melody Generator</title>
+  <style>
+    :root {
+      --bg-color: #0f172a;
+      --card-bg: #1e293b;
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border-color: #334155;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      display: flex;
+      justify-content: center;
+      padding: 2rem;
+      min-height: 100vh;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 900px;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+
+    header h1 {
+      font-size: 2rem;
+      color: var(--text-main);
+      margin-bottom: 0.5rem;
+    }
+
+    header p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    .card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1.5rem;
+    }
+
+    .controls-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .checkbox-group {
+      flex-direction: row;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: auto;
+      padding-bottom: 0.5rem;
+    }
+
+    label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    select, textarea, input[type="number"] {
+      background-color: var(--bg-color);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 0.75rem;
+      border-radius: 6px;
+      font-size: 1rem;
+      outline: none;
+    }
+
+    select:focus, textarea:focus, input:focus {
+      border-color: var(--accent);
+    }
+
+    textarea {
+      width: 100%;
+      height: 120px;
+      resize: vertical;
+    }
+
+    .btn {
+      background-color: var(--accent);
+      color: white;
+      border: none;
+      padding: 0.85rem 1.5rem;
+      font-size: 1rem;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+      width: 100%;
+    }
+
+    .btn:hover {
+      background-color: var(--accent-hover);
+    }
+
+    .results {
+      display: none;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .results.active {
+      display: flex;
+    }
+
+    .midi-visualizer {
+      height: 120px;
+      background-color: var(--bg-color);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-around;
+      padding: 1rem;
+    }
+
+    .note-bar {
+      width: 8%;
+      background: linear-gradient(180deg, #818cf8 0%, var(--accent) 100%);
+      border-radius: 4px;
+      transition: height 0.3s ease;
+    }
+
+    .audio-player-container {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    audio {
+      width: 100%;
+      border-radius: 6px;
+    }
+
+    .download-group {
+      display: flex;
+      gap: 1rem;
+    }
+
+    .btn-secondary {
+      background-color: transparent;
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      text-decoration: none;
+      text-align: center;
+      line-height: 1.5;
+      padding: 0.85rem 1.5rem;
+      border-radius: 6px;
+      flex: 1;
+      font-weight: 600;
+      transition: background-color 0.2s ease;
+    }
+
+    .btn-secondary:hover {
+      background-color: var(--border-color);
+    }
+
+    .status-badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      background-color: #10b98120;
+      color: #10b981;
+      border: 1px solid #10b98140;
+      width: fit-content;
+      margin-bottom: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <h1>Lyric-to-MIDI Generator</h1>
+      <p>On-Device AI Pitch & Polyphonic Synthesis Engine</p>
+    </header>
+
+    <div class="card">
+      <div class="status-badge">⚡ Lightweight Engine Loaded (On-Device)</div>
+      
+      <div class="controls-grid">
+        <div class="form-group">
+          <label for="scale">Target Scale</label>
+          <select id="scale">
+            <option value="major">C Major Scale</option>
+            <option value="minor">A Minor Scale</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="tempo">Tempo (BPM)</label>
+          <input type="number" id="tempo" value="120" min="60" max="200">
+        </div>
+
+        <div class="form-group">
+          <label for="chord-style">Chord Polyphony</label>
+          <select id="chord-style">
+            <option value="single">Single Melody Notes</option>
+            <option value="triad" selected>Standard Triad (3-Note)</option>
+            <option value="seventh">Rich 7th Chords</option>
+            <option value="octaves">Octaves / Power</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="gate">Articulation (Gate)</label>
+          <select id="gate">
+            <option value="0.9">Legato (Sustained)</option>
+            <option value="0.5" selected>Normal</option>
+            <option value="0.25">Staccato (Short)</option>
+          </select>
+        </div>
+
+        <div class="form-group checkbox-group">
+          <input type="checkbox" id="humanize" checked>
+          <label for="humanize" style="text-transform: none; cursor: pointer;">Humanize Timing & Velocity</label>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 1.25rem;">
+        <label for="lyrics">Enter Lyrics</label>
+        <textarea id="lyrics" placeholder="Type your lyrics here...&#10;e.g., Walking through the rain late at night">Walking through the rain late at night</textarea>
+      </div>
+
+      <button class="btn" id="generate-btn" onclick="generateMelody()">Generate MIDI & Audio</button>
+    </div>
+
+    <div class="card results" id="results-card">
+      <h3>Generated Melody Output</h3>
+      
+      <div class="form-group">
+        <label>Piano Roll Preview</label>
+        <div class="midi-visualizer" id="visualizer"></div>
+      </div>
+
+      <div class="audio-player-container">
+        <label>Synthesized Audio Preview (.WAV)</label>
+        <audio controls id="audio-player"></audio>
+      </div>
+
+      <div class="download-group">
+        <a id="midi-download" class="btn btn-secondary" href="#" download="melody.mid">Download MIDI (.mid)</a>
+        <a id="wav-download" class="btn btn-secondary" href="#" download="vocal_guide.wav">Download WAV (.wav)</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Scale Definitions with matching pitch frequencies
+    const SCALES = {
+      major: { notes: [60, 62, 64, 65, 67, 69, 71, 72], freqs: [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25] },
+      minor: { notes: [57, 59, 60, 62, 64, 65, 67, 69], freqs: [220.00, 246.94, 261.63, 293.66, 329.63, 349.23, 392.00, 440.00] }
+    };
+
+    // Polyphonic chord interval offset arrays
+    const CHORD_TYPES = {
+      single: [0],
+      triad: [0, 2, 4],
+      seventh: [0, 2, 4, 6],
+      octaves: [0, 7]
+    };
+
+    function generateMelody() {
+      const lyrics = document.getElementById('lyrics').value.trim();
+      const scaleType = document.getElementById('scale').value || 'major';
+      const bpm = parseInt(document.getElementById('tempo').value) || 120;
+      const articulation = parseFloat(document.getElementById('gate').value || 0.5);
+      const humanize = document.getElementById('humanize').checked;
+      const chordStyle = document.getElementById('chord-style').value || 'triad';
+      
+      const btn = document.getElementById('generate-btn');
+      const resultsCard = document.getElementById('results-card');
+
+      if (!lyrics) {
+        alert('Please enter some lyrics first.');
+        return;
+      }
+
+      btn.textContent = 'Processing & Synthesizing...';
+      btn.disabled = true;
+
+      setTimeout(() => {
+        const words = lyrics.split(/\s+/);
+        const scale = SCALES[scaleType] || SCALES.major;
+        const melodyData = [];
+
+        words.forEach((word, wordIdx) => {
+          const syllables = word.match(/[^aeiouy]*[aeiouy]+(?:[^aeiouy]*$|[^aeiouy](?=[^aeiouy]))?/gi) || [word];
+          
+          syllables.forEach((syl, sylIdx) => {
+            const pitchIdx = (word.length + sylIdx + wordIdx * 2) % scale.notes.length;
+            
+            const rootMidi = scale.notes[pitchIdx];
+            const rootFreq = scale.freqs[pitchIdx];
+
+            const chordIntervals = CHORD_TYPES[chordStyle] || [0];
+            const chordMidi = chordIntervals.map(interval => rootMidi + interval);
+            const chordFreqs = chordIntervals.map(interval => rootFreq * Math.pow(2, interval / 12));
+
+            let velocity = 90; 
+            let timingJitter = 0;
+            
+            if (humanize) {
+              velocity += Math.floor(Math.random() * 20 - 10);
+              timingJitter = (Math.random() * 0.03 - 0.015);
+            }
+
+            melodyData.push({
+              rootFreq,
+              chordFreqs,
+              rootMidi,
+              chordMidi,
+              velocity: Math.min(127, Math.max(1, velocity)),
+              durationMultiplier: articulation,
+              timeOffset: timingJitter
+            });
+          });
+        });
+
+        // Render Visualizer Bars
+        const visualizer = document.getElementById('visualizer');
+        visualizer.innerHTML = '';
+        melodyData.forEach(item => {
+          const bar = document.createElement('div');
+          bar.className = 'note-bar';
+          const heightPercent = Math.min(100, Math.max(20, (item.rootFreq / 550) * 100));
+          bar.style.height = `${heightPercent}%`;
+          visualizer.appendChild(bar);
+        });
+
+        // Synthesize Polyphonic Audio WAV
+        const wavBlob = createPolyphonicWavBlob(melodyData, bpm);
+        const wavUrl = URL.createObjectURL(wavBlob);
+        document.getElementById('audio-player').src = wavUrl;
+        document.getElementById('wav-download').href = wavUrl;
+
+        // Generate Polyphonic MIDI File
+        const midiBlob = createPolyphonicMidiBlob(melodyData, bpm);
+        document.getElementById('midi-download').href = URL.createObjectURL(midiBlob);
+
+        btn.textContent = 'Generate MIDI & Audio';
+        btn.disabled = false;
+        resultsCard.classList.add('active');
+        resultsCard.scrollIntoView({ behavior: 'smooth' });
+      }, 400);
+    }
+
+    // Generates Polyphonic Audio Wave
+    function createPolyphonicWavBlob(melodyData, bpm) {
+      const sampleRate = 22050;
+      const beatDuration = 60 / bpm;
+      const totalSamples = Math.floor(sampleRate * beatDuration * melodyData.length);
+      
+      const buffer = new ArrayBuffer(44 + totalSamples * 2);
+      const view = new DataView(buffer);
+
+      // Write Standard Header
+      writeString(view, 0, 'RIFF');
+      view.setUint32(4, 36 + totalSamples * 2, true);
+      writeString(view, 8, 'WAVE');
+      writeString(view, 12, 'fmt ');
+      view.setUint32(16, 16, true);
+      view.setUint16(20, 1, true); 
+      view.setUint16(22, 1, true); 
+      view.setUint32(24, sampleRate, true);
+      view.setUint32(28, sampleRate * 2, true);
+      view.setUint16(32, 2, true);
+      view.setUint16(34, 16, true);
+      writeString(view, 36, 'data');
+      view.setUint32(40, totalSamples * 2, true);
+
+      let offset = 44;
+      melodyData.forEach(note => {
+        const noteDuration = beatDuration * note.durationMultiplier;
+        const noteSamples = Math.floor(sampleRate * beatDuration);
+        const activeSamples = Math.floor(sampleRate * noteDuration);
+
+        for (let i = 0; i < noteSamples; i++) {
+          let mixedSample = 0;
+          if (i < activeSamples) {
+            const t = i / sampleRate;
+            note.chordFreqs.forEach(freq => {
+              mixedSample += Math.sin(2 * Math.PI * freq * t) * Math.exp(-t * 2.5);
+            });
+            mixedSample = (mixedSample / note.chordFreqs.length) * (note.velocity / 127);
+          }
+          view.setInt16(offset, mixedSample < 0 ? mixedSample * 0x8000 : mixedSample * 0x7FFF, true);
+          offset += 2;
+        }
+      });
+
+      return new Blob([buffer], { type: 'audio/wav' });
+    }
+
+    // Generates Polyphonic Standard MIDI (.mid) File
+    function createPolyphonicMidiBlob(melodyData, bpm) {
+      const header = [0x4d, 0x54, 0x68, 0x64, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x01, 0x00, 0x60];
+      const trackHeader = [0x4d, 0x54, 0x72, 0x6b];
+      let trackData = [];
+      
+      const microsecondsPerQuarter = Math.round(60000000 / bpm);
+      trackData.push(0x00, 0xFF, 0x51, 0x03, 
+        (microsecondsPerQuarter >> 16) & 0xFF,
+        (microsecondsPerQuarter >> 8) & 0xFF,
+        microsecondsPerQuarter & 0xFF
+      );
+
+      melodyData.forEach(item => {
+        const ticks = Math.round(96 * item.durationMultiplier);
+        
+        // Polyphonic Note On
+        item.chordMidi.forEach((midiNote, idx) => {
+          trackData.push(idx === 0 ? 0x00 : 0x00, 0x90, midiNote, item.velocity);
+        });
+
+        // Polyphonic Note Off
+        item.chordMidi.forEach((midiNote, idx) => {
+          trackData.push(idx === 0 ? ticks : 0x00, 0x80, midiNote, 0x00);
+        });
+      });
+
+      trackData.push(0x00, 0xFF, 0x2F, 0x00);
+      const trackLenBytes = [
+        (trackData.length >> 24) & 0xFF,
+        (trackData.length >> 16) & 0xFF,
+        (trackData.length >> 8) & 0xFF,
+        trackData.length & 0xFF
+      ];
+
+      return new Blob([new Uint8Array([...header, ...trackHeader, ...trackLenBytes, ...trackData])], { type: 'audio/midi' });
+    }
+
+    function writeString(view, offset, string) {
+      for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
+      }
+    }
+  </script>
+</body>
+</html>

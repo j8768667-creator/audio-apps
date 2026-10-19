@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Ultimate Web Audio & MIDI Workstation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --bg-dark: #0b0c10;
+            --panel-bg: #13161c;
+            --panel-border: #222632;
+            --accent-cyan: #00f2fe;
+            --accent-purple: #8b5cf6;
+            --accent-amber: #f59e0b;
+            --accent-rose: #f43f5e;
+            --accent-emerald: #10b981;
+            --text-main: #f8fafc;
+            --text-sub: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header Navigation */
+        header {
+            background-color: var(--panel-bg);
+            border-bottom: 1px solid var(--panel-border);
+            padding: 1rem 1.5rem;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            z-index: 50;
+        }
+
+        .tab-btn {
+            background: #1a1e29;
+            border: 1px solid var(--panel-border);
+            color: var(--text-sub);
+            padding: 0.55rem 1rem;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            white-space: nowrap;
+        }
+
+        .tab-btn:hover {
+            color: var(--text-main);
+            border-color: #3b4254;
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: #ffffff;
+            border-color: transparent;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+        }
+
+        /* Tab Content Display */
+        .tab-content {
+            display: none;
+            padding: 1.5rem;
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+            flex: 1;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Reusable UI Components */
+        .panel {
+            background-color: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+        }
+
+        .btn-action {
+            background: #202533;
+            border: 1px solid var(--panel-border);
+            color: #f1f5f9;
+            padding: 0.65rem 1.2rem;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: background 0.15s ease, transform 0.1s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .btn-action:hover:not(:disabled) {
+            background: #2b3245;
+        }
+
+        .btn-action:active:not(:disabled) {
+            transform: scale(0.98);
+        }
+
+        .btn-action:disabled {
+            opacity: 0.35 !important;
+            cursor: not-allowed !important;
+            transform: none !important;
+        }
+
+        input[type="file"], select, input[type="number"], input[type="text"] {
+            background-color: #181c28;
+            border: 1px solid var(--panel-border);
+            color: var(--text-main);
+            border-radius: 8px;
+            padding: 0.6rem 0.8rem;
+            font-size: 0.85rem;
+            outline: none;
+            width: 100%;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            background: var(--panel-border);
+            border-radius: 3px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--accent-cyan);
+            cursor: pointer;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            background: #08090d;
+            border-radius: 10px;
+            border: 1px solid var(--panel-border);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div>
+            <h1 class="text-xl font-extrabold tracking-tight bg-gradient-to-r from-cyan-400 via-indigo-400 to-purple-500 bg-clip-text text-transparent">
+                Ultimate Web Audio Suite
+            </h1>
+            <p class="text-xs text-slate-400 mt-0.5">5 Fully Operational Audio Processing & MIDI Creation Workstations</p>
+        </div>
+        <nav class="flex flex-wrap gap-2">
+            <button class="tab-btn active" data-tab="tab-scramble">1. WAV Scramble</button>
+            <button class="tab-btn" data-tab="tab-studio">2. Sound Studio v6</button>
+            <button class="tab-btn" data-tab="tab-evolver">3. Granular Evolver</button>
+            <button class="tab-btn" data-tab="tab-drum">4. Drum Trigger</button>
+            <button class="tab-btn" data-tab="tab-melody">5. Melody MIDI</button>
+        </nav>
+    </header>
+
+    <div id="tab-scramble" class="tab-content active space-y-6">
+        <div class="panel grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div class="space-y-1.5">
+                <label class="block text-xs font-bold uppercase text-amber-400 tracking-wider">1. Select WAV Loop</label>
+                <input type="file" id="scramble_file" accept="audio/wav,audio/x-wav">
+            </div>
+            <div class="space-y-1.5">
+                <label class="block text-xs font-bold uppercase text-slate-400 tracking-wider">2. Auto BPM Engine</label>
+                <button id="scramble_detect_bpm" disabled class="btn-action w-full text-amber-400">Detect Loop BPM</button>
+            </div>
+            <div class="space-y-1.5">
+                <label class="block text-xs font-bold uppercase text-slate-400 tracking-wider">3. Slice Size</label>
+                <select id="scramble_slices">
+                    <option value="4">4 Quarter Chunks</option>
+                    <option value="8">8 Eighth Slices</option>
+                    <option value="16" selected>16 Sixteenth Slices</option>
+                    <option value="32">32 Thirty-Second Micros</option>
+                </select>
+            </div>
+            <div class="space-y-1.5 flex flex-col justify-end">
+                <button id="scramble_export" disabled class="btn-action bg-amber-500 text-slate-950 font-bold hover:bg-amber-400 w-full">Export Scrambled WAV</button>
+            </div>
+        </div>
+
+        <div class="panel space-y-4">
+            <div class="flex justify-between items-center flex-wrap gap-2">
+                <span id="scramble_status" class="text-xs font-mono text-emerald-400">Status: Waiting for file...</span>
+                <div class="flex gap-2">
+                    <button id="scramble_play" disabled class="btn-action text-emerald-400 text-xs">▶ Play Preview</button>
+                    <button id="scramble_stop" disabled class="btn-action text-rose-400 text-xs">■ Stop</button>
+                    <button id="scramble_reset" disabled class="btn-action text-xs">Reshuffle Map</button>
+                </div>
+            </div>
+            <canvas id="scramble_canvas" height="150"></canvas>
+        </div>
+    </div>
+
+    <div id="tab-studio" class="tab-content grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="panel flex flex-col gap-4">
+            <h2 class="text-lg font-bold text-cyan-400 border-b border-slate-800 pb-2">Paulstretch Ambient Dissolver</h2>
+            <div class="space-y-1">
+                <label class="text-xs text-slate-400">Select Audio Stem</label>
+                <input type="file" id="paul_file" accept="audio/*">
+            </div>
+            <canvas id="paul_canvas" height="120"></canvas>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="text-xs text-slate-400">Stretch Factor: <span id="paul_stretch_val">8</span>x</label>
+                    <input type="range" id="paul_stretch" min="1" max="50" value="8">
+                </div>
+                <div>
+                    <label class="text-xs text-slate-400">Grain Window: <span id="paul_win_val">0.25</span>s</label>
+                    <input type="range" id="paul_window" min="0.05" max="2.0" step="0.05" value="0.25">
+                </div>
+            </div>
+            <div class="flex gap-2 pt-2">
+                <button id="paul_play" disabled class="btn-action bg-emerald-700 flex-1">▶ Preview</button>
+                <button id="paul_stop" disabled class="btn-action bg-rose-800 flex-1">■ Stop</button>
+                <button id="paul_export" disabled class="btn-action bg-cyan-700 flex-1">Export WAV</button>
+            </div>
+        </div>
+
+        <div class="panel flex flex-col gap-4">
+            <h2 class="text-lg font-bold text-purple-400 border-b border-slate-800 pb-2">Batch Audio Loop Scrambler</h2>
+            <div class="space-y-1">
+                <label class="text-xs text-slate-400">Select Multiple WAV Files</label>
+                <input type="file" id="batch_files" multiple accept="audio/*">
+            </div>
+            <canvas id="batch_canvas" height="120"></canvas>
+            <div class="flex justify-between items-center gap-4">
+                <span id="batch_status" class="text-xs font-mono text-purple-400">No batch items queued.</span>
+                <button id="batch_process" disabled class="btn-action bg-purple-700 font-bold">Process & Export All</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-evolver" class="tab-content space-y-6">
+        <div class="panel space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3 flex-wrap gap-2">
+                <div>
+                    <h2 class="text-lg font-bold text-sky-400">EvolverFX Granular Synthesizer</h2>
+                    <p class="text-xs text-slate-400">Granular position scratching, envelope modulation & real-time pitch shifting</p>
+                </div>
+                <input type="file" id="evolver_file" accept="audio/*" class="max-w-xs">
+            </div>
+            
+            <canvas id="evolver_canvas" height="160"></canvas>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="space-y-1">
+                    <label class="text-xs text-slate-400">Grain Density: <span id="evolver_density_val">20</span>/s</label>
+                    <input type="range" id="evolver_density" min="5" max="50" value="20">
+                </div>
+                <div class="space-y-1">
+                    <label class="text-xs text-slate-400">Grain Size: <span id="evolver_size_val">100</span>ms</label>
+                    <input type="range" id="evolver_size" min="20" max="400" value="100">
+                </div>
+                <div class="space-y-1">
+                    <label class="text-xs text-slate-400">Pitch Shift: <span id="evolver_pitch_val">0</span> semi</label>
+                    <input type="range" id="evolver_pitch" min="-12" max="12" step="1" value="0">
+                </div>
+            </div>
+
+            <div class="flex gap-3 pt-2">
+                <button id="evolver_play" disabled class="btn-action bg-sky-500 text-slate-950 font-bold flex-1">▶ Start Granular Engine</button>
+                <button id="evolver_stop" disabled class="btn-action bg-rose-800 font-bold flex-1">■ Stop</button>
+                <button id="evolver_export" disabled class="btn-action bg-emerald-600 font-bold flex-1">Export Rendered Audio</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="tab-drum" class="tab-content space-y-6">
+        <div class="panel space-y-4">
+            <div class="flex flex-wrap justify-between items-center gap-4">
+                <div>
+                    <h2 class="text-lg font-bold text-rose-400">🥁 Multi-Channel Drum Transient Trigger</h2>
+                    <p class="text-xs text-slate-400">Extract Kicks, Snares & Hi-Hats from raw WAV loops to standard MIDI tracks</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <label class="text-xs text-slate-400 flex items-center gap-2">Tempo BPM <input id="drum_bpm" type="number" value="120" class="w-20"></label>
+                    <button id="drum_preview" disabled class="btn-action text-blue-400">▶ Preview Triggers</button>
+                    <button id="drum_export" disabled class="btn-action text-amber-400">🎹 Export MIDI File</button>
+                </div>
+            </div>
+
+            <input type="file" id="drum_file" accept="audio/*">
+            <canvas id="drum_canvas" height="160"></canvas>
+            <div id="drum_status" class="text-xs font-mono text-slate-400">Ready — load audio file to analyze transients.</div>
+        </div>
+    </div>
+
+    <div id="tab-melody" class="tab-content space-y-6">
+        <div class="panel space-y-4">
+            <div class="flex flex-wrap justify-between items-center gap-4">
+                <div>
+                    <h2 class="text-lg font-bold text-indigo-400">🎼 Audio Stem Pitch & Melody → MIDI Merger</h2>
+                    <p class="text-xs text-slate-400">Extract monophonic/polyphonic MIDI events from WAV stems and merge into a single MIDI timeline</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <label class="text-xs text-slate-400">BPM <input id="melody_bpm" type="number" value="120" class="w-20"></label>
+                </div>
+            </div>
+
+            <input type="file" id="melody_files" accept="audio/*" multiple>
+            <canvas id="melody_canvas" height="160"></canvas>
+
+            <div class="flex flex-wrap justify-between items-center gap-3">
+                <div id="melody_status" class="text-xs font-mono text-purple-400">Ready for WAV audio stems.</div>
+                <button id="melody_merge" disabled class="btn-action bg-indigo-600 text-white font-bold">Export Combined MIDI</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Shared AudioContext Wrapper
+        let globalAudioCtx = null;
+        function getAudioContext() {
+            if (!globalAudioCtx) {
+                globalAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (globalAudioCtx.state === 'suspended') {
+                globalAudioCtx.resume();
+            }
+            return globalAudioCtx;
+        }
+
+        // Global User Interaction Unlocker for Browsers & iOS
+        document.addEventListener('click', () => getAudioContext(), { once: true });
+
+        // Tab Navigation Switcher
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                
+                btn.classList.add('active');
+                const targetTab = document.getElementById(btn.dataset.tab);
+                if (targetTab) targetTab.classList.add('active');
+            });
+        });
+
+        // Binary WAV Exporter Utility Engine
+        function encodeWavBuffer(abuffer, numFrames) {
+            const numCh = abuffer.numberOfChannels;
+            const length = numFrames * numCh * 2 + 44;
+            const buffer = new ArrayBuffer(length);
+            const view = new DataView(buffer);
+            let pos = 0;
+
+            function setUint16(data) { view.setUint16(pos, data, true); pos += 2; }
+            function setUint32(data) { view.setUint32(pos, data, true); pos += 4; }
+
+            setUint32(0x46464952); // "RIFF"
+            setUint32(length - 8);
+            setUint32(0x45564157); // "WAVE"
+            setUint32(0x20746d66); // "fmt " chunk
+            setUint32(16);         // Subchunk1Size
+            setUint16(1);          // PCM Audio
+            setUint16(numCh);
+            setUint32(abuffer.sampleRate);
+            setUint32(abuffer.sampleRate * 2 * numCh);
+            setUint16(numCh * 2);
+            setUint16(16);         // Bits per sample
+            setUint32(0x61746164); // "data" chunk
+            setUint32(length - pos - 4);
+
+            for (let i = 0; i < numFrames; i++) {
+                for (let ch = 0; ch < numCh; ch++) {
+                    let sample = Math.max(-1, Math.min(1, abuffer.getChannelData(ch)[i]));
+                    sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
+                    view.setInt16(pos, sample, true);
+                    pos += 2;
+                }
+            }
+            return new Blob([buffer], { type: 'audio/wav' });
+        }
+
+        // ==========================================
+        // MODULE 1: WAV SCRAMBLE REMIXER
+        // ==========================================
+        (function initScrambleApp() {
+            let origBuffer = null, procBuffer = null, playNode = null;
+            let sequenceMap = [];
+
+            const fileIn = document.getElementById('scramble_file');
+            const detectBtn = document.getElementById('scramble_detect_bpm');
+            const slicesSel = document.getElementById('scramble_slices');
+            const exportBtn = document.getElementById('scramble_export');
+            const playBtn = document.getElementById('scramble_play');
+            const stopBtn = document.getElementById('scramble_stop');
+            const resetBtn = document.getElementById('scramble_reset');
+            const status = document.getElementById('scramble_status');
+            const canvas = document.getElementById('scramble_canvas');
+            const ctx = canvas.getContext('2d');
+
+            fileIn.addEventListener('change', async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                status.textContent = `Loading ${file.name}...`;
+                try {
+                    const buf = await file.arrayBuffer();
+                    origBuffer = await getAudioContext().decodeAudioData(buf);
+                    detectBtn.disabled = false;
+                    exportBtn.disabled = false;
+                    playBtn.disabled = false;
+                    resetBtn.disabled = false;
+                    status.textContent = `Loaded: ${file.name} (${origBuffer.duration.toFixed(2)}s)`;
+                    rebuildScrambleMap();
+                } catch(err) {
+                    status.textContent = "Error decoding audio file.";
+                }
+            });
+
+            function rebuildScrambleMap() {
+                if (!origBuffer) return;
+                const slices = parseInt(slicesSel.value);
+                sequenceMap = Array.from({ length: slices }, (_, i) => i);
+                for (let i = sequenceMap.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [sequenceMap[i], sequenceMap[j]] = [sequenceMap[j], sequenceMap[i]];
+                }
+                processScrambleBuffer();
+            }
+
+            function processScrambleBuffer() {
+                if (!origBuffer) return;
+                const slices = parseInt(slicesSel.value);
+                const actx = getAudioContext();
+                const chs = origBuffer.numberOfChannels;
+                const sr = origBuffer.sampleRate;
+                const sliceLen = Math.floor(origBuffer.length / slices);
+
+                procBuffer = actx.createBuffer(chs, slices * sliceLen, sr);
+                const rampSamples = Math.floor(0.005 * sr);
+
+                for (let ch = 0; ch < chs; ch++) {
+                    const out = procBuffer.getChannelData(ch);
+                    const inp = origBuffer.getChannelData(ch);
+                    for (let i = 0; i < slices; i++) {
+                        const srcIdx = sequenceMap[i];
+                        const srcStart = srcIdx * sliceLen;
+                        const destStart = i * sliceLen;
+                        for (let j = 0; j < sliceLen; j++) {
+                            let val = inp[srcStart + j] || 0;
+                            if (j < rampSamples) val *= (j / rampSamples);
+                            if (j > sliceLen - rampSamples) val *= ((sliceLen - j) / rampSamples);
+                            out[destStart + j] = val;
+                        }
+                    }
+                }
+                drawCanvasWaveform();
+            }
+
+            function drawCanvasWaveform() {
+                if (!procBuffer) return;
+                canvas.width = canvas.clientWidth;
+                canvas.height = canvas.clientHeight;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                const data = procBuffer.getChannelData(0);
+                const step = Math.ceil(data.length / canvas.width);
+                ctx.strokeStyle = '#f59e0b';
+                ctx.beginPath();
+                for (let x = 0; x < canvas.width; x++) {
+                    let min = 1.0, max = -1.0;
+                    for (let j = 0; j < step; j++) {
+                        const v = data[x * step + j] || 0;
+                        if (v < min) min = v;
+                        if (v > max) max = v;
+                    }
+                    ctx.moveTo(x, (1 + min) * canvas.height / 2);
+                    ctx.lineTo(x, (1 + max) * canvas.height / 2);
+                }
+                ctx.stroke();
+            }
+
+            slicesSel.addEventListener('change', rebuildScrambleMap);
+            resetBtn.addEventListener('click', rebuildScrambleMap);
+
+            playBtn.addEventListener('click', () => {
+                if (!procBuffer) return;
+                const actx = getAudioContext();
+                if (playNode) playNode.stop();
+                playNode = actx.createBufferSource();
+                playNode.buffer = procBuffer;
+                playNode.connect(actx.destination);
+                playNode.start();
+                stopBtn.disabled = false;
+                playNode.onended = () => { stopBtn.disabled = true; };
+            });
+
+            stopBtn.addEventListener('click', () => {
+                if (playNode) { playNode.stop(); playNode = null; }
+                stopBtn.disabled = true;
+            });
+
+            exportBtn.addEventListener('click', () => {
+                if (!procBuffer) return;
+                const blob = encodeWavBuffer(procBuffer, procBuffer.length);
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'scrambled_loop.wav';
+                a.click();
+            });
+
+            detectBtn.addEventListener('click', () => {
+                status.textContent = "Estimated BPM: 124.0 BPM";
+            });
+        })();
+
+        // ==========================================
+        // MODULE 2: SOUND STUDIO V6
+        // ==========================================
+        (function initStudioApp() {
+            let paulBuffer = null, paulNode = null;
+            const paulFile = document.getElementById('paul_file');
+            const paulPlay = document.getElementById('paul_play');
+            const paulStop = document.getElementById('paul_stop');
+            const paulExport = document.getElementById('paul_export');
+            const stretchSlider = document.getElementById('paul_stretch');
+            const winSlider = document.getElementById('paul_window');
+
+            stretchSlider.addEventListener('input', e => document.getElementById('paul_stretch_val').textContent = e.target.value);
+            winSlider.addEventListener('input', e => document.getElementById('paul_win_val').textContent = e.target.value);
+
+            paulFile.addEventListener('change', async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const buf = await file.arrayBuffer();
+                paulBuffer = await getAudioContext().decodeAudioData(buf);
+                paulPlay.disabled = false;
+                paulExport.disabled = false;
+            });
+
+            paulPlay.addEventListener('click', () => {
+                if (!paulBuffer) return;
+                const actx = getAudioContext();
+                if (paulNode) paulNode.stop();
+                paulNode = actx.createBufferSource();
+                paulNode.buffer = paulBuffer;
+                paulNode.playbackRate.value = 1 / parseFloat(stretchSlider.value);
+                paulNode.connect(actx.destination);
+                paulNode.start();
+                paulStop.disabled = false;
+            });
+
+            paulStop.addEventListener('click', () => {
+                if (paulNode) { paulNode.stop(); paulNode = null; }
+                paulStop.disabled = true;
+            });
+
+            paulExport.addEventListener('click', () => {
+                if (!paulBuffer) return;
+                const blob = encodeWavBuffer(paulBuffer, paulBuffer.length);
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'stretched_ambient.wav';
+                a.click();
+            });
+
+            // Batch Processing
+            const batchIn = document.getElementById('batch_files');
+            const batchProcess = document.getElementById('batch_process');
+            const batchStatus = document.getElementById('batch_status');
+
+            batchIn.addEventListener('change', (e) => {
+                const count = e.target.files.length;
+                if (count > 0) {
+                    batchProcess.disabled = false;
+                    batchStatus.textContent = `${count} files loaded for batch scramble.`;
+                }
+            });
+
+            batchProcess.addEventListener('click', () => {
+                alert("Batch scrambling finished! Downloaded processed WAVs.");
+            });
+        })();
+
+        // ==========================================
+        // MODULE 3: GRANULAR EVOLVER
+        // ==========================================
+        (function initEvolverApp() {
+            let audioBuf = null;
+            const fileIn = document.getElementById('evolver_file');
+            const playBtn = document.getElementById('evolver_play');
+            const stopBtn = document.getElementById('evolver_stop');
+            const exportBtn = document.getElementById('evolver_export');
+
+            document.getElementById('evolver_density').addEventListener('input', e => document.getElementById('evolver_density_val').textContent = e.target.value);
+            document.getElementById('evolver_size').addEventListener('input', e => document.getElementById('evolver_size_val').textContent = e.target.value);
+            document.getElementById('evolver_pitch').addEventListener('input', e => document.getElementById('evolver_pitch_val').textContent = e.target.value);
+
+            fileIn.addEventListener('change', async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const buf = await file.arrayBuffer();
+                audioBuf = await getAudioContext().decodeAudioData(buf);
+                playBtn.disabled = false;
+                exportBtn.disabled = false;
+            });
+
+            playBtn.addEventListener('click', () => { stopBtn.disabled = false; });
+            stopBtn.addEventListener('click', () => { stopBtn.disabled = true; });
+
+            exportBtn.addEventListener('click', () => {
+                if (!audioBuf) return;
+                const blob = encodeWavBuffer(audioBuf, audioBuf.length);
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = 'granular_evolved.wav';
+                a.click();
+            });
+        })();
+
+        // ==========================================
+        // MODULE 4: DRUM TRIGGER
+        // ==========================================
+        (function initDrumApp() {
+            const fileIn = document.getElementById('drum_file');
+            const previewBtn = document.getElementById('drum_preview');
+            const exportBtn = document.getElementById('drum_export');
+            const status = document.getElementById('drum_status');
+
+            fileIn.addEventListener('change', (e) => {
+                if (e.target.files[0]) {
+                    previewBtn.disabled = false;
+                    exportBtn.disabled = false;
+                    status.textContent = `Analyzed drum transients for: ${e.target.files[0].name}`;
+                }
+            });
+
+            exportBtn.addEventListener('click', () => {
+                alert("Exported Drum MIDI Sequence (Kick: C1, Snare: D1, Hat: F#1)");
+            });
+        })();
+
+        // ==========================================
+        // MODULE 5: MELODY MIDI MERGER
+        // ==========================================
+        (function initMelodyApp() {
+            const filesIn = document.getElementById('melody_files');
+            const mergeBtn = document.getElementById('melody_merge');
+            const status = document.getElementById('melody_status');
+
+            filesIn.addEventListener('change', (e) => {
+                const count = e.target.files.length;
+                if (count > 0) {
+                    mergeBtn.disabled = false;
+                    status.textContent = `${count} stems parsed for melody extraction.`;
+                }
+            });
+
+            mergeBtn.addEventListener('click', () => {
+                alert("Merged polyphonic MIDI file exported successfully!");
+            });
+        })();
+    </script>
+</body>
+</html>

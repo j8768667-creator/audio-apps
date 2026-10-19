@@ -1,0 +1,1596 @@
+# Musical Harmony Generator Studio
+
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Harmony Generator - Algorithmic Composition Studio</title>
+    
+    <!-- Tone.js for audio synthesis -->
+    <script src="https://cdn.jsdelivr.net/npm/tone@14.8.39/build/Tone.js"></script>
+    
+    <!-- Monaco Editor for chord visualization (if needed) -->
+    <script src="https://unpkg.com/monaco-editor/dist/min/index.js"></script>
+    
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <style>
+        :root {
+            /* Dark theme optimized for iPad */
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent: #38bdf8;
+            --accent-hover: #0ea5e8;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --info: #6366f1;
+            
+            /* Style-specific colors */
+            --style-pop: #ef4444;
+            --style-hiphop: #10b981;
+            --style-rock: #dc2638;
+            --style-country: #fb923c;
+            --style-edm: #8b5cf6;
+            --style-latin: #ef4444;
+            --style-cinematic: #f97316;
+            --style-rnb: #ec4899;
+            --style-ambient: #6b7280;
+            --style-classical: #10b981;
+            
+            /* UI Elements */
+            --border-color: rgba(255, 255, 255, 0.1);
+            --hover-bg: rgba(255, 255, 255, 0.05);
+            --active-bg: rgba(56, 189, 248, 0.15);
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        html, body {
+            width: 100%;
+            min-height: 100vh;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            touch-action: manipulation;
+            overscroll-behavior: none;
+            position: relative;
+            overflow-x: hidden;
+        }
+        
+        /* iPad double-tap zoom prevention */
+        @media (hover) {
+            html, body {
+                touch-action: none;
+            }
+        }
+        
+        /* App Layout */
+        .app-container {
+            display: grid;
+            grid-template-rows: auto 1fr;
+            min-height: 100vh;
+            position: relative;
+        }
+        
+        /* Header / Navigation */
+        header {
+            background-color: var(--bg-secondary);
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            z-index: 100;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            color: var(--accent);
+            font-size: 1rem;
+        }
+        
+        .logo svg {
+            width: 24px;
+            height: 24px;
+        }
+        
+        .nav-tabs {
+            display: flex;
+            gap: 4px;
+            background-color: var(--bg-tertiary);
+            padding: 4px;
+            border-radius: 12px;
+        }
+        
+        .nav-tab {
+            padding: 8px 16px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+            font-size: 14px;
+        }
+        
+        .nav-tab:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+        
+        .nav-tab.active {
+            background-color: var(--accent);
+            color: #000;
+        }
+        
+        .nav-tab.active svg {
+            color: #000;
+        }
+        
+        /* Main Content Grid */
+        .content-grid {
+            display: grid;
+            grid-template-columns: 280px 1fr;
+            gap: 16px;
+            padding: 16px;
+        }
+        
+        /* Control Panel */
+        .control-panel {
+            background-color: var(--bg-secondary);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            padding: 16px;
+            height: fit-content;
+            position: sticky;
+            top: 20px;
+        }
+        
+        .panel-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        /* Form Elements */
+        .form-group {
+            margin-bottom: 16px;
+        }
+        
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+        
+        .input, select, textarea {
+            width: 100%;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 10px 12px;
+            color: var(--text-primary);
+            font-size: 14px;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.1);
+        }
+        
+        select {
+            cursor: pointer;
+            padding-right: 32px;
+        }
+        
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+            touch-action: none;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .btn::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.5);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s, opacity 0.6s;
+            opacity: 0;
+        }
+        
+        .btn:active::after {
+            width: 300px;
+            height: 300px;
+            opacity: 0;
+        }
+        
+        .btn-primary {
+            background-color: var(--accent);
+            color: #000;
+            font-weight: 600;
+        }
+        
+        .btn-primary:hover {
+            background-color: var(--accent-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(56, 189, 248, 0.3);
+        }
+        
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+        
+        .btn-secondary {
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+        
+        .btn-secondary:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+        
+        .btn-success {
+            background-color: var(--success);
+            color: #000;
+        }
+        
+        .btn-success:hover {
+            background-color: #12ca94;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        }
+        
+        .btn-danger {
+            background-color: var(--danger);
+            color: #fff;
+        }
+        
+        .btn-danger:hover {
+            background-color: #ef4444;
+            transform: translateY(-2px);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+        
+        /* Style Selector Grid */
+        .style-selector {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+        }
+        
+        .style-chip {
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 6px;
+            text-align: center;
+        }
+        
+        .style-chip:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+        }
+        
+        .style-chip.active {
+            background-color: rgba(56, 189, 248, 0.1);
+            border-color: var(--accent);
+            box-shadow: 0 0 12px rgba(56, 189, 248, 0.2);
+        }
+        
+        .style-chip-icon {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .style-chip-icon svg {
+            width: 20px;
+            height: 20px;
+        }
+        
+        .style-chip-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        
+        .style-chip-desc {
+            font-size: 10px;
+            color: var(--text-muted);
+            line-height: 1.2;
+        }
+        
+        /* Chord Editor */
+        .chord-editor {
+            background-color: var(--bg-tertiary);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+        
+        .chord-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .chord-row:last-child {
+            border-bottom: none;
+        }
+        
+        .chord-label {
+            width: 80px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--accent);
+        }
+        
+        .chord-inputs {
+            display: flex;
+            gap: 8px;
+            flex: 1;
+        }
+        
+        .root-selector {
+            width: 100px;
+        }
+        
+        .type-selector {
+            width: 160px;
+        }
+        
+        .chord-info {
+            display: flex;
+            gap: 12px;
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-left: auto;
+        }
+        
+        /* Visualization Area */
+        .visualization-container {
+            background-color: var(--bg-secondary);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            padding: 24px;
+            height: 500px;
+        }
+        
+        # Piano Roll Visualization Styles
+        .piano-roll {
+            position: relative;
+            background-color: var(--bg-primary);
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+        
+        .key-area {
+            display: flex;
+            height: 60px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .key-label {
+            width: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            color: var(--text-muted);
+        }
+        
+        .keys-container {
+            flex: 1;
+            position: relative;
+        }
+        
+        .piano-keys {
+            display: flex;
+            height: 100%;
+            width: 100%;
+        }
+        
+        .piano-key {
+            flex: 1;
+            border-right: 1px solid var(--border-color);
+            transition: background-color 0.2s ease;
+            position: relative;
+        }
+        
+        .piano-key:hover {
+            background-color: rgba(56, 189, 248, 0.1);
+        }
+        
+        .piano-key.active {
+            background-color: rgba(56, 189, 248, 0.3);
+        }
+        
+        .black-key {
+            background-color: #000;
+            z-index: 1;
+            border-right: none;
+        }
+        
+        .black-key.active {
+            background-color: rgba(234, 179, 8, 0.5);
+        }
+        
+        .melody-lane, .chord-lane, .drum-lane {
+            height: 200px;
+            position: relative;
+            background-color: var(--bg-primary);
+            margin-top: 60px;
+        }
+        
+        .lane-header {
+            position: absolute;
+            top: -30px;
+            left: 0;
+            right: 0;
+            display: flex;
+            justify-content: space-around;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+        
+        .melody-lane .lane-header { color: var(--style-pop); }
+        .chord-lane .lane-header { color: var(--style-ambient); }
+        .drum-lane .lane-header { color: var(--style-edm); }
+        
+        /* Rhythm Grid */
+        .rhythm-grid {
+            display: grid;
+            grid-template-columns: repeat(16, 1fr);
+            gap: 2px;
+            padding: 20px 0;
+            margin-top: spacing(2);
+        }
+        
+        .rhythm-cell {
+            height: 24px;
+            background-color: var(--bg-tertiary);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        
+        .rhythm-cell:hover {
+            background-color: rgba(56, 189, 248, 0.2);
+        }
+        
+        .rhythm-cell.active {
+            background-color: var(--accent);
+            box-shadow: 0 0 8px rgba(56, 189, 248, 0.5);
+        }
+        
+        .rhythm-cell.playing {
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        
+        /* Export Panel */
+        .export-panel {
+            background-color: var(--bg-tertiary);
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 16px;
+        }
+        
+        .export-options {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-top: 16px;
+        }
+        
+        .export-option {
+            background-color: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .export-option:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+        }
+        
+        .export-option h3 {
+            font-size: 1rem;
+            margin-bottom: 8px;
+        }
+        
+        .export-option p {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: var(--bg-tertiary);
+            border-radius: 3px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-muted);
+        }
+        
+        /* Utility Classes */
+        .hidden {
+            display: none !important;
+        }
+        
+        .mb-16 { margin-bottom: 16px; }
+        .mb-12 { margin-bottom: 12px; }
+        .mb-8 { margin-bottom: 8px; }
+        .mb-4 { margin-bottom: 4px; }
+        
+        .mt-16 { margin-top: 16px; }
+        .mt-12 { margin-top: 12px; }
+        
+        .p-16 { padding: 16px; }
+        .p-12 { padding: 12px; }
+        .p-8 { padding: 8px; }
+        .p-4 { padding: 4px; }
+        
+        .text-xs { font-size: 11px; }
+        .text-sm { font-size: 13px; }
+        .text-base { font-size: 14px; }
+        .text-lg { font-size: 16px; }
+        .text-xl { font-size: 18px; }
+        
+        .font-mono {
+            font-family: 'SF Mono', Monaco, 'Fira Code', 'Consolas', monospace;
+        }
+        
+        .rounded-lg { border-radius: 8px; }
+        .rounded-xl { border-radius: 12px; }
+        
+        .shadow-sm { box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05); }
+        .shadow-md { box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
+        .shadow-lg { box-shadow: 0 10px 15px rgba(0, 0, 0, 0.2); }
+        
+        .transition-all { transition: all 0.2s ease; }
+        
+        /* Mobile Responsive Adjustments */
+        @media (max-width: 768px) {
+            .app-container {
+                grid-template-rows: auto 1fr;
+            }
+            
+            .content-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .control-panel {
+                position: static;
+                margin-bottom: 16px;
+            }
+            
+            .style-selector {
+                grid-template-columns: repeat(3, 1fr);
+            }
+            
+            .nav-tabs {
+                flex-wrap: wrap;
+                height: auto;
+            }
+            
+            .nav-tab {
+                font-size: 12px;
+                padding: 6px 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header / Navigation -->
+        <header>
+            <div class="logo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 19v-6l12-6M9 19v-6l12-6M9 19v-6l12-6M9 19v-6l12-6M9 19v-6l12-6M9 19v-6l12-6M9 19v-6l12-6M9 19v-6l12-6M9 19v-6l12-6M9 19v-6l12-6M9 19v-6l12-6"></path>
+                </svg>
+                Harmony Generator
+            </div>
+            
+            <div class="nav-tabs">
+                <div class="nav-tab active" data-tab="editor">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 5a2 2 0 012-4h12a2 2 0 012 4H4zM4 21h16a2 2 0 002-2V5a2 2 0 00-2zM9 8h6M9 12h6M9 8h6M9 12h6"></path>
+                    </svg>
+                    Editor
+                </div>
+                <div class="nav-tab" data-tab="visualization">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path>
+                        <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    Visualization
+                </div>
+                <div class="nav-tab" data-tab="export">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0102-2v-4M7 10l12-6M7 10l-12-6M21 12a2 2 0 0-2-2V6a2 2 0 00-2zM1 12l12-6M1 12v-4a2 2 0 012-2M21 12a2 2 0 0-2-2V6a2 2 0 00-2z"></path>
+                    </svg>
+                    Export
+                </div>
+            </div>
+        </header>
+        
+        <div class="content-grid">
+            <!-- Control Panel -->
+            <aside class="control-panel">
+                <h2 class="panel-title">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.954 1.954 0 012.005 3.07 12.005 3.07 2.924-1.756 2.924-1.756.35 0 12.005 3.07 12.005 3.07 3.35 0a1.954 1.954 0 00-12.005-3.07a1.954 1.954 0 000-3.07zM21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    Composition Engine
+                </h2>
+                
+                <!-- File Import Section -->
+                <div class="form-group">
+                    <label>Import MIDI File</label>
+                    <input type="file" id="midi-import" accept=".mid,.midi" class="input">
+                </div>
+                
+                <!-- Manual Input Section -->
+                <div class="form-group">
+                    <label>Manual Chord Progression</label>
+                    <input type="text" id="manual-input" placeholder="e.g., Cmaj7, G7, Am, Fmaj7" class="input">
+                </div>
+                
+                <!-- Style Selection -->
+                <div class="form-group">
+                    <label>Select Musical Style</label>
+                    <div class="style-selector">
+                        <div class="style-chip active" data-style="pop">
+                            <div class="style-chip-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M9 19v-6l12-6M9 19v-6l12-6M9 19v-6l12-6M9 19v-6l12-6M9 19v-6l12-6M9 19v-6l12-6M9 19v-6l12-6M9 19v-6l12-6M9 19v-6l12-6M9 19v-6l12-6M9 19v-6l12-6M9 19v-6l12-6"></path>
+                                </svg>
+                            </div>
+                            <div class="style-chip-title">Pop</div>
+                            <div class="style-chip-desc">Simple four-chord progressions, major keys, predictable</div>
+                        </div>
+                        
+                        <div class="style-chip" data-style="hiphop">
+                            <div class="style-chip-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M4.93 4.93l2.83 2.83M15.73 15.73l2.83 2.83M1 12l4-4 4 4M20 12l-4-4 4-4M4.93 19.07l2.83-2.83M15.73 8.27l2.83-2.83"></path>
+                                </svg>
+                            </div>
+                            <div class="style-chip-title">Hip-Hop/Rap</div>
+                            <div class="style-chip-desc">Minimal loops, dark minor keys, repetitive patterns</div>
+                        </div>
+                        
+                        <div class="style-chip" data-style="rock">
+                            <div class="style-chip-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <path d="M12 2v4M12 20v4M4.93 4.93l2.83 2.83M15.73 15.73l2.83 2.83M1 12l4-4 4 4M20 12l-4-4 4-4M4.93 19.07l2.83-2.83M15.73 8.27l2.83-2.83"></path>
+                                </svg>
+                            </div>
+                            <div class="style-chip-title">Rock</div>
+                            <div class="style-chip-desc">Driven by root and fifth intervals, modal interchange</div>
+                        </div>
+                        
+                        <div class="style-chip" data-style="country">
+                            <div class="style-chip-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M3 9l9-6 9 6M3 9l9 6 9-6M3 9v6m9 6v-6m0 0v-7c0-.36.15-.68.41-.9l.34.26.84.68a1 1 0 00 1.41-.09V21a1 1 0 01-1 1V9a1 1 0 00-1 1V9a1 1 0 00-1 1v5"></path>
+                                </svg>
+                            </div>
+                            <div class="style-chip-title">Country</div>
+                            <div class="style-chip-desc">Standard three-chord structures, clean acoustic major chords</div>
+                        </div>
+                        
+                        <div class="style-chip" data-style="edm">
+                            <div class="style-chard-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="2" y="2" width="20" height="20" rx="2" ry="2"></rect>
+                                    <path d="M12 8v8l4-4-4 0-4zM12 8v8l-4-4 4 0 4z"></path>
+                                </svg>
+                            </div>
+                            <div class="style-chip-title">EDM</div>
+                            <div class="style-chip-desc">Big synth pads, build-ups with rising tension, drops with driving bass</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Additional Style Chips (simplified for space) -->
+                <div class="style-selector">
+                    <div class="style-chip" data-style="latin">
+                        <div class="style-chip-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 2C8 6.5 5.5 10 5 12c-.5 1.5 0 3-1 4L3 18l6 2 6-2 1-4c-1-1-.5-2.5-1-4-.5-1.5 0-3 1-4zM12 2c5.5 3.5 8 7 8 12s-2.5 8.5-8 12S6.5 8.5 8 12 2.5 3.5 8 7 12 2.5 3.5 8 7zM12 8c1.1 0 2 .9.9 2 2v4c0 1.1-.9 2-2 2s-2-.9-2-2v-4c0-1.1.9-2 2-2z"></path>
+                            </svg>
+                        </div>
+                        <div class="style-chip-title">Latin</div>
+                        <div class="style-chip-desc">Syncopated acoustic guitar, minor chords, passionate</div>
+                    </div>
+                    
+                    <div class="style-chip" data-style="cinematic">
+                        <div class="style-chip-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M20.9 2H3.1c-.6 0-1 .4.4-1.7 2.1L12 13.1l9.8 11.2c.7.8 1.6 1.7 2.1.6.5 1.7.5 2.8M2.1 2h16.9c1.1 0 2 .9.9 2 2v10c0 1.1-.9 2-2 2H2.1c-1.1 0-2-.9-2-2V4.1c-.5-1.2-1.4-2.4-2.7-3.7M2.1 2C2.6 3.7 3 5.3 3 8c0 4.1 1.9 7.5 5.2 9.7"></path>
+                            </svg>
+                        </div>
+                        <div class="style-chip-title">Cinematic</div>
+                        <div class="style-chip-desc">Orchestral movements, modal shifts to trigger emotions</div>
+                    </div>
+                    
+                    <div class="style-chip" data-style="rnb">
+                        <div class="style-chip-icon">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 2a10 10 0 000 20 10 10 0 000-20zM12 2a10 10 0 000 20 10 10 0 000-20zM16 8a4 4 0 01-8 0 4 8 4 0 001-8 0M12 12v4M8 16h8M10 16c0-.6.2-1 1-1h4c.6 0 1 .4.4 2 .6M14 16c0-.6.2-1 1-1h4c.6 0 1 .4.4 2 .6"></path>
+                            </svg>
+                        </div>
+                        <div class="style-chip-title">R&B/Soul</div>
+                        <div class="style-chip-desc">Extended jazz harmony, seventh/ninth/eleventh chords, smooth atmosphere</div>
+                    </div>
+                </div>
+                
+                <!-- Core Controls -->
+                <div class="form-group">
+                    <label>BPM</label>
+                    <input type="number" id="input-bpm" min="40" max="300" value="120" class="input">
+                </div>
+                
+                <div class="form-group">
+                    <label>Playback Speed</label>
+                    <input type="range" id="slider-speed" min="0.25" max="2" step="0.1" value="1" class="input">
+                </div>
+                
+                <div class="form-group">
+                    <label>Duration</label>
+                    <select id="select-duration" class="input">
+                        <option value="4">4 Bars</option>
+                        <option value="8" selected>8 Bars</option>
+                        <option value="16">16 Bars</option>
+                        <option value="32">32 Bars</option>
+                    </select>
+                </div>
+                
+                <!-- Control Buttons -->
+                <div style="display: flex; gap: 8px; margin-top: 16px;">
+                    <button id="btn-generate" class="btn btn-primary" style="flex: 1;">
+                        Generate Arrangement
+                    </button>
+                    <button id="btn-play" class="btn btn-success">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                        Play
+                    </button>
+                    <button id="btn-stop" class="btn btn-danger">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h12v12H6z"/></svg>
+                        Stop
+                    </button>
+                </div>
+                
+                <!-- Export Section -->
+                <div class="export-panel">
+                    <h3>Export Options</h3>
+                    <div class="export-options">
+                        <div class="export-option" onclick="alert('MIDI download would start here')">
+                            <h4>MIDI File</h4>
+                            <p>Export as standard MIDI with separate tracks</p>
+                        </div>
+                        
+                        <div class="export-option" onclick="alert('Audio would be processed here')">
+                            <h4>Audio Render</h4>
+                            <p>Generate audio file with synthesized sounds</p>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+            
+            <!-- Main Visualization Area -->
+            <main class="visualization-container">
+                <div class="pane" id="editor-pane" style="display: block;">
+                    <div class="piano-roll">
+                        <div class="key-area">
+                            <div class="key-label">C</div>
+                            <div class="key-label">D</div>
+                            <div class="key-label">E</div>
+                            <div class="key-label">F</div>
+                            <div class="key-label">G</div>
+                            <div class="key-label">A</div>
+                            <div class="key-label">B</div>
+                        </div>
+                        
+                        <div class="keys-container">
+                            <div class="piano-keys">
+                                <div class="piano-key white-key"></div>
+                                <div class="piano-key black-key"></div>
+                                <div class="piano-key white-key"></div>
+                                <div class="piano-key black-key"></div>
+                                <div class="piano-key white-key"></div>
+                                <div class="piano-key black-key"></div>
+                                <div class="piano-key white-key"></div>
+                                <div class="piano-key black-key"></div>
+                                <div class="piano-key white-key"></div>
+                                <div class="piano-key black-key"></div>
+                                <div class="piano-key white-key"></div>
+                                <div class="piano-key black-key"></div>
+                                <div class="piano-key white-key"></div>
+                                <div class="piano-key black-key"></div>
+                                <div class="piano-key white-key"></div>
+                                <div class="piano-key black-key"></div>
+                                <div class="piano-key white-key"></div>
+                                <div class="piano-key black-key"></div>
+                                <div class="piano-key white-key"></div>
+                                <div class="piano-key black-key"></div>
+                                <div class="piano-key white-key"></div>
+                                <div class::<div class="piano-key black-key"></div>
+                                <div class="piano-key white-key"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="padding: 16px;">
+                        <h3>Chord Progression Editor</h3>
+                        <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+                            <input type="text" placeholder="e.g., Am, G, C, D" class="input" style="flex: 1;">
+                            <button class="btn btn-primary" style="padding: 0 20px;">Apply</button>
+                        </div>
+                        
+                        <div style="margin-top: 16px;">
+                            <h4>Current Progression</h4>
+                            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
+                                <span class="btn btn-secondary" style="font-size: 12px; padding: 4px 8px;">Am</span>
+                                <span class="btn btn-secondary" style="font-size: 12px; padding: 4px 8px;">F</span>
+                                <span class="btn btn-secondary" style="font-size: 12px; padding: 4px 8px;">C</span>
+                                <span class="btn btn-secondary" style="font-size: 12px; padding: 4px 8px;">G</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="pane" id="visualization-pane" style="display: none;">
+                    <div class="visualization-header">
+                        <h3>Music Visualization</h3>
+                        <div class="controls">
+                            <button class="btn btn-sm">Loop</button>
+                            <button class="btn btn-sm">Sustain</button>
+                            <button class="btn btn-sm btn-danger">Clear</button>
+                        </div>
+                    </div>
+                    
+                    <div class="viz-canvas-container">
+                        <canvas id="main-canvas" width="800" height="400"></canvas>
+                    </div>
+                    
+                    <div class="viz-legend">
+                        <div class="legend-item">
+                            <div class="legend-color" style="background-color: #ef4444;"></div>
+                            <span>Chords</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background-color: #3b82f6;"></div>
+                            <span>Melody</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background-color: #10b981;"></div>
+                            <span>Drums</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="pane" id="export-pane" style="display: none;">
+                    <div class="export-container">
+                        <h3>Export Options</h3>
+                        
+                        <div class="export-format-selector">
+                            <div class="export-format-option active" data-format="midi">
+                                <h4>MIDI File</h4>
+                                <p>Standard MIDI format with separate tracks for chords, melody, and drums</p>
+                            </div>
+                            
+                            <div class="export-format-option" data-format="audio">
+                                <h4>Audio File</h4>
+                                <p>Rendered audio with synthesized instruments</p>
+                            </div>
+                            
+                            <div class="export-format-option" data-format="json">
+                                <h4>JSON Data</h4>
+                                <p>Structured music data for integration</p>
+                            </div>
+                        </div>
+                        
+                        <div class="export-settings">
+                            <h4>Export Settings</h4>
+                            <div class="setting-item">
+                                <label>Quality</label>
+                                <select class="input">
+                                    <option value="high">High Quality (16-bit)</option>
+                                    <option value="medium">Medium Quality (8-bit)</option>
+                                    <option value="low">Low Quality (Compressed)</option>
+                                </select>
+                            </div>
+                            
+                            <div class="setting-item">
+                                <label>Duration</label>
+                                <select class="input">
+                                    <option value="full">Full Length</option>
+                                    <option value="loop">Loop</option>
+                                    <option value="short">Short (1 bar)</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <button class="btn btn-success" style="width: 100%; margin-top: 16px;">
+                            Generate Export
+                        </button>
+                    </div>
+                </div>
+            </main>
+        </div>
+        
+        <script>
+            // Application State Management
+            const appState = {
+                // Core Parameters
+                currentKey: 'C',
+                currentStyle: 'pop',
+                bpm: 120,
+                swing: 50,
+                duration: 8,
+                volume: 80,
+                
+                // Generated Content
+                chords: [],
+                melody: [],
+                drums: [],
+                currentProgression: [],
+                
+                // Playback State
+                isPlaying: false,
+                currentBar: 0,
+                currentStep: 0,
+                totalSteps: 0,
+                audioContext: null,
+                masterVolume: null,
+                
+                // MIDI Export State
+                midiBuffer: null,
+                
+                // Canvas Visualization
+                canvas: null,
+                ctx: null,
+                animationFrameId: null
+            };
+            
+            // Initialize Application
+            document.addEventListener('DOMContentLoaded', () => {
+                initApp();
+            });
+            
+            function initApp() {
+                // Initialize Tone.js
+                if (Tone.context.state !== 'running') {
+                    Tone.start();
+                }
+                
+                // Setup event listeners
+                setupEventListeners();
+                
+                // Initialize MIDI parser
+                initMIDIParser();
+                
+                // Setup visualization
+                setupVisualization();
+                
+                // Generate initial sequence
+                generateSequence();
+                
+                // Update UI
+                updateUI();
+            }
+            
+            function setupEventListeners() {
+                // Navigation tabs
+                document.querySelectorAll('.nav-tab').forEach(tab => {
+                    tab.addEventListener('click', (e) => {
+                        const targetTab = e.currentTarget.getAttribute('data-tab');
+                        
+                        // Remove active class from all tabs
+                        document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+                        
+                        // Add active class to clicked tab
+                        e.currentTarget.classList.add('active');
+                        
+                        // Hide all panes
+                        document.querySelectorAll('.pane').forEach(p => p.style.display = 'none');
+                        
+                        // Show target pane
+                        document.getElementById(targetTab + '-pane').style.display = 'block';
+                    });
+                });
+                
+                // Generate button
+                document.getElementById('btn-generate').addEventListener('click', () => {
+                    generateSequence();
+                });
+                
+                // Play button
+                document.getElementById('btn-play').addEventListener('click', () => {
+                    playSequence();
+                });
+                
+                // Stop button
+                document.getElementById('btn-stop').addEventListener('click', () => {
+                    stopSequence();
+                });
+                
+                // Export buttons
+                document.querySelectorAll('.export-option').forEach(option => {
+                    option.addEventListener('click', () => {
+                        const format = option.getAttribute('data-format');
+                        exportSequence(format);
+                    });
+                });
+            }
+            
+            function generateSequence() {
+                // Reset current state
+                appState.chords = getDefaultProgression();
+                appState.melody = generateMelody();
+                appState.drums = generateDrums();
+                appState.currentBar = 0;
+                appState.currentStep = 0;
+                appState.isPlaying = false;
+                
+                // Update visualization
+                drawGrid();
+                
+                // Update UI
+                updateUI();
+                
+                console.log('Generated sequence');
+            }
+            
+            function updateUI() {
+                // Update BPM display
+                document.getElementById('bpm-value').textContent = appState.bpm;
+                
+                // Update swing display
+                document.getElementById('swing-value').textContent = appState.swing + '%';
+                
+                // Update progress bar (placeholder)
+                const progressPercentage = ((appState.currentBar + appState.currentStep / 8) / appState.duration) * 100;
+                document.getElementById('progress-fill').style.width = `${progressPercentage}%`;
+            }
+            
+            // Core Generation Functions
+            function getDefaultProgression() {
+                const progressions = {
+                    pop: ['Am', 'F', 'C', 'G'],
+                    rock: ['Em', 'C', 'G', 'D'],
+                    hiphop: ['C', 'F', 'Am', 'G'],
+                    country: ['G', 'C', 'D', 'Em'],
+                    edm: ['Ab', 'Eb', 'B', 'F#'],
+                    latin: ['Am', 'F', 'C', 'G'],
+                    cinematic: ['Eb', 'Bb', 'F', 'C'],
+                    rnb: ['C', 'Ab', 'F', 'Bb'],
+                    ambient: ['Am', 'G', 'C', 'F'],
+                    classical: ['C', 'F', 'G', 'C']
+                };
+                
+                const selectedStyle = appState.style;
+                const baseProgression = progressions[selectedStyle] || progressions.pop;
+                
+                // Convert string names to full objects
+                return baseProgression.map(chord => ({
+                    name: chord,
+                    notes: getChordNotes(chord),
+                    durationBars: 2
+                }));
+            }
+            
+            function getChordNotes(chordName) {
+                const noteMap = {
+                    'C': ['C3', 'E3', 'G3'],
+                    'Am': ['A3', 'C4', 'E4'],
+                    'G': ['G3', 'B3', 'D4'],
+                    'F': ['F3', 'A3', 'C4'],
+                    'D': ['D3', 'F#3', 'A3'],
+                    'Em': ['E3', 'G3', 'B3'],
+                    'Ab': ['Ab3', 'C4', 'Eb4'],
+                    'Bb': ['Bb3', 'D4', 'F4'],
+                    'C#': ['C#3', 'F3', 'G#3'],
+                    'F#': ['F#3', 'A#3', 'C#4'],
+                    'G#': ['G#3', 'C4', 'D#4'],
+                    'A#': ['A#3', 'D4', 'E4'],
+                    'B#': ['B#3', 'E4', 'F##4']
+                };
+                
+                return noteMap[chordName] || ['C3', 'E3', 'G3'];
+            }
+            
+            function generateMelody() {
+                const patternTypes = {
+                    pop: generatePopMelody,
+                    rock: generateRockMelody,
+                    hiphop: generateHipHopMelody,
+                    country: generateCountryMelody,
+                    edm: generateEdmMelody,
+                    latin: generateLatinMelody,
+    cinematic: generateCinematicMelody,
+    rnb: generateRnBMelody,
+    ambient: generateAmbientMelody,
+    classical: generateClassicalMelody
+                };
+                
+                const generator = patternTypes[appState.style] || patternTypes.pop;
+                return generator();
+            }
+            
+            function generatePopMelody() {
+                const melody = [];
+                const bars = appState.duration;
+                
+                for (let bar = 0; bar < bars; bar++) {
+                    for (let step = 0; step < 4; step++) {
+                        const noteName = getMelodyNote(appState.style);
+                        const time = (bar * 4 + step) * (60 / appState.bpm);
+                        const duration = 0.5;
+                        const velocity = 0.8 + Math.random() * 0.2;
+                        
+                        melody.push({
+                            time: time,
+                            note: noteName,
+                            duration: duration,
+                            velocity: velocity
+                        });
+                    }
+                }
+                
+                return melody;
+            }
+            
+            function generateMelodyNote(style) {
+                const scale = getScaleForStyle(style);
+                const randomIndex = Math.floor(Math.random() * scale.length);
+                return scale[randomIndex];
+            }
+            
+            function getScaleForStyle(style) {
+                const scales = {
+                    pop: ['C', 'D', 'E', 'F', 'G', 'A', 'B'],
+                    rock: ['C', 'D', 'E', 'G', 'A', 'B'],
+                    hiphop: ['C', 'Eb', 'F', 'G#', 'Bb', 'C#'],
+                    country: ['C', 'G', 'D', 'A'],
+                    edm: ['C', 'F#', 'Bb', 'D#'],
+                    latin: ['C', 'Eb', 'F', 'G'],
+                    cinematic: ['C', 'F', 'G', 'A'],
+                    rnb: ['C', 'Eb', 'F#', 'G#'],
+                    ambient: ['C', 'Eb', 'F', 'Ab'],
+                    classical: ['C', 'D', 'E', 'F', 'G', 'A', 'B']
+                };
+                
+                return scales[style] || scales.pop;
+            }
+            
+            function generatePopMelody() {
+                const melody = [];
+                const bars = appState.duration;
+                
+                for (let bar = 0; bar < bars; bar++) {
+                    for (let step = 0; step < 4; step++) {
+                        const noteName = getMelodyNote('pop');
+                        const time = (bar * 4 + step) * (60 / appState.bpm);
+                        const duration = 0.5;
+                        const velocity = 0.8 + Math.random() * 0.2;
+                        
+                        melody.push({
+                            time: time,
+                            note: noteName,
+                            duration: duration,
+                            velocity: velocity
+                        });
+                    }
+                }
+                
+                return melody;
+            }
+            
+            function getMelodyNote(style) {
+                const scales = {
+                    pop: ['C', 'D', 'E', 'F', 'G', 'A', 'B'],
+                    rock: ['C', 'D', 'E', 'G', 'A', 'B'],
+                    hiphop: ['C', 'Eb', 'F', 'G#', 'Bb', 'C#'],
+                    country: ['C', 'G', 'D', 'A'],
+                    edm: ['C', 'F#', 'Bb', 'D#'],
+                    latin: ['C', 'Eb', 'F', 'G'],
+                    cinematic: ['C', 'F', 'G', 'A'],
+                    rnb: ['C', 'Eb', 'F#', 'G#'],
+                    ambient: ['C', 'Eb', 'F', 'Ab'],
+                    classical: ['C', 'D', 'E', 'F', 'G', 'A', 'B']
+                };
+                
+                const scale = scales[style] || scales.pop;
+                return scale[Math.floor(Math.random() * scale.length)];
+            }
+            
+            function generateMelody() {
+                const patternTypes = {
+                    pop: generatePopMelody,
+                    rock: generateRockMelody,
+                    hiphop: generateHipHopMelody,
+                    country: generateCountryMelody,
+                };
+                
+                const generator = patternTypes[appState.style] || patternTypes.pop;
+                return generator();
+            }
+            
+            function generatePopMelody() {
+                const melody = [];
+                const bars = appState.duration;
+                
+                for (let bar = 0; bar < bars; bar++) {
+                    for (let step = 0; step < 4; step++) {
+                        const noteName = getMelodyNote('pop');
+                        const time = (bar * 4 + step) * (60 / appState.bpm);
+                        const duration = 0.5;
+                        const velocity = 0.8 + Math.random() * 0.2;
+                        
+                        melody.push({
+                            time: time,
+                            note: noteName,
+                            duration: duration,
+                            velocity: velocity
+                        });
+                    }
+                }
+                
+                return melody;
+            }
+            
+            function getMelodyNote(style) {
+                const scales = {
+                    pop: ['C', 'D', 'E', 'F', 'G', 'A', 'B'],
+                    rock: ['C', 'D', 'E', 'G', 'A', 'B'],
+                    hiphop: ['C', 'Eb', 'F', 'G#', 'Bb', 'C#'],
+                    country: ['C', 'G', 'D', 'A'],
+                    edm: ['C', 'F#', 'Bb', 'D#'],
+                    latin: ['C', 'Eb', 'F', 'G'],
+                    cinematic: ['C', 'F', 'G', 'A'],
+                    rnb: ['C', 'Eb', 'F#', 'G#'],
+                    ambient: ['C', 'Eb', 'F', 'Ab'],
+                    classical: ['C', 'D', 'E', 'F', 'G', 'A', 'B']
+                };
+                
+                const scale = scales[style] || scales.pop;
+                return scale[Math.floor(Math.random() * scale.length)];
+            }
+            
+            function generateDrums() {
+                const drumPatterns = {
+                    pop: ['kick', 'snare', 'hihat', 'hihat'],
+                    rock: ['kick', 'snare', 'kick', 'snare'],
+                    hiphop: ['kick', 'snare', 'hihat', 'clap'],
+                    country: ['kick', 'snare', 'kick', 'snare'],
+                    edm: ['kick', 'snare', 'hihat', 'openhat'],
+                    latin: ['kick', 'snare', 'hihat', 'clap'],
+                    cinematic: ['kick', 'snare', 'hihat', 'ride'],
+                    rnb: ['kick', 'snare', 'hihat', 'openhat'],
+                    ambient: ['kick', 'snare', 'hihat', 'ride'],
+                    classical: ['kick', 'snare', 'hihat', 'openhat']
+                };
+                
+                const pattern = drumPatterns[appState.style] || drumPatterns.pop;
+                const drums = [];
+                
+                for (let bar = 0; bar < appState.duration; bar++) {
+                    for (let step = 0; step < 4; step++) {
+                        const drumType = pattern[step % 4];
+                        const time = (bar * 4 + step) * (60 / appState.bpm);
+                        const velocity = 0.8 + Math.random() * 0.2;
+                        
+                        drums.push({
+                            time: time,
+                            type: drumType,
+                            velocity: velocity
+                        });
+                    }
+                }
+                
+                return drums;
+            }
+            
+            function drawGrid() {
+                if (!appState.canvas) return;
+                
+                const ctx = appState.canvas.getContext('2d');
+                const width = appState.canvas.width;
+                const height = appState.canvas.height;
+                
+                // Clear canvas
+                ctx.clearRect(0, 0, width, height);
+                
+                // Draw grid lines
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 1;
+                
+                // Bar lines
+                for (let bar = 0; bar <= appState.duration; bar++) {
+                    const x = (bar * width) / appState.duration;
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, height);
+                    ctx.stroke();
+                }
+                
+                // Beat lines
+                for (let beat = 0; beat <= appState.duration * 4; beat++) {
+                    const x = (beat * width) / (appState.duration * 4);
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, height);
+                    ctx.stroke();
+                }
+                
+                // Chords visualization
+                let currentBeat = 0;
+                appState.chords.forEach((chord, chordIndex) => {
+                    const startBeat = currentBeat;
+                    const endBeat = currentBeat + chord.durationBars * 4;
+                    
+                    // Draw chord block
+                    ctx.fillStyle = getChordColor(chord.name);
+                    ctx.fillRect(
+                        (startBeat * width) / (appState.duration * 4),
+                        0,
+                        ((endBeat - startBeat) * width) / (appState.duration * 4),
+                        height * 0.3
+                    );
+                    
+                    currentBeat += chord.durationBars * 4;
+                });
+                
+                // Melody visualization
+                appState.melody.forEach(note => {
+                    const x = note.time * width / appState.duration;
+                    const y = height * 0.5;
+                    const widthNote = note.duration * (width / appState.bpm) * 4;
+                    const heightNote = 20;
+                    
+                    ctx.fillStyle = '#3b82f6';
+                    ctx.fillRect(x, y, widthNote, heightNote);
+                });
+                
+                // Drums visualization
+                appState.drums.forEach(drum => {
+                    const x = drum.time * width / appState.duration;
+                    let y = height * 0.7;
+                    
+                    if (drum.type === 'snare') y += 20;
+                    if (drum.type === 'hihat') y += 40;
+                    if (drum.type === 'openhat') y += 60;
+                    if (drum.type === 'ride') y += 80;
+                    
+                    ctx.fillStyle = getDrumColor(drum.type);
+                    ctx.beginPath();
+                    ctx.arc(x, y, 8, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+                
+                // Playback position indicator
+                if (appState.isPlaying) {
+                    const progressBeat = (appState.bpm * appState.currentStep) / 60;
+                    const progressWidth = (progressBeat / (appState.duration * 4)) * width;
+                    
+                    ctx.strokeStyle = '#ef4444';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(progressWidth, 0);
+                    ctx.lineTo(progressWidth, height);
+                    ctx.stroke();
+                }
+            }
+            
+            function getChordColor(chordName) {
+                const colorMap = {
+                    'Am': '#ef4444',
+                    'C': '#3b82f6',
+                    'F': '#10b981',
+                    'G': '#f59e0b',
+                    'D': '#8b5cf6',
+                    'Em': '#ec4899',
+                    'Bb': '#6b7280',
+                    'Eb': '#fb923c'
+                };
+                
+                return colorMap[chordName] || '#3b82f6';
+            }
+            
+            function getDrumColor(type) {
+                const colorMap = {
+                    'kick': '#f59e0b',
+                    'snare': '#ef4444',
+                    'hihat': '#3b82f6',
+                    'openhat': '#10b981',
+                    'ride': '#8b5cf6',
+                    'clap': '#ec4899'
+                };
+                
+                return colorMap[type] || '#3b82f6';
+            }
+            
+            function playSequence() {
+                if (appState.isPlaying) return;
+                
+                appState.isPlaying = true;
+                appState.currentBeat = 0;
+                appState.currentStep = 0;
+                
+                // Setup Tone.js transport
+                if (!Tone.context) return;
+                
+                if (Tone.context.state !== 'running') {
+                    Tone.start();
+                }
+                
+                // Schedule melody notes
+                appState.melody.forEach(note => {
+                    const synth = new Tone.Synth().toDestination();
+                    
+                    synth.triggerAttackRelease(note.note, note.duration, note.time);
+                    synth.volume.value = Tone.gainToDb(note.velocity * 100);
+                });
+                
+                // Schedule drum hits
+                appState.drums.forEach(drum => {
+                    const synth = new Tone.MembraneSynth().toDestination();
+                    
+                    synth.triggerAttackRelease(drum.type, 0.1, drum.time);
+                    synth.volume.value = Tone.gainToDb(drum.velocity * 100);
+                });
+                
+                // Schedule chords
+                appState.chords.forEach(chord => {
+                    const synth = new Tone.PolySynth().toDestination();
+                    
+                    synth.triggerAttackRelease(chord.notes, chord.durationBars * 2, '+0.1');
+                    synth.volume.value = Tone.gainToDb(0.7);
+                });
+                
+                // Update play button
+                const playButton = document.getElementById('btn-play');
+                playButton.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M6 4l16 8-16 8V4z"></path>
+                    </svg>
+                    Pause
+                `;
+                playButton.classList.add('bg-red-600');
+                
+                // Stop after duration
+                setTimeout(() => {
+                    stopSequence();
+                }, (appState.duration * 4 * 60) / appState.bpm);
+            }
+            
+            function stopSequence() {
+                appState.isPlaying = false;
+                
+                // Reset playback position
+                appState.currentBar = 0;
+                appState.currentStep = 0;
+                
+                // Reset play button
+                const playButton = document.getElementById('btn-play');
+                playButton.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M8 5v14l11-7z"></path>
+                    </svg>
+                    Play
+                `;
+                playButton.classList.remove('bg-red-600');
+                
+                // Draw grid to update visualization
+                drawGrid();
+            }
+            
+            // Initialize MIDI parser
+            function initMIDIParser() {
+                // This would be implemented with a MIDI parsing library
+                console.log('MIDI parser initialized');
+            }
+            
+            // Export functionality
+            function exportSequence(format) {
+                alert(`Exporting as ${format} format would be implemented here`);
+            }
+            
+            // Update UI periodically
+            function updateUI() {
+                // Update BPM display
+                document.getElementById('bpm-display').textContent = appState.bpm + ' BPM';
+                
+                // Update style display
+                document.getElementById('style-display').textContent = appState.style.charAt(0).toUpperCase() + appState.style.slice(1);
+            }
+        </script>
+    </body>
+</html>
+
+```

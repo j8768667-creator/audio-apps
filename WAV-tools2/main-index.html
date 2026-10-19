@@ -1,0 +1,1068 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Audio Sound-Design Studio v6</title>
+    <style>
+        :root {
+            --bg-color: #0d0f12;
+            --panel-bg: #161920;
+            --panel-border: #262a36;
+            --accent-cyan: #00f2fe;
+            --accent-purple: #7928ca;
+            --accent-green: #10b981;
+            --accent-pink: #ec4899;
+            --text-color: #f1f5f9;
+            --text-dim: #94a3b8;
+        }
+
+        * {
+            box-sizing: border-box;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        header {
+            background-color: var(--panel-bg);
+            padding: 1rem 1.5rem;
+            border-bottom: 1px solid var(--panel-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            padding: 1.25rem;
+            max-width: 1300px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        @media (min-width: 850px) {
+            .container {
+                flex-direction: row;
+            }
+        }
+
+        .tool-panel {
+            flex: 1;
+            background-color: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            border-radius: 14px;
+            padding: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.1rem;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+        }
+
+        .tool-title {
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--panel-border);
+            padding-bottom: 0.75rem;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.4rem;
+        }
+
+        .control-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+        }
+
+        label {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            background: var(--panel-border);
+            border-radius: 3px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: var(--accent-cyan);
+            cursor: pointer;
+        }
+
+        select, button, input[type="file"] {
+            font-size: 0.9rem;
+            padding: 0.7rem 0.9rem;
+            border-radius: 8px;
+            border: 1px solid var(--panel-border);
+            background-color: #1e222b;
+            color: var(--text-color);
+            outline: none;
+            width: 100%;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        button {
+            background: linear-gradient(135deg, #2563eb, #1d4ed8);
+            color: white;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            flex: 1;
+        }
+
+        button.btn-preview {
+            background: linear-gradient(135deg, #059669, #10b981);
+        }
+
+        button.btn-stop {
+            background: linear-gradient(135deg, #dc2626, #ef4444);
+        }
+
+        button:active {
+            opacity: 0.85;
+        }
+
+        button:disabled {
+            background: var(--panel-border) !important;
+            color: var(--text-dim) !important;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .visualizer-container {
+            width: 100%;
+            height: 110px;
+            background-color: #0b0c0f;
+            border: 1px solid var(--panel-border);
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .status-log {
+            font-size: 0.8rem;
+            font-family: monospace;
+            color: var(--accent-cyan);
+            min-height: 1.2rem;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Audio Sound-Design Studio</h1>
+        <span id="audio-status" style="font-size: 0.8rem; color: var(--text-dim);">Tap anywhere to enable Audio Engine</span>
+    </header>
+
+    <div class="container">
+        <section class="tool-panel">
+            <div class="tool-title">
+                <span>Paulstretch Ambient Dissolver</span>
+            </div>
+            
+            <div class="control-group">
+                <label>Select Audio File(s)</label>
+                <input type="file" id="paulstretch-input" multiple accept="audio/*,.wav,.mp3,.m4a,.flac">
+            </div>
+
+            <div class="control-group">
+                <label for="paulstretch-file-select">Active File for Preview (<span id="paul-file-count">0</span> loaded)</label>
+                <select id="paulstretch-file-select" disabled>
+                    <option value="">No files loaded</option>
+                </select>
+            </div>
+
+            <div class="visualizer-container">
+                <canvas id="paul-canvas"></canvas>
+            </div>
+
+            <div class="control-grid">
+                <div class="control-group">
+                    <label for="paul-start">Start Trim: <span id="paul-start-val">0</span>%</label>
+                    <input type="range" id="paul-start" min="0" max="95" value="0">
+                </div>
+                <div class="control-group">
+                    <label for="paul-end">End Trim: <span id="paul-end-val">100</span>%</label>
+                    <input type="range" id="paul-end" min="5" max="100" value="100">
+                </div>
+            </div>
+
+            <div class="control-group">
+                <label for="stretch-factor">Time Stretch Factor: <span id="stretch-val">20</span>x</label>
+                <input type="range" id="stretch-factor" min="2" max="100" value="20">
+            </div>
+
+            <div class="control-grid">
+                <div class="control-group">
+                    <label for="window-size">Grain Size (Window)</label>
+                    <select id="window-size">
+                        <option value="0.05">50 ms (Grainy/Metallic)</option>
+                        <option value="0.15">150 ms (Textural)</option>
+                        <option value="0.30" selected>300 ms (Ambient Pad)</option>
+                        <option value="0.60">600 ms (Super Smooth)</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="paul-pitch">Pitch Shift</label>
+                    <select id="paul-pitch">
+                        <option value="-12">-1 Octave</option>
+                        <option value="-7">-7 Semitones</option>
+                        <option value="0" selected>Original Pitch</option>
+                        <option value="7">+7 Semitones</option>
+                        <option value="12">+1 Octave</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="control-grid">
+                <div class="control-group">
+                    <label for="paul-blur">Spectral Randomization</label>
+                    <select id="paul-blur">
+                        <option value="0">Off (Strict Granular)</option>
+                        <option value="0.5" selected>Medium Blend</option>
+                        <option value="1.0">Maximum Diffusion</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="paul-export-len">Export Length Limit</label>
+                    <select id="paul-export-len">
+                        <option value="0" selected>Full Original Stretched</option>
+                        <option value="15">Max 15 Seconds</option>
+                        <option value="30">Max 30 Seconds</option>
+                        <option value="60">Max 60 Seconds</option>
+                        <option value="120">Max 120 Seconds</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <button id="preview-paulstretch" class="btn-preview" disabled>Preview File</button>
+                <button id="process-paulstretch" disabled>Export Batch (All Files)</button>
+            </div>
+            <div class="status-log" id="paulstretch-status">Ready</div>
+        </section>
+
+        <section class="tool-panel">
+            <div class="tool-title">
+                <span>Batch Audio Scrambler</span>
+            </div>
+            
+            <div class="control-group">
+                <label>Select Loop File(s)</label>
+                <input type="file" id="scramble-input" multiple accept="audio/*,.wav,.mp3,.m4a,.flac">
+            </div>
+
+            <div class="control-group">
+                <label for="scramble-file-select">Active Loop for Preview (<span id="scramble-file-count">0</span> loaded)</label>
+                <select id="scramble-file-select" disabled>
+                    <option value="">No files loaded</option>
+                </select>
+            </div>
+
+            <div class="visualizer-container">
+                <canvas id="scramble-canvas"></canvas>
+            </div>
+
+            <div class="control-grid">
+                <div class="control-group">
+                    <label for="scramble-start">Start Trim: <span id="scramble-start-val">0</span>%</label>
+                    <input type="range" id="scramble-start" min="0" max="95" value="0">
+                </div>
+                <div class="control-group">
+                    <label for="scramble-end">End Trim: <span id="scramble-end-val">100</span>%</label>
+                    <input type="range" id="scramble-end" min="5" max="100" value="100">
+                </div>
+            </div>
+
+            <div class="control-grid">
+                <div class="control-group">
+                    <label for="subdivision">Grid Subdivisions</label>
+                    <select id="subdivision">
+                        <option value="4">1/4 Slices</option>
+                        <option value="8">1/8 Slices</option>
+                        <option value="16" selected>1/16 Slices</option>
+                        <option value="32">1/32 Slices</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="algorithm">Shuffle Logic</label>
+                    <select id="algorithm">
+                        <option value="random">Pure Randomize</option>
+                        <option value="reverse-all">Reverse Slice Order</option>
+                        <option value="stutter">Stutter Pattern</option>
+                        <option value="ping-pong">Ping-Pong Shuffle</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="control-grid">
+                <div class="control-group">
+                    <label for="slice-reverse">Per-Slice Reverse Probability: <span id="reverse-val">50</span>%</label>
+                    <input type="range" id="slice-reverse" min="0" max="100" value="50">
+                </div>
+                <div class="control-group">
+                    <label for="scramble-export-len">Output Repetitions</label>
+                    <select id="scramble-export-len">
+                        <option value="1" selected>1x Length (Original Duration)</option>
+                        <option value="2">2x Repeating Loop</option>
+                        <option value="4">4x Extended Loop</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <button id="preview-scramble" class="btn-preview" disabled>Preview Loop</button>
+                <button id="process-scramble" disabled>Export Batch (All Loops)</button>
+            </div>
+            <div class="status-log" id="scramble-status">Ready</div>
+        </section>
+    </div>
+
+    <script>
+        let audioCtx = null;
+        let masterGain = null;
+        let activePreviewSource = null;
+        let animationFrameId = null;
+
+        function unlockAudioEngine() {
+            if (!audioCtx) {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                audioCtx = new AudioContextClass();
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 1.0;
+                masterGain.connect(audioCtx.destination);
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            document.getElementById('audio-status').textContent = "Audio Engine Active (" + audioCtx.sampleRate + "Hz)";
+        }
+
+        window.addEventListener('click', unlockAudioEngine);
+        window.addEventListener('touchstart', unlockAudioEngine);
+
+        function stopPreview() {
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+                animationFrameId = null;
+            }
+            if (activePreviewSource) {
+                try { activePreviewSource.stop(); } catch(e){}
+                activePreviewSource = null;
+            }
+            document.querySelectorAll('.btn-preview').forEach(b => {
+                b.textContent = b.id.includes('paul') ? "Preview File" : "Preview Loop";
+                b.classList.remove('btn-stop');
+            });
+
+            if (paulDecodedBuffers[currentPaulFileIdx]) {
+                drawWaveform(paulCanvas, paulDecodedBuffers[currentPaulFileIdx], 0, [], -1, paulStartRatio, paulEndRatio);
+            }
+            if (scrambleDecodedBuffers[currentScrambleFileIdx]) {
+                updateScrambleVisualization();
+            }
+        }
+
+        function drawWaveform(canvas, audioBuffer, sliceGrid = 0, highlightedSlices = [], progressRatio = -1, startRatio = 0, endRatio = 1) {
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width = canvas.parentElement.clientWidth;
+            const height = canvas.height = canvas.parentElement.clientHeight;
+
+            ctx.clearRect(0, 0, width, height);
+            
+            if (!audioBuffer) {
+                ctx.fillStyle = '#1e222b';
+                ctx.fillRect(0, 0, width, height);
+                return;
+            }
+
+            const data = audioBuffer.getChannelData(0);
+            const step = Math.ceil(data.length / width);
+            const amp = height / 2;
+
+            // Draw Dimmed Out-of-Bounds Selection Region
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+            ctx.fillRect(0, 0, startRatio * width, height);
+            ctx.fillRect(endRatio * width, 0, (1 - endRatio) * width, height);
+
+            // Selection Boundary Lines
+            ctx.strokeStyle = '#00f2fe';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(startRatio * width, 0); ctx.lineTo(startRatio * width, height);
+            ctx.moveTo(endRatio * width, 0); ctx.lineTo(endRatio * width, height);
+            ctx.stroke();
+
+            if (sliceGrid > 0) {
+                const selWidth = (endRatio - startRatio) * width;
+                const sliceWidth = selWidth / sliceGrid;
+                const startX = startRatio * width;
+                for (let i = 0; i < sliceGrid; i++) {
+                    ctx.fillStyle = (highlightedSlices[i] && highlightedSlices[i].reversed) 
+                        ? 'rgba(236, 72, 153, 0.18)' 
+                        : 'rgba(0, 242, 254, 0.04)';
+                    ctx.fillRect(startX + (i * sliceWidth), 0, sliceWidth, height);
+                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+                    ctx.strokeRect(startX + (i * sliceWidth), 0, sliceWidth, height);
+                }
+            }
+
+            ctx.beginPath();
+            ctx.strokeStyle = '#262a36';
+            ctx.moveTo(0, amp);
+            ctx.lineTo(width, amp);
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.strokeStyle = '#00f2fe';
+            ctx.lineWidth = 1.5;
+
+            for (let i = 0; i < width; i++) {
+                let min = 1.0;
+                let max = -1.0;
+                for (let j = 0; j < step; j++) {
+                    const datum = data[(i * step) + j];
+                    if (datum < min) min = datum;
+                    if (datum > max) max = datum;
+                }
+                ctx.moveTo(i, (1 + min) * amp);
+                ctx.lineTo(i, (1 + max) * amp);
+            }
+            ctx.stroke();
+
+            if (progressRatio >= 0 && progressRatio <= 1) {
+                const activeStart = startRatio * width;
+                const activeWidth = (endRatio - startRatio) * width;
+                const progressX = activeStart + (progressRatio * activeWidth);
+
+                ctx.fillStyle = 'rgba(0, 242, 254, 0.15)';
+                ctx.fillRect(activeStart, 0, progressRatio * activeWidth, height);
+
+                ctx.beginPath();
+                ctx.strokeStyle = '#ec4899';
+                ctx.lineWidth = 2.5;
+                ctx.moveTo(progressX, 0);
+                ctx.lineTo(progressX, height);
+                ctx.stroke();
+
+                ctx.fillStyle = '#ec4899';
+                ctx.beginPath();
+                ctx.arc(progressX, 6, 5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function extractSlicedBuffer(originalBuffer, startRatio, endRatio) {
+            const startSample = Math.floor(startRatio * originalBuffer.length);
+            const endSample = Math.floor(endRatio * originalBuffer.length);
+            const slicedLength = Math.max(1, endSample - startSample);
+
+            const slicedBuffer = audioCtx.createBuffer(
+                originalBuffer.numberOfChannels,
+                slicedLength,
+                originalBuffer.sampleRate
+            );
+
+            for (let ch = 0; ch < originalBuffer.numberOfChannels; ch++) {
+                const src = originalBuffer.getChannelData(ch);
+                const dest = slicedBuffer.getChannelData(ch);
+                for (let i = 0; i < slicedLength; i++) {
+                    dest[i] = src[startSample + i] || 0;
+                }
+            }
+            return slicedBuffer;
+        }
+
+        function bufferToWave(abuffer, len) {
+            let numOfChan = abuffer.numberOfChannels,
+                length = len * numOfChan * 2 + 44,
+                out = new DataView(new ArrayBuffer(length)),
+                channels = [], i, sample, offset = 0, pos = 0;
+
+            function setUint16(data) { out.setUint16(pos, data, true); pos += 2; }
+            function setUint32(data) { out.setUint32(pos, data, true); pos += 4; }
+
+            setUint32(0x46464952);
+            setUint32(length - 8);
+            setUint32(0x45564157);
+            setUint32(0x20746d66);
+            setUint32(16);
+            setUint16(1);
+            setUint16(numOfChan);
+            setUint32(abuffer.sampleRate);
+            setUint32(abuffer.sampleRate * 2 * numOfChan);
+            setUint16(numOfChan * 2);
+            setUint16(16);
+            setUint32(0x61746164);
+            setUint32(length - pos - 4);
+
+            for (i = 0; i < abuffer.numberOfChannels; i++) channels.push(abuffer.getChannelData(i));
+
+            while (pos < length) {
+                for (i = 0; i < numOfChan; i++) {
+                    sample = Math.max(-1, Math.min(1, channels[i][offset]));
+                    sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
+                    out.setInt16(pos, sample, true);
+                    pos += 2;
+                }
+                offset++;
+            }
+            return new Blob([out], { type: "audio/wav" });
+        }
+
+        // --- PAULSTRETCH ENGINE ---
+        const paulstretchInput = document.getElementById('paulstretch-input');
+        const paulSelect = document.getElementById('paulstretch-file-select');
+        const paulCountSpan = document.getElementById('paul-file-count');
+        const paulstretchBtn = document.getElementById('process-paulstretch');
+        const paulstretchPreviewBtn = document.getElementById('preview-paulstretch');
+        const stretchRange = document.getElementById('stretch-factor');
+        const stretchVal = document.getElementById('stretch-val');
+        const paulstretchStatus = document.getElementById('paulstretch-status');
+        const paulCanvas = document.getElementById('paul-canvas');
+
+        const paulStartSlider = document.getElementById('paul-start');
+        const paulEndSlider = document.getElementById('paul-end');
+        let paulStartRatio = 0.0;
+        let paulEndRatio = 1.0;
+
+        paulStartSlider.addEventListener('input', (e) => {
+            paulStartRatio = parseFloat(e.target.value) / 100;
+            if (paulStartRatio >= paulEndRatio) {
+                paulEndRatio = Math.min(1.0, paulStartRatio + 0.05);
+                paulEndSlider.value = paulEndRatio * 100;
+                document.getElementById('paul-end-val').textContent = paulEndSlider.value;
+            }
+            document.getElementById('paul-start-val').textContent = e.target.value;
+            if (paulDecodedBuffers[currentPaulFileIdx]) {
+                drawWaveform(paulCanvas, paulDecodedBuffers[currentPaulFileIdx], 0, [], -1, paulStartRatio, paulEndRatio);
+            }
+        });
+
+        paulEndSlider.addEventListener('input', (e) => {
+            paulEndRatio = parseFloat(e.target.value) / 100;
+            if (paulEndRatio <= paulStartRatio) {
+                paulStartRatio = Math.max(0, paulEndRatio - 0.05);
+                paulStartSlider.value = paulStartRatio * 100;
+                document.getElementById('paul-start-val').textContent = paulStartSlider.value;
+            }
+            document.getElementById('paul-end-val').textContent = e.target.value;
+            if (paulDecodedBuffers[currentPaulFileIdx]) {
+                drawWaveform(paulCanvas, paulDecodedBuffers[currentPaulFileIdx], 0, [], -1, paulStartRatio, paulEndRatio);
+            }
+        });
+
+        stretchRange.addEventListener('input', (e) => stretchVal.textContent = e.target.value);
+
+        let paulFiles = [];
+        let paulDecodedBuffers = [];
+        let currentPaulFileIdx = 0;
+
+        paulstretchInput.addEventListener('change', async (e) => {
+            unlockAudioEngine();
+            paulFiles = Array.from(e.target.files);
+            paulDecodedBuffers = new Array(paulFiles.length).fill(null);
+            
+            paulSelect.innerHTML = '';
+            paulCountSpan.textContent = paulFiles.length;
+
+            if (paulFiles.length > 0) {
+                paulSelect.disabled = false;
+                paulFiles.forEach((f, idx) => {
+                    const opt = document.createElement('option');
+                    opt.value = idx;
+                    opt.textContent = `${idx + 1}. ${f.name}`;
+                    paulSelect.appendChild(opt);
+                });
+
+                currentPaulFileIdx = 0;
+                paulSelect.value = 0;
+
+                for (let i = 0; i < paulFiles.length; i++) {
+                    await decodePaulFile(i);
+                }
+
+                paulstretchBtn.disabled = false;
+                paulstretchPreviewBtn.disabled = false;
+            } else {
+                paulSelect.disabled = true;
+                paulstretchBtn.disabled = true;
+                paulstretchPreviewBtn.disabled = true;
+            }
+        });
+
+        paulSelect.addEventListener('change', (e) => {
+            stopPreview();
+            currentPaulFileIdx = parseInt(e.target.value);
+            drawWaveform(paulCanvas, paulDecodedBuffers[currentPaulFileIdx], 0, [], -1, paulStartRatio, paulEndRatio);
+            paulstretchStatus.textContent = `Loaded file: ${paulFiles[currentPaulFileIdx].name}`;
+        });
+
+        async function decodePaulFile(idx) {
+            unlockAudioEngine();
+            if (!paulDecodedBuffers[idx] && paulFiles[idx]) {
+                paulstretchStatus.textContent = `Pre-decoding file ${idx + 1}/${paulFiles.length}...`;
+                const arrayBuffer = await paulFiles[idx].arrayBuffer();
+                paulDecodedBuffers[idx] = await audioCtx.decodeAudioData(arrayBuffer);
+            }
+            if (idx === currentPaulFileIdx) {
+                drawWaveform(paulCanvas, paulDecodedBuffers[idx], 0, [], -1, paulStartRatio, paulEndRatio);
+                paulstretchStatus.textContent = `Loaded file: ${paulFiles[idx].name}`;
+            }
+        }
+
+        function generatePaulstretchBuffer(audioBuffer, previewOnly = false) {
+            const trimmedBuffer = extractSlicedBuffer(audioBuffer, paulStartRatio, paulEndRatio);
+            const factor = parseFloat(stretchRange.value);
+            const grainSizeSec = parseFloat(document.getElementById('window-size').value);
+            const pitchShift = parseFloat(document.getElementById('paul-pitch').value);
+            const blurAmount = parseFloat(document.getElementById('paul-blur').value);
+            const exportLimit = parseFloat(document.getElementById('paul-export-len').value);
+
+            const pitchRatio = Math.pow(2, pitchShift / 12);
+            const sampleRate = trimmedBuffer.sampleRate;
+            const grainSizeSamples = Math.floor(grainSizeSec * sampleRate);
+            const numChannels = trimmedBuffer.numberOfChannels;
+
+            let targetDuration = trimmedBuffer.duration * factor;
+            if (exportLimit > 0 && targetDuration > exportLimit) {
+                targetDuration = exportLimit;
+            }
+            if (previewOnly && targetDuration > 8) {
+                targetDuration = 8;
+            }
+
+            const targetLengthSamples = Math.floor(targetDuration * sampleRate);
+            const outputBuffer = audioCtx.createBuffer(numChannels, targetLengthSamples, sampleRate);
+
+            const hopSizeInput = grainSizeSamples / factor;
+            const hopSizeOutput = grainSizeSamples / 2;
+
+            const windowFunc = new Float32Array(grainSizeSamples);
+            for (let i = 0; i < grainSizeSamples; i++) {
+                windowFunc[i] = 0.5 * (1 - Math.cos((2 * Math.PI * i) / grainSizeSamples));
+            }
+
+            let inputPos = 0;
+            let outputPos = 0;
+
+            while (outputPos + grainSizeSamples < targetLengthSamples) {
+                const readPos = Math.floor(inputPos);
+
+                for (let ch = 0; ch < numChannels; ch++) {
+                    const inData = trimmedBuffer.getChannelData(ch);
+                    const outData = outputBuffer.getChannelData(ch);
+
+                    for (let i = 0; i < grainSizeSamples; i++) {
+                        let sampleIdx = readPos + i;
+                        if (sampleIdx >= inData.length) sampleIdx = inData.length - 1;
+
+                        let sample = inData[sampleIdx] * windowFunc[i];
+                        if (blurAmount > 0 && Math.random() < blurAmount * 0.3) {
+                            sample = sample * (0.85 + Math.random() * 0.3);
+                        }
+                        outData[outputPos + i] += sample;
+                    }
+                }
+
+                inputPos += hopSizeInput;
+                if (inputPos + grainSizeSamples >= trimmedBuffer.length) {
+                    inputPos = 0;
+                }
+                outputPos += Math.floor(hopSizeOutput);
+            }
+
+            if (pitchShift !== 0) {
+                const pitchedBuffer = audioCtx.createBuffer(numChannels, Math.floor(targetLengthSamples / pitchRatio), sampleRate);
+                for (let ch = 0; ch < numChannels; ch++) {
+                    const srcData = outputBuffer.getChannelData(ch);
+                    const destData = pitchedBuffer.getChannelData(ch);
+                    for (let i = 0; i < destData.length; i++) {
+                        const srcIndex = Math.floor(i * pitchRatio);
+                        if (srcIndex < srcData.length) {
+                            destData[i] = srcData[srcIndex];
+                        }
+                    }
+                }
+                return pitchedBuffer;
+            }
+
+            return outputBuffer;
+        }
+
+        paulstretchPreviewBtn.addEventListener('click', () => {
+            unlockAudioEngine();
+            if (activePreviewSource) {
+                stopPreview();
+                return;
+            }
+
+            const currentBuf = paulDecodedBuffers[currentPaulFileIdx];
+            if (!currentBuf) return;
+
+            try {
+                paulstretchStatus.textContent = "Synthesizing stretch preview...";
+
+                const rendered = generatePaulstretchBuffer(currentBuf, true);
+                
+                const src = audioCtx.createBufferSource();
+                src.buffer = rendered;
+                src.connect(masterGain);
+                src.start(0);
+                activePreviewSource = src;
+
+                const startTime = audioCtx.currentTime;
+                const duration = rendered.duration;
+
+                paulstretchPreviewBtn.textContent = "Stop";
+                paulstretchPreviewBtn.classList.add('btn-stop');
+                paulstretchStatus.textContent = "Playing preview...";
+
+                function updateTimeline() {
+                    const elapsed = audioCtx.currentTime - startTime;
+                    const progress = elapsed / duration;
+
+                    if (progress <= 1 && activePreviewSource === src) {
+                        drawWaveform(paulCanvas, paulDecodedBuffers[currentPaulFileIdx], 0, [], progress, paulStartRatio, paulEndRatio);
+                        animationFrameId = requestAnimationFrame(updateTimeline);
+                    } else {
+                        stopPreview();
+                    }
+                }
+                updateTimeline();
+
+                src.onended = () => stopPreview();
+            } catch(e) {
+                console.error(e);
+                paulstretchStatus.textContent = "Error playing audio preview.";
+            }
+        });
+
+        paulstretchBtn.addEventListener('click', async () => {
+            unlockAudioEngine();
+            stopPreview();
+
+            for (let i = 0; i < paulFiles.length; i++) {
+                const file = paulFiles[i];
+                paulstretchStatus.textContent = `Processing batch (${i + 1}/${paulFiles.length}): ${file.name}`;
+
+                try {
+                    await decodePaulFile(i);
+                    const stretched = generatePaulstretchBuffer(paulDecodedBuffers[i], false);
+                    const wavBlob = bufferToWave(stretched, stretched.length);
+
+                    const url = URL.createObjectURL(wavBlob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `stretched_${file.name.replace(/\.[^/.]+$/, "")}.wav`;
+                    a.click();
+                } catch(err) {
+                    console.error("Batch file error:", err);
+                }
+            }
+            paulstretchStatus.textContent = `All ${paulFiles.length} files processed & downloaded!`;
+        });
+
+
+        // --- BATCH SCRAMBLER ENGINE ---
+        const scrambleInput = document.getElementById('scramble-input');
+        const scrambleSelect = document.getElementById('scramble-file-select');
+        const scrambleCountSpan = document.getElementById('scramble-file-count');
+        const scrambleBtn = document.getElementById('process-scramble');
+        const scramblePreviewBtn = document.getElementById('preview-scramble');
+        const scrambleStatus = document.getElementById('scramble-status');
+        const reverseRange = document.getElementById('slice-reverse');
+        const reverseVal = document.getElementById('reverse-val');
+        const scrambleCanvas = document.getElementById('scramble-canvas');
+
+        const scrambleStartSlider = document.getElementById('scramble-start');
+        const scrambleEndSlider = document.getElementById('scramble-end');
+        let scrambleStartRatio = 0.0;
+        let scrambleEndRatio = 1.0;
+
+        scrambleStartSlider.addEventListener('input', (e) => {
+            scrambleStartRatio = parseFloat(e.target.value) / 100;
+            if (scrambleStartRatio >= scrambleEndRatio) {
+                scrambleEndRatio = Math.min(1.0, scrambleStartRatio + 0.05);
+                scrambleEndSlider.value = scrambleEndRatio * 100;
+                document.getElementById('scramble-end-val').textContent = scrambleEndSlider.value;
+            }
+            document.getElementById('scramble-start-val').textContent = e.target.value;
+            updateScrambleVisualization();
+        });
+
+        scrambleEndSlider.addEventListener('input', (e) => {
+            scrambleEndRatio = parseFloat(e.target.value) / 100;
+            if (scrambleEndRatio <= scrambleStartRatio) {
+                scrambleStartRatio = Math.max(0, scrambleEndRatio - 0.05);
+                scrambleStartSlider.value = scrambleStartRatio * 100;
+                document.getElementById('scramble-start-val').textContent = scrambleStartSlider.value;
+            }
+            document.getElementById('scramble-end-val').textContent = e.target.value;
+            updateScrambleVisualization();
+        });
+
+        reverseRange.addEventListener('input', (e) => reverseVal.textContent = e.target.value);
+
+        let scrambleFiles = [];
+        let scrambleDecodedBuffers = [];
+        let currentScrambleFileIdx = 0;
+        let currentSlicePlan = [];
+
+        scrambleInput.addEventListener('change', async (e) => {
+            unlockAudioEngine();
+            scrambleFiles = Array.from(e.target.files);
+            scrambleDecodedBuffers = new Array(scrambleFiles.length).fill(null);
+            
+            scrambleSelect.innerHTML = '';
+            scrambleCountSpan.textContent = scrambleFiles.length;
+
+            if (scrambleFiles.length > 0) {
+                scrambleSelect.disabled = false;
+                scrambleFiles.forEach((f, idx) => {
+                    const opt = document.createElement('option');
+                    opt.value = idx;
+                    opt.textContent = `${idx + 1}. ${f.name}`;
+                    scrambleSelect.appendChild(opt);
+                });
+
+                currentScrambleFileIdx = 0;
+                scrambleSelect.value = 0;
+
+                for (let i = 0; i < scrambleFiles.length; i++) {
+                    await decodeScrambleFile(i);
+                }
+
+                scrambleBtn.disabled = false;
+                scramblePreviewBtn.disabled = false;
+            } else {
+                scrambleSelect.disabled = true;
+                scrambleBtn.disabled = true;
+                scramblePreviewBtn.disabled = true;
+            }
+        });
+
+        scrambleSelect.addEventListener('change', (e) => {
+            stopPreview();
+            currentScrambleFileIdx = parseInt(e.target.value);
+            updateScrambleVisualization();
+            scrambleStatus.textContent = `Loaded loop: ${scrambleFiles[currentScrambleFileIdx].name}`;
+        });
+
+        async function decodeScrambleFile(idx) {
+            unlockAudioEngine();
+            if (!scrambleDecodedBuffers[idx] && scrambleFiles[idx]) {
+                scrambleStatus.textContent = `Pre-decoding loop ${idx + 1}/${scrambleFiles.length}...`;
+                const arrayBuffer = await scrambleFiles[idx].arrayBuffer();
+                scrambleDecodedBuffers[idx] = await audioCtx.decodeAudioData(arrayBuffer);
+            }
+            if (idx === currentScrambleFileIdx) {
+                updateScrambleVisualization();
+                scrambleStatus.textContent = `Loaded loop: ${scrambleFiles[idx].name}`;
+            }
+        }
+
+        document.getElementById('subdivision').addEventListener('change', updateScrambleVisualization);
+        document.getElementById('algorithm').addEventListener('change', updateScrambleVisualization);
+        reverseRange.addEventListener('change', updateScrambleVisualization);
+
+        function updateScrambleVisualization() {
+            if (!scrambleDecodedBuffers[currentScrambleFileIdx]) return;
+            const slices = parseInt(document.getElementById('subdivision').value);
+            const revChance = parseFloat(reverseRange.value) / 100;
+            
+            currentSlicePlan = [];
+            for (let i = 0; i < slices; i++) {
+                currentSlicePlan.push({
+                    reversed: Math.random() < revChance
+                });
+            }
+            drawWaveform(scrambleCanvas, scrambleDecodedBuffers[currentScrambleFileIdx], slices, currentSlicePlan, -1, scrambleStartRatio, scrambleEndRatio);
+        }
+
+        function generateScrambleBuffer(audioBuffer) {
+            const trimmedBuffer = extractSlicedBuffer(audioBuffer, scrambleStartRatio, scrambleEndRatio);
+            const slices = parseInt(document.getElementById('subdivision').value);
+            const algo = document.getElementById('algorithm').value;
+            const revChance = parseFloat(reverseRange.value) / 100;
+            const repeatTimes = parseInt(document.getElementById('scramble-export-len').value);
+
+            const numChannels = trimmedBuffer.numberOfChannels;
+            const baseSamples = trimmedBuffer.length;
+            const sampleRate = trimmedBuffer.sampleRate;
+            const chunkSamples = Math.floor(baseSamples / slices);
+            const totalSamples = baseSamples * repeatTimes;
+
+            const outputBuffer = audioCtx.createBuffer(numChannels, totalSamples, sampleRate);
+
+            for (let rep = 0; rep < repeatTimes; rep++) {
+                let indices = Array.from({length: slices}, (_, i) => i);
+
+                if (algo === 'random') {
+                    indices.sort(() => Math.random() - 0.5);
+                } else if (algo === 'reverse-all') {
+                    indices.reverse();
+                } else if (algo === 'stutter') {
+                    const first = indices[0];
+                    indices = indices.map((idx, i) => (i % 2 === 0 ? first : idx));
+                } else if (algo === 'ping-pong') {
+                    indices = indices.map((idx, i) => (i % 2 === 0 ? idx : slices - 1 - idx));
+                }
+
+                const repSampleOffset = rep * baseSamples;
+
+                for (let i = 0; i < slices; i++) {
+                    const sourceSliceIdx = indices[i];
+                    const sourceStartSample = sourceSliceIdx * chunkSamples;
+                    const destStartSample = repSampleOffset + (i * chunkSamples);
+                    const isReversed = Math.random() < revChance;
+
+                    for (let ch = 0; ch < numChannels; ch++) {
+                        const inData = trimmedBuffer.getChannelData(ch);
+                        const outData = outputBuffer.getChannelData(ch);
+
+                        if (isReversed) {
+                            for (let s = 0; s < chunkSamples; s++) {
+                                const srcPos = sourceStartSample + chunkSamples - 1 - s;
+                                outData[destStartSample + s] = inData[srcPos] || 0;
+                            }
+                        } else {
+                            for (let s = 0; s < chunkSamples; s++) {
+                                const srcPos = sourceStartSample + s;
+                                outData[destStartSample + s] = inData[srcPos] || 0;
+                            }
+                        }
+                    }
+                }
+            }
+
+            return outputBuffer;
+        }
+
+        scramblePreviewBtn.addEventListener('click', () => {
+            unlockAudioEngine();
+            if (activePreviewSource) {
+                stopPreview();
+                return;
+            }
+
+            const currentBuf = scrambleDecodedBuffers[currentScrambleFileIdx];
+            if (!currentBuf) return;
+
+            try {
+                scrambleStatus.textContent = "Rendering scramble preview...";
+
+                const rendered = generateScrambleBuffer(currentBuf);
+                
+                const src = audioCtx.createBufferSource();
+                src.buffer = rendered;
+                src.connect(masterGain);
+                src.start(0);
+                activePreviewSource = src;
+
+                const startTime = audioCtx.currentTime;
+                const duration = rendered.duration;
+                const slices = parseInt(document.getElementById('subdivision').value);
+
+                scramblePreviewBtn.textContent = "Stop";
+                scramblePreviewBtn.classList.add('btn-stop');
+                scrambleStatus.textContent = "Playing preview...";
+
+                function updateTimeline() {
+                    const elapsed = audioCtx.currentTime - startTime;
+                    const progress = elapsed / duration;
+
+                    if (progress <= 1 && activePreviewSource === src) {
+                        drawWaveform(scrambleCanvas, scrambleDecodedBuffers[currentScrambleFileIdx], slices, currentSlicePlan, progress, scrambleStartRatio, scrambleEndRatio);
+                        animationFrameId = requestAnimationFrame(updateTimeline);
+                    } else {
+                        stopPreview();
+                    }
+                }
+                updateTimeline();
+
+                src.onended = () => stopPreview();
+            } catch(e) {
+                console.error(e);
+                scrambleStatus.textContent = "Error rendering scramble preview.";
+            }
+        });
+
+        scrambleBtn.addEventListener('click', async () => {
+            unlockAudioEngine();
+            stopPreview();
+
+            for (let i = 0; i < scrambleFiles.length; i++) {
+                const file = scrambleFiles[i];
+                scrambleStatus.textContent = `Scrambling batch (${i + 1}/${scrambleFiles.length}): ${file.name}`;
+
+                try {
+                    await decodeScrambleFile(i);
+                    const scrambled = generateScrambleBuffer(scrambleDecodedBuffers[i]);
+                    const wavBlob = bufferToWave(scrambled, scrambled.length);
+
+                    const url = URL.createObjectURL(wavBlob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `scrambled_${file.name.replace(/\.[^/.]+$/, "")}.wav`;
+                    a.click();
+                } catch(err) {
+                    console.error("Batch file error:", err);
+                }
+            }
+            scrambleStatus.textContent = `All ${scrambleFiles.length} loops scrambled & downloaded!`;
+        });
+    </script>
+</body>
+</html>

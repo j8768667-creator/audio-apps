@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#09110f" />
+  <title>Continuum — MIDI extension studio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'], display: ['DM Sans', 'Inter', 'sans-serif'] },
+          colors: { ink: '#09110f', panel: '#101a17', line: '#20332d', mint: '#a6f3c5', lime: '#d7fa71', cloud: '#e8f0eb', muted: '#8da79b' },
+          boxShadow: { glow: '0 0 0 1px rgba(166,243,197,.08), 0 20px 60px rgba(0,0,0,.25)' }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/tone@14.7.77/build/Tone.js"></script>
+  <script src="https://unpkg.com/@tonejs/midi@2.0.28/build/Midi.js"></script>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #09110f; color: #e8f0eb; font-family: Inter, sans-serif; }
+    .grain { background-image: radial-gradient(rgba(232,240,235,.06) .7px, transparent .7px); background-size: 7px 7px; }
+    .mesh { background: radial-gradient(circle at 75% 0%, rgba(166,243,197,.10), transparent 32%), radial-gradient(circle at 0% 75%, rgba(215,250,113,.055), transparent 28%); }
+    .upload-zone { border: 1px dashed #3c6654; transition: all .25s ease; }
+    .upload-zone:hover, .upload-zone.dragging { border-color: #a6f3c5; background: rgba(166,243,197,.07); transform: translateY(-2px); }
+    .btn { transition: transform .2s ease, background .2s ease, border-color .2s ease, color .2s ease; }
+    .btn:hover { transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); }
+    .wave-bar { transform-origin: bottom; animation: pulse 2.2s ease-in-out infinite; }
+    .wave-bar:nth-child(3n) { animation-delay: -.45s; } .wave-bar:nth-child(4n) { animation-delay: -.9s; } .wave-bar:nth-child(5n) { animation-delay: -1.3s; }
+    @keyframes pulse { 0%,100% { transform: scaleY(.55); opacity: .6; } 50% { transform: scaleY(1); opacity: 1; } }
+    .spinner { animation: spin 1s linear infinite; } @keyframes spin { to { transform: rotate(360deg); } }
+    input[type=number]::-webkit-inner-spin-button { opacity: .5; }
+    .scrollbar::-webkit-scrollbar { width: 5px; } .scrollbar::-webkit-scrollbar-thumb { background: #2a4439; border-radius: 99px; }
+  </style>
+  <meta property="og:image" content="https://bolt.new/static/og_default.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="https://bolt.new/static/og_default.png">
+</head>
+<body class="min-h-screen mesh grain">
+  <main class="mx-auto max-w-[1440px] px-5 py-5 sm:px-8 lg:px-12 lg:py-8">
+    <header class="flex items-center justify-between border-b border-line pb-5">
+      <div class="flex items-center gap-3">
+        <div class="grid h-9 w-9 place-items-center rounded-xl bg-mint text-ink shadow-[0_0_24px_rgba(166,243,197,.18)]">
+          <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round"><path d="M5 3v14a4 4 0 1 0 4-4V3l10-2v12a4 4 0 1 0 4-4V2L9 4"/></svg>
+        </div>
+        <div><p class="font-display text-lg font-bold tracking-tight">continuum<span class="text-mint">.</span></p><p class="text-[10px] uppercase tracking-[.22em] text-muted">MIDI extension studio</p></div>
+      </div>
+      <div class="hidden items-center gap-3 text-xs text-muted sm:flex"><span class="h-2 w-2 rounded-full bg-mint shadow-[0_0_10px_#a6f3c5]"></span> Runs locally in your browser</div>
+    </header>
+
+    <section class="grid gap-8 pb-12 pt-10 lg:grid-cols-[1.06fr_.94fr] lg:items-end lg:pt-16">
+      <div>
+        <div class="mb-5 inline-flex items-center gap-2 rounded-full border border-line bg-panel/70 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[.18em] text-mint"><span class="h-1.5 w-1.5 rounded-full bg-lime"></span> Phrase-aware generation</div>
+        <h1 class="max-w-2xl font-display text-5xl font-semibold leading-[1.04] tracking-[-.055em] text-cloud sm:text-6xl lg:text-[76px]">Give your track<br /><span class="text-mint">more room</span> to move.</h1>
+        <p class="mt-6 max-w-xl text-base leading-7 text-muted sm:text-lg">Upload a MIDI sketch and let Continuum find its pulse, patterns, and harmonic language — then carry the idea forward without losing its character.</p>
+      </div>
+      <div class="relative hidden min-h-[180px] items-end justify-end overflow-hidden rounded-3xl border border-line bg-panel/45 p-7 lg:flex">
+        <div class="absolute inset-x-7 top-7 flex h-20 items-end gap-1 opacity-80" aria-hidden="true"><span class="wave-bar h-7 w-1 rounded-full bg-mint"></span><span class="wave-bar h-12 w-1 rounded-full bg-mint"></span><span class="wave-bar h-16 w-1 rounded-full bg-lime"></span><span class="wave-bar h-9 w-1 rounded-full bg-mint"></span><span class="wave-bar h-20 w-1 rounded-full bg-mint"></span><span class="wave-bar h-14 w-1 rounded-full bg-lime"></span><span class="wave-bar h-8 w-1 rounded-full bg-mint"></span><span class="wave-bar h-18 w-1 rounded-full bg-mint"></span><span class="wave-bar h-11 w-1 rounded-full bg-lime"></span><span class="wave-bar h-24 w-1 rounded-full bg-mint"></span><span class="wave-bar h-13 w-1 rounded-full bg-mint"></span><span class="wave-bar h-17 w-1 rounded-full bg-lime"></span><span class="wave-bar h-7 w-1 rounded-full bg-mint"></span><span class="wave-bar h-15 w-1 rounded-full bg-mint"></span><span class="wave-bar h-22 w-1 rounded-full bg-lime"></span><span class="wave-bar h-10 w-1 rounded-full bg-mint"></span><span class="wave-bar h-18 w-1 rounded-full bg-mint"></span><span class="wave-bar h-8 w-1 rounded-full bg-lime"></span><span class="wave-bar h-14 w-1 rounded-full bg-mint"></span><span class="wave-bar h-21 w-1 rounded-full bg-mint"></span><span class="wave-bar h-11 w-1 rounded-full bg-lime"></span><span class="wave-bar h-17 w-1 rounded-full bg-mint"></span><span class="wave-bar h-8 w-1 rounded-full bg-mint"></span><span class="wave-bar h-14 w-1 rounded-full bg-lime"></span><span class="wave-bar h-10 w-1 rounded-full bg-mint"></span><span class="wave-bar h-20 w-1 rounded-full bg-mint"></span><span class="wave-bar h-12 w-1 rounded-full bg-lime"></span><span class="wave-bar h-7 w-1 rounded-full bg-mint"></span><span class="wave-bar h-17 w-1 rounded-full bg-mint"></span><span class="wave-bar h-10 w-1 rounded-full bg-lime"></span><span class="wave-bar h-21 w-1 rounded-full bg-mint"></span><span class="wave-bar h-14 w-1 rounded-full bg-mint"></span><span class="wave-bar h-8 w-1 rounded-full bg-lime"></span><span class="wave-bar h-18 w-1 rounded-full bg-mint"></span><span class="wave-bar h-11 w-1 rounded-full bg-mint"></span><span class="wave-bar h-23 w-1 rounded-full bg-lime"></span><span class="wave-bar h-8 w-1 rounded-full bg-mint"></span><span class="wave-bar h-15 w-1 rounded-full bg-mint"></span><span class="wave-bar h-10 w-1 rounded-full bg-lime"></span><span class="wave-bar h-18 w-1 rounded-full bg-mint"></span><span class="wave-bar h-12 w-1 rounded-full bg-mint"></span><span class="wave-bar h-7 w-1 rounded-full bg-lime"></span></div>
+        <p class="relative z-10 text-right text-xs uppercase tracking-[.2em] text-muted">listen for the<br /><span class="text-cloud">continuation</span></p>
+      </div>
+    </section>
+
+    <section class="grid gap-5 lg:grid-cols-[1.18fr_.82fr]">
+      <div class="rounded-3xl border border-line bg-panel/85 p-5 shadow-glow sm:p-7">
+        <div class="mb-6 flex items-center justify-between"><div><p class="text-xs font-semibold uppercase tracking-[.16em] text-muted">01 / Source material</p><h2 class="mt-2 font-display text-2xl font-semibold text-cloud">Drop in your MIDI</h2></div><div class="rounded-lg border border-line px-2.5 py-1 text-[10px] font-semibold uppercase tracking-widest text-muted">.mid · .midi</div></div>
+        <label id="dropZone" class="upload-zone group flex min-h-[220px] cursor-pointer flex-col items-center justify-center rounded-2xl px-6 text-center">
+          <input id="fileInput" type="file" accept=".mid,.midi,audio/midi" class="hidden" />
+          <div class="mb-5 grid h-14 w-14 place-items-center rounded-2xl border border-line bg-[#17251f] text-mint transition group-hover:scale-105 group-hover:border-mint">
+            <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4m0 0L8 8m4-4 4 4"/><path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg>
+          </div>
+          <p class="font-display text-lg font-semibold text-cloud">Choose a MIDI file or drop it here</p><p class="mt-2 text-sm text-muted">Your file never leaves this browser</p>
+        </label>
+        <div id="fileSummary" class="mt-4 hidden items-center justify-between rounded-xl border border-line bg-[#14221d] px-4 py-3"><div class="flex min-w-0 items-center gap-3"><div class="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-mint/10 text-mint"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div><div class="min-w-0"><p id="fileName" class="truncate text-sm font-semibold text-cloud"></p><p id="fileSize" class="text-xs text-muted"></p></div></div><button id="removeFile" class="btn rounded-lg p-2 text-muted hover:bg-white/5 hover:text-cloud" aria-label="Remove file"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m18 6-12 12M6 6l12 12"/></svg></button></div>
+        <div id="errorMessage" class="mt-4 hidden rounded-xl border border-red-400/25 bg-red-400/10 px-4 py-3 text-sm text-red-200"></div>
+      </div>
+
+      <div class="rounded-3xl border border-line bg-panel/85 p-5 shadow-glow sm:p-7"><p class="text-xs font-semibold uppercase tracking-[.16em] text-muted">02 / Shape the idea</p><h2 class="mt-2 font-display text-2xl font-semibold text-cloud">How far should it go?</h2><p class="mt-3 text-sm leading-6 text-muted">We’ll extend the last musical phrase while preserving its timing, voicing, and energy.</p>
+        <div class="mt-8 rounded-2xl border border-line bg-[#14221d] p-5"><label for="barsInput" class="flex items-center justify-between text-sm font-medium text-cloud"><span>Additional bars</span><span id="barsHint" class="text-xs text-muted">8 bars ≈ 16 seconds</span></label><div class="mt-4 flex items-center gap-3"><button data-step="-1" class="step-btn btn grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-line text-xl text-muted hover:border-mint hover:text-mint">−</button><input id="barsInput" type="number" min="1" max="128" value="8" class="h-12 w-full rounded-xl border border-line bg-[#0d1713] px-4 text-center font-display text-2xl font-semibold text-cloud outline-none transition focus:border-mint" /><button data-step="1" class="step-btn btn grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-line text-xl text-muted hover:border-mint hover:text-mint">+</button></div><div class="mt-4 flex justify-between text-[10px] uppercase tracking-[.16em] text-muted"><span>1 bar</span><span>128 bars max</span></div></div>
+        <button id="analyzeButton" disabled class="btn mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-mint px-5 py-3.5 text-sm font-bold text-ink shadow-[0_10px_25px_rgba(166,243,197,.13)] hover:bg-[#c4f8d5] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:transform-none"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m13 2-9 12h7l-1 8 10-13h-7l0-7Z"/></svg> Analyze & extend</button>
+      </div>
+    </section>
+
+    <section id="results" class="mt-5 hidden">
+      <div class="mb-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p class="text-xs font-semibold uppercase tracking-[.16em] text-muted">03 / Your continuation</p><h2 class="mt-2 font-display text-3xl font-semibold tracking-tight text-cloud">The shape of your track</h2></div><div id="statusBadge" class="flex w-fit items-center gap-2 rounded-full border border-mint/25 bg-mint/10 px-3 py-1.5 text-xs font-medium text-mint"><span class="h-1.5 w-1.5 rounded-full bg-mint"></span> Extension ready</div></div>
+      <div class="grid gap-5 lg:grid-cols-[1.6fr_.8fr]">
+        <div class="rounded-3xl border border-line bg-panel/85 p-5 shadow-glow sm:p-7"><div class="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line sm:grid-cols-4"><div class="bg-[#14221d] p-4"><p class="text-[10px] uppercase tracking-[.16em] text-muted">Tempo</p><p id="tempoValue" class="mt-2 font-display text-2xl font-semibold text-cloud">—</p><p class="text-xs text-muted">BPM</p></div><div class="bg-[#14221d] p-4"><p class="text-[10px] uppercase tracking-[.16em] text-muted">Key</p><p id="keyValue" class="mt-2 font-display text-2xl font-semibold text-cloud">—</p><p id="modeValue" class="text-xs text-muted">detected</p></div><div class="bg-[#14221d] p-4"><p class="text-[10px] uppercase tracking-[.16em] text-muted">Original</p><p id="barsValue" class="mt-2 font-display text-2xl font-semibold text-cloud">—</p><p class="text-xs text-muted">bars</p></div><div class="bg-[#14221d] p-4"><p class="text-[10px] uppercase tracking-[.16em] text-muted">Tracks</p><p id="tracksValue" class="mt-2 font-display text-2xl font-semibold text-cloud">—</p><p class="text-xs text-muted">active</p></div></div>
+          <div class="mt-7"><div class="mb-3 flex items-center justify-between"><p class="text-sm font-semibold text-cloud">Arrangement timeline</p><p id="timelineLabel" class="text-xs text-muted">Original → Extension</p></div><div id="timeline" class="flex h-16 items-end gap-1 overflow-hidden rounded-xl bg-[#0d1713] p-3"></div><div class="mt-2 flex justify-between text-[10px] uppercase tracking-[.16em] text-muted"><span>Start</span><span id="transitionLabel">Transition point</span><span>Now</span></div></div>
+          <div class="mt-7 flex flex-wrap items-center gap-3 border-t border-line pt-5"><button id="playButton" class="btn flex items-center gap-2 rounded-xl bg-mint px-4 py-2.5 text-sm font-bold text-ink hover:bg-[#c4f8d5]"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="m8 5 11 7-11 7V5Z"/></svg> Play preview</button><button id="pauseButton" class="btn flex items-center gap-2 rounded-xl border border-line px-4 py-2.5 text-sm font-medium text-cloud hover:border-mint hover:text-mint"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zm8 0h4v14h-4z"/></svg> Pause</button><button id="stopButton" class="btn flex items-center gap-2 rounded-xl border border-line px-4 py-2.5 text-sm font-medium text-cloud hover:border-mint hover:text-mint"><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h12v12H6z"/></svg> Stop</button><span id="playbackStatus" class="ml-auto text-xs text-muted">Ready to preview</span></div></div>
+        <div class="rounded-3xl border border-line bg-panel/85 p-5 shadow-glow sm:p-7"><p class="text-xs font-semibold uppercase tracking-[.16em] text-muted">Musical fingerprint</p><h3 class="mt-2 font-display text-xl font-semibold text-cloud">What we heard</h3><div id="fingerprint" class="mt-6 space-y-5"></div><div class="mt-7 rounded-2xl border border-mint/15 bg-mint/5 p-4"><p class="text-xs font-semibold uppercase tracking-[.16em] text-mint">Continuity note</p><p id="continuityNote" class="mt-2 text-sm leading-6 text-cloud/80">The extension mirrors the source phrase.</p></div><button id="downloadButton" class="btn mt-5 flex w-full items-center justify-center gap-2 rounded-xl border border-mint/40 px-4 py-3 text-sm font-semibold text-mint hover:bg-mint hover:text-ink"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"/></svg> Download extended MIDI</button></div>
+      </div>
+    </section>
+    <footer class="flex flex-col gap-2 border-t border-line py-7 text-xs text-muted sm:flex-row sm:items-center sm:justify-between"><span>continuum / musical ideas, continued</span><span>Built for the space between “almost done” and “just right”.</span></footer>
+  </main>
+
+  <script>
+    (() => {
+      'use strict';
+      const $ = (id) => document.getElementById(id);
+      const dropZone = $('dropZone'), fileInput = $('fileInput'), fileSummary = $('fileSummary'), analyzeButton = $('analyzeButton'), barsInput = $('barsInput');
+      let sourceFile = null, sourceMidi = null, extendedMidi = null, synths = [], part = null, isPlaying = false;
+
+      const clampBars = () => { const n = Math.max(1, Math.min(128, Number.parseInt(barsInput.value, 10) || 8)); barsInput.value = n; return n; };
+      const formatBytes = (n) => n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1024 / 1024).toFixed(1)} MB`;
+      const showError = (message) => { $('errorMessage').textContent = message; $('errorMessage').classList.remove('hidden'); };
+      const hideError = () => $('errorMessage').classList.add('hidden');
+      const setFile = async (file) => {
+        hideError();
+        if (!file) return;
+        if (!/\.midi?$/i.test(file.name)) { showError('Please choose a standard .mid or .midi file.'); return; }
+        try {
+          const buffer = await file.arrayBuffer();
+          const MidiClass = window.Midi?.Midi || window.Midi;
+          if (!MidiClass) throw new Error('The MIDI parser is still loading. Please try again in a moment.');
+          const midi = new MidiClass(buffer);
+          if (!midi.tracks.length || !midi.tracks.some(t => t.notes.length)) throw new Error('This MIDI does not contain any playable notes.');
+          sourceFile = file; sourceMidi = midi;
+          $('fileName').textContent = file.name; $('fileSize').textContent = `${formatBytes(file.size)} · ready to analyze`;
+          fileSummary.classList.remove('hidden'); fileSummary.classList.add('flex'); analyzeButton.disabled = false;
+        } catch (error) { sourceFile = null; sourceMidi = null; fileSummary.classList.add('hidden'); fileSummary.classList.remove('flex'); analyzeButton.disabled = true; showError(error.message || 'This file could not be read as MIDI.'); }
+      };
+      fileInput.addEventListener('change', (event) => setFile(event.target.files[0]));
+      ['dragenter', 'dragover'].forEach(type => dropZone.addEventListener(type, (e) => { e.preventDefault(); dropZone.classList.add('dragging'); }));
+      ['dragleave', 'drop'].forEach(type => dropZone.addEventListener(type, (e) => { e.preventDefault(); dropZone.classList.remove('dragging'); }));
+      dropZone.addEventListener('drop', (e) => setFile(e.dataTransfer.files[0]));
+      $('removeFile').addEventListener('click', () => { sourceFile = null; sourceMidi = null; fileInput.value = ''; fileSummary.classList.add('hidden'); fileSummary.classList.remove('flex'); analyzeButton.disabled = true; $('results').classList.add('hidden'); hideError(); stopPlayback(); });
+      document.querySelectorAll('.step-btn').forEach(btn => btn.addEventListener('click', () => { barsInput.value = clampBars() + Number(btn.dataset.step); clampBars(); updateBarsHint(); }));
+      barsInput.addEventListener('input', updateBarsHint);
+      function updateBarsHint() { const bars = clampBars(); const bpm = sourceMidi?.header?.tempos?.[0]?.bpm || 120; $('barsHint').textContent = `${bars} bars ≈ ${Math.round(bars * 4 * 60 / bpm)} seconds`; }
+
+      function getTempo(midi) { const tempo = midi.header?.tempos?.[0]?.bpm; return Math.round(tempo || 120); }
+      function getTimeSignature(midi) { const sig = midi.header?.timeSignatures?.[0]?.timeSignature; return sig ? `${sig[0]}/${sig[1]}` : '4/4'; }
+      function getKey(midi) { const key = midi.header?.keySignatures?.[0]; if (!key) return { name: 'C', mode: 'major' }; const names = ['C','C♯','D','E♭','E','F','F♯','G','A♭','A','B♭','B']; return { name: names[((key.key ?? 0) + 12) % 12], mode: key.scale === 1 ? 'minor' : 'major' }; }
+      function getDuration(midi) { return midi.duration || Math.max(...midi.tracks.flatMap(t => t.notes.map(n => n.time + n.duration)), 0); }
+      function analyze(midi, bars) {
+        const tempo = getTempo(midi), signature = getTimeSignature(midi), key = getKey(midi), duration = getDuration(midi), beatsPerBar = Number(signature.split('/')[0]) || 4, barSeconds = beatsPerBar * 60 / tempo, originalBars = Math.max(1, Math.ceil(duration / barSeconds));
+        const activeTracks = midi.tracks.filter(t => t.notes.length); const notes = activeTracks.flatMap(t => t.notes); const tailStart = Math.max(0, duration - barSeconds * Math.min(8, originalBars)); const tailNotes = notes.filter(n => n.time >= tailStart);
+        const density = tailNotes.length / Math.max(1, Math.min(8, originalBars)); const avgVelocity = Math.round((tailNotes.reduce((sum, n) => sum + (n.velocity || .7), 0) / Math.max(1, tailNotes.length)) * 100);
+        const pitchClasses = [...new Set(tailNotes.map(n => n.midi % 12))]; const intervals = tailNotes.slice(1).map((n, i) => n.midi - tailNotes[i].midi).filter(x => Math.abs(x) <= 12); const repeated = intervals.length ? Math.round(intervals.filter(x => intervals.filter(y => y === x).length > 1).length / intervals.length * 100) : 0;
+        const progression = pitchClasses.length > 2 ? 'Layered movement' : pitchClasses.length === 2 ? 'Two-note pulse' : 'Root-focused';
+        return { tempo, signature, key, duration, beatsPerBar, barSeconds, originalBars, activeTracks, notes, tailNotes, density, avgVelocity, repeated, progression, pitchClasses };
+      }
+      function makeExtension(info, bars) {
+        const MidiClass = window.Midi?.Midi || window.Midi; const midi = new MidiClass(); midi.header.setTempo(info.tempo); midi.header.timeSignatures.push({ ticks: 0, timeSignature: info.signature.split('/').map(Number) });
+        const extensionStart = info.duration; const phraseLength = info.barSeconds * Math.min(4, info.originalBars); const tailStart = Math.max(0, info.duration - phraseLength);
+        info.activeTracks.forEach((sourceTrack, trackIndex) => {
+          const track = midi.addTrack(); track.name = sourceTrack.name || `Continuum ${trackIndex + 1}`; if (sourceTrack.instrument?.number != null) track.instrument.number = sourceTrack.instrument.number;
+          const notes = sourceTrack.notes; const phrase = notes.filter(n => n.time >= tailStart); const localPhrase = phrase.length ? phrase : notes;
+          for (let bar = 0; bar < bars; bar++) { const cycle = Math.floor(bar / Math.max(1, Math.min(4, info.originalBars))); const cycleOffset = bar * info.barSeconds; localPhrase.forEach((note, noteIndex) => { const relative = ((note.time - tailStart) % phraseLength + phraseLength) % phraseLength; const swing = (noteIndex + bar + trackIndex) % 7 === 0 ? Math.min(.012, info.barSeconds / 64) : 0; const time = extensionStart + cycleOffset + relative + swing; const octaveLift = cycle > 0 && trackIndex === 0 && noteIndex % 13 === 0 ? 12 : 0; track.addNote({ midi: Math.max(0, Math.min(127, note.midi + octaveLift)), time, duration: Math.min(note.duration, info.barSeconds), velocity: Math.max(.1, Math.min(1, (note.velocity || .7) * (bar % 4 === 3 ? .94 : 1))) }); }); }
+        });
+        return midi;
+      }
+      function buildOutput(info, bars) { const MidiClass = window.Midi?.Midi || window.Midi; const output = new MidiClass(sourceMidi.toArray()); const extension = makeExtension(info, bars); extension.tracks.forEach((extTrack, index) => { const target = output.tracks[index] || output.addTrack(); extTrack.notes.forEach(n => target.addNote({ midi: n.midi, time: n.time, duration: n.duration, velocity: n.velocity })); }); output.header.setTempo(info.tempo); return output; }
+      function renderTimeline(info, bars) { const total = info.originalBars + bars; const wrap = $('timeline'); wrap.innerHTML = ''; for (let i = 0; i < total; i++) { const bar = document.createElement('span'); bar.className = `h-${Math.max(3, Math.min(14, 4 + ((i * 7 + info.notes.length) % 11)))} w-full rounded-sm ${i < info.originalBars ? 'bg-[#507568]' : 'bg-mint'}`; bar.style.height = `${25 + ((i * 19 + info.pitchClasses.length * 7) % 70)}%`; bar.title = i < info.originalBars ? `Original bar ${i + 1}` : `Extended bar ${i - info.originalBars + 1}`; wrap.appendChild(bar); } $('transitionLabel').textContent = `Bar ${info.originalBars} / transition`; $('timelineLabel').textContent = `${info.originalBars} original → ${bars} extended`; }
+      function renderFingerprint(info) { const items = [{ label: 'Note density', value: `${Math.min(99, Math.round(info.density * 12))}%`, width: Math.min(100, info.density * 12), color: 'bg-mint' }, { label: 'Velocity profile', value: `${info.avgVelocity}%`, width: info.avgVelocity, color: 'bg-lime' }, { label: 'Interval repetition', value: `${info.repeated}%`, width: info.repeated, color: 'bg-[#8ec9a8]' }]; $('fingerprint').innerHTML = items.map(item => `<div><div class="mb-2 flex justify-between text-xs"><span class="text-muted">${item.label}</span><span class="font-semibold text-cloud">${item.value}</span></div><div class="h-1.5 overflow-hidden rounded-full bg-[#263b32]"><div class="h-full rounded-full ${item.color} transition-all" style="width:${item.width}%"></div></div></div>`).join(''); $('continuityNote').textContent = `${info.progression} with ${info.pitchClasses.length} pitch tones in the final phrase. The extension repeats the source voicing across ${clampBars()} new bars at ${info.tempo} BPM.`; }
+
+      analyzeButton.addEventListener('click', async () => { if (!sourceMidi) return; hideError(); analyzeButton.disabled = true; analyzeButton.innerHTML = '<span class="spinner h-4 w-4 rounded-full border-2 border-ink/30 border-t-ink"></span> Listening to the phrase…'; try { await new Promise(resolve => setTimeout(resolve, 650)); const bars = clampBars(); const info = analyze(sourceMidi, bars); extendedMidi = buildOutput(info, bars); $('tempoValue').textContent = info.tempo; $('keyValue').textContent = info.key.name; $('modeValue').textContent = `${info.key.mode} · ${info.signature}`; $('barsValue').textContent = info.originalBars; $('tracksValue').textContent = info.activeTracks.length; renderTimeline(info, bars); renderFingerprint(info); $('results').classList.remove('hidden'); $('results').scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (error) { showError(error.message || 'The extension could not be generated.'); } finally { analyzeButton.disabled = false; analyzeButton.innerHTML = '<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="m13 2-9 12h7l-1 8 10-13h-7l0-7Z"/></svg> Analyze & extend'; } });
+
+      function stopPlayback() { if (part) { part.stop(); part.dispose(); part = null; } synths.forEach(s => s.dispose()); synths = []; if (window.Tone) { Tone.Transport.stop(); Tone.Transport.cancel(); } isPlaying = false; $('playbackStatus').textContent = 'Ready to preview'; }
+      async function playPreview() { if (!extendedMidi) return; try { await Tone.start(); stopPlayback(); const notes = extendedMidi.tracks.flatMap(t => t.notes).sort((a,b) => a.time - b.time); synths = [new Tone.PolySynth(Tone.Synth, { oscillator: { type: 'triangle' }, envelope: { attack: .01, decay: .15, sustain: .18, release: .4 } }).toDestination()]; part = new Tone.Part((time, note) => synths[0].triggerAttackRelease(Tone.Frequency(note.midi, 'midi'), note.duration, time, note.velocity || .7), notes.map(n => [n.time, n])); part.start(0); Tone.Transport.start(); isPlaying = true; $('playbackStatus').textContent = 'Playing original + extension'; } catch (error) { showError('Audio preview needs browser audio permission. Try pressing Play again.'); } }
+      $('playButton').addEventListener('click', playPreview); $('pauseButton').addEventListener('click', () => { if (window.Tone && isPlaying) { Tone.Transport.pause(); $('playbackStatus').textContent = 'Paused'; } }); $('stopButton').addEventListener('click', stopPlayback);
+      $('downloadButton').addEventListener('click', () => { if (!extendedMidi) return; try { const bytes = extendedMidi.toArray(); const blob = new Blob([bytes], { type: 'audio/midi' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `${(sourceFile?.name || 'continuum').replace(/\.midi?$/i, '')}-extended.mid`; link.click(); URL.revokeObjectURL(url); } catch (error) { showError('The extended file could not be packaged for download.'); } });
+    })();
+  </script>
+</body>
+</html>

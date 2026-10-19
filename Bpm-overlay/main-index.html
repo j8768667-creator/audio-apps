@@ -1,0 +1,1334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>Audio Editor — Beat Grid & Export</title>
+
+    <style>
+        /* ----- Reset & Base ----- */
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body {
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            background: #0d0f14;
+            color: #e8edf5;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+            font-size: 14px;
+            -webkit-font-smoothing: antialiased;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-touch-callout: none;
+            /* Prevent double-tap zoom on iPad */
+            touch-action: manipulation;
+        }
+
+        /* ----- App container with safe area insets ----- */
+        #app {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 6px 10px 10px 10px;
+            padding-bottom: env(safe-area-inset-bottom, 10px);
+            background: #0d0f14;
+        }
+
+        /* ----- Toolbar ----- */
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 6px 8px;
+            padding: 6px 0 8px 0;
+            border-bottom: 1px solid #262b33;
+            flex-shrink: 0;
+            min-height: 48px;
+        }
+
+        .toolbar .group {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+
+        .toolbar .group-label {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: #6e7a8a;
+            margin-right: 2px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            background: #1e2530;
+            color: #e8edf5;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.15s, transform 0.1s;
+            min-height: 36px;
+            min-width: 36px;
+            touch-action: manipulation;
+            white-space: nowrap;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+            background: #2a3342;
+        }
+
+        .btn-primary {
+            background: #2b6b9c;
+            color: #fff;
+        }
+        .btn-primary:active {
+            background: #1e4f77;
+        }
+
+        .btn-success {
+            background: #1f8b5a;
+            color: #fff;
+        }
+        .btn-success:active {
+            background: #156a44;
+        }
+
+        .btn-danger {
+            background: #9e3b3b;
+            color: #fff;
+        }
+        .btn-danger:active {
+            background: #792d2d;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid #3a4555;
+            box-shadow: none;
+        }
+        .btn-outline:active {
+            background: #1a2029;
+        }
+
+        .btn:disabled {
+            opacity: 0.4;
+            transform: none !important;
+            pointer-events: none;
+        }
+
+        .bpm-input-wrap {
+            display: flex;
+            align-items: center;
+            background: #1a2029;
+            border-radius: 6px;
+            padding: 0 4px 0 10px;
+            border: 1px solid #2e3745;
+        }
+
+        .bpm-input-wrap input[type="number"] {
+            background: transparent;
+            border: none;
+            color: #e8edf5;
+            font-size: 16px;
+            font-weight: 600;
+            width: 56px;
+            padding: 6px 2px;
+            outline: none;
+            min-height: 36px;
+        }
+
+        .bpm-input-wrap input[type="number"]::-webkit-inner-spin-button,
+        .bpm-input-wrap input[type="number"]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+        .bpm-input-wrap input[type="number"] {
+            -moz-appearance: textfield;
+        }
+
+        .bpm-input-wrap .bpm-label {
+            color: #6e7a8a;
+            font-size: 12px;
+            font-weight: 500;
+            padding-right: 4px;
+        }
+
+        .threshold-wrap {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: #1a2029;
+            border-radius: 6px;
+            padding: 4px 10px;
+            border: 1px solid #2e3745;
+        }
+
+        .threshold-wrap input[type="range"] {
+            width: 60px;
+            height: 4px;
+            -webkit-appearance: none;
+            background: #3a4555;
+            border-radius: 4px;
+            outline: none;
+        }
+        .threshold-wrap input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #4a8fc5;
+            cursor: pointer;
+        }
+        .threshold-wrap .th-value {
+            font-size: 12px;
+            font-weight: 500;
+            color: #8e9aab;
+            min-width: 28px;
+            text-align: center;
+        }
+
+        #fileInput {
+            position: absolute;
+            opacity: 0;
+            width: 1px;
+            height: 1px;
+            pointer-events: none;
+        }
+
+        /* ----- Waveform container (flex‑grow) ----- */
+        .waveform-wrap {
+            flex: 1;
+            position: relative;
+            min-height: 160px;
+            margin-top: 8px;
+            background: #11161e;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid #242b36;
+            touch-action: none;
+        }
+
+        #waveformCanvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+            cursor: grab;
+            background: #11161e;
+        }
+
+        /* ----- Info panel (bottom) ----- */
+        .info-panel {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px 12px;
+            padding: 8px 4px 2px 4px;
+            flex-shrink: 0;
+            min-height: 40px;
+            border-top: 1px solid #1a2029;
+            margin-top: 6px;
+            /* ensure it stays within view */
+            padding-bottom: 4px;
+        }
+
+        .info-panel .stats {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px 18px;
+            font-size: 12px;
+            color: #8e9aab;
+        }
+
+        .info-panel .stats .val {
+            color: #e8edf5;
+            font-weight: 500;
+        }
+
+        .marker-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 3px 6px;
+            max-height: 40px;
+            overflow-y: auto;
+            flex: 1;
+            min-width: 80px;
+        }
+
+        .marker-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            padding: 2px 8px 2px 6px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 500;
+            background: #1a2029;
+            border: 1px solid #2e3745;
+            color: #bcc5d4;
+            transition: border-color 0.2s;
+            touch-action: manipulation;
+            min-height: 24px;
+        }
+
+        .marker-chip .dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .marker-chip .offset {
+            font-size: 9px;
+            color: #6e7a8a;
+            font-weight: 400;
+        }
+
+        .marker-chip.selected {
+            border-color: #4a8fc5;
+            background: #1e3142;
+        }
+
+        .marker-chip .del {
+            margin-left: 2px;
+            color: #9e3b3b;
+            cursor: pointer;
+            font-weight: 700;
+            font-size: 12px;
+            padding: 0 2px;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(13, 15, 20, 0.8);
+            backdrop-filter: blur(4px);
+            z-index: 10;
+            border-radius: 10px;
+            font-size: 15px;
+            color: #aabbcc;
+        }
+        .loading-overlay.active {
+            display: flex;
+        }
+        .loading-overlay .spinner {
+            width: 28px;
+            height: 28px;
+            border: 3px solid #1e2530;
+            border-top-color: #4a8fc5;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 12px;
+        }
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .drag-tooltip {
+            position: fixed;
+            pointer-events: none;
+            background: #1a2029cc;
+            backdrop-filter: blur(6px);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 500;
+            color: #e8edf5;
+            border: 1px solid #2e3745;
+            display: none;
+            z-index: 100;
+            white-space: nowrap;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+        }
+        .drag-tooltip.visible {
+            display: block;
+        }
+        .drag-tooltip .sub {
+            font-weight: 400;
+            color: #8e9aab;
+            font-size: 10px;
+        }
+
+        /* ----- Responsive fine‑tuning ----- */
+        @media (max-width: 640px) {
+            .toolbar {
+                gap: 4px 6px;
+                padding: 4px 0 6px 0;
+            }
+            .btn {
+                padding: 4px 10px;
+                font-size: 12px;
+                min-height: 32px;
+                min-width: 32px;
+            }
+            .bpm-input-wrap input[type="number"] {
+                width: 44px;
+                font-size: 14px;
+                padding: 4px 2px;
+                min-height: 32px;
+            }
+            .threshold-wrap input[type="range"] {
+                width: 44px;
+            }
+            .threshold-wrap .th-value {
+                font-size: 10px;
+                min-width: 20px;
+            }
+            .marker-chip {
+                font-size: 10px;
+                padding: 1px 6px 1px 4px;
+                min-height: 20px;
+            }
+            .waveform-wrap {
+                min-height: 120px;
+            }
+        }
+
+        /* iPad portrait: give more space */
+        @media (orientation: portrait) and (min-width: 768px) {
+            .waveform-wrap {
+                min-height: 300px;
+            }
+        }
+
+        /* Prevent double‑tap zoom on interactive elements */
+        button,
+        input,
+        label,
+        canvas,
+        .clickable {
+            touch-action: manipulation;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- TOOLBAR -->
+        <div class="toolbar">
+            <div class="group">
+                <button class="btn btn-primary" id="loadBtn">📂 Load</button>
+                <input type="file" id="fileInput" accept="audio/*,audio/mpeg,audio/wav,audio/aac,audio/mp4,audio/ogg" />
+            </div>
+
+            <div class="group">
+                <span class="group-label">BPM</span>
+                <div class="bpm-input-wrap">
+                    <input type="number" id="bpmInput" value="120" min="20" max="300" step="0.5" />
+                    <span class="bpm-label">bpm</span>
+                </div>
+            </div>
+
+            <div class="group">
+                <span class="group-label">Sensitivity</span>
+                <div class="threshold-wrap">
+                    <input type="range" id="thresholdSlider" min="0.01" max="0.12" step="0.001" value="0.04" />
+                    <span class="th-value" id="thresholdValue">0.04</span>
+                </div>
+            </div>
+
+            <div class="group">
+                <button class="btn btn-success" id="playBtn" disabled>▶</button>
+                <button class="btn" id="stopBtn" disabled>⏹</button>
+                <button class="btn btn-outline" id="snapAllBtn" disabled>🔗 Snap</button>
+            </div>
+
+            <div class="group" style="margin-left:auto;">
+                <button class="btn" id="detectBtn" disabled>🔍 Detect</button>
+                <button class="btn" id="resetBtn" disabled>↺ Reset</button>
+                <button class="btn btn-danger" id="clearBtn" disabled>✕ Clear</button>
+                <button class="btn btn-primary" id="exportBtn" disabled>💾 Export</button>
+            </div>
+        </div>
+
+        <!-- WAVEFORM -->
+        <div class="waveform-wrap" id="waveformWrap">
+            <canvas id="waveformCanvas"></canvas>
+            <div class="loading-overlay" id="loadingOverlay">
+                <div class="spinner"></div>
+                <span>Processing…</span>
+            </div>
+        </div>
+
+        <!-- INFO -->
+        <div class="info-panel">
+            <div class="stats">
+                <span>⏱ <span class="val" id="timeDisplay">0:00.0</span></span>
+                <span>🎵 <span class="val" id="markerCount">0</span></span>
+                <span>📐 <span class="val" id="zoomLevel">1.0×</span></span>
+            </div>
+            <div class="marker-list" id="markerList"></div>
+        </div>
+
+        <!-- DRAG TOOLTIP -->
+        <div class="drag-tooltip" id="dragTooltip">
+            <span id="dragTooltipText">+0.00</span>
+            <span class="sub"> beats</span>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            'use strict';
+
+            // DOM refs
+            const canvas = document.getElementById('waveformCanvas');
+            const ctx = canvas.getContext('2d');
+            const wrap = document.getElementById('waveformWrap');
+
+            const fileInput = document.getElementById('fileInput');
+            const loadBtn = document.getElementById('loadBtn');
+            const bpmInput = document.getElementById('bpmInput');
+            const thresholdSlider = document.getElementById('thresholdSlider');
+            const thresholdValue = document.getElementById('thresholdValue');
+            const playBtn = document.getElementById('playBtn');
+            const stopBtn = document.getElementById('stopBtn');
+            const snapAllBtn = document.getElementById('snapAllBtn');
+            const detectBtn = document.getElementById('detectBtn');
+            const resetBtn = document.getElementById('resetBtn');
+            const clearBtn = document.getElementById('clearBtn');
+            const exportBtn = document.getElementById('exportBtn');
+            const timeDisplay = document.getElementById('timeDisplay');
+            const markerCount = document.getElementById('markerCount');
+            const zoomLevel = document.getElementById('zoomLevel');
+            const markerList = document.getElementById('markerList');
+            const loadingOverlay = document.getElementById('loadingOverlay');
+            const dragTooltip = document.getElementById('dragTooltip');
+            const dragTooltipText = document.getElementById('dragTooltipText');
+
+            // State
+            const state = {
+                audioBuffer: null,
+                bufferData: null,
+                sampleRate: 44100,
+                duration: 0,
+                isPlaying: false,
+                startTime: 0,
+                pauseTime: 0,
+                currentTime: 0,
+                source: null,
+                bpm: 120,
+                zoom: 120,
+                offset: 0,
+                markers: [],
+                detectedTimes: [],
+                dragging: false,
+                dragIndex: -1,
+                dragStartX: 0,
+                dragStartTime: 0,
+                canvasWidth: 0,
+                canvasHeight: 0,
+                waveformY: 0,
+                waveformHeight: 0,
+                audioCtx: null,
+                resizeTimer: null,
+                threshold: 0.04,
+                originalFileName: '',
+            };
+
+            // AudioContext
+            function getAudioContext() {
+                if (!state.audioCtx) {
+                    state.audioCtx = new(window.AudioContext || window.webkitAudioContext)();
+                }
+                return state.audioCtx;
+            }
+
+            function resumeAudioContext() {
+                const ctx = getAudioContext();
+                if (ctx.state === 'suspended') return ctx.resume();
+                return Promise.resolve();
+            }
+
+            // Canvas sizing
+            function resizeCanvas() {
+                const rect = wrap.getBoundingClientRect();
+                const dpr = window.devicePixelRatio || 1;
+                const w = rect.width;
+                const h = rect.height;
+                canvas.width = w * dpr;
+                canvas.height = h * dpr;
+                canvas.style.width = w + 'px';
+                canvas.style.height = h + 'px';
+                state.canvasWidth = w;
+                state.canvasHeight = h;
+                ctx.scale(dpr, dpr);
+                const marginTop = 14;
+                const marginBottom = 14;
+                state.waveformY = marginTop;
+                state.waveformHeight = h - marginTop - marginBottom;
+                render();
+            }
+
+            // BPM helpers
+            function getBeatDuration() { return 60 / state.bpm; }
+
+            function getBeatIndex(time) { return time / getBeatDuration(); }
+
+            function getBeatOffset(time) {
+                const idx = getBeatIndex(time);
+                return idx - Math.round(idx);
+            }
+
+            function snapToGrid(time) {
+                const idx = getBeatIndex(time);
+                return Math.round(idx) * getBeatDuration();
+            }
+
+            // Onset detection with adjustable threshold
+            function detectOnsets(data, sampleRate, threshold) {
+                if (!data || data.length === 0) return [];
+                const winSamples = Math.floor(sampleRate * 0.010);
+                const hopSamples = Math.floor(sampleRate * 0.005);
+                const envelope = [];
+                for (let i = 0; i < data.length - winSamples; i += hopSamples) {
+                    let sum = 0;
+                    for (let j = 0; j < winSamples; j++) {
+                        const v = data[i + j];
+                        sum += v * v;
+                    }
+                    envelope.push(Math.sqrt(sum / winSamples));
+                }
+                const onsets = [];
+                const minDist = Math.floor(sampleRate * 0.035 / hopSamples);
+                const deriv = [];
+                for (let i = 1; i < envelope.length; i++) {
+                    deriv.push(Math.max(0, envelope[i] - envelope[i - 1]));
+                }
+                let lastPeak = -minDist;
+                for (let i = 1; i < deriv.length - 1; i++) {
+                    if (deriv[i] > deriv[i - 1] && deriv[i] > deriv[i + 1] && deriv[i] > threshold) {
+                        const time = (i * hopSamples) / sampleRate;
+                        if (time > 0.05 && time < state.duration - 0.05) {
+                            if (i - lastPeak >= minDist) {
+                                onsets.push(time);
+                                lastPeak = i;
+                            }
+                        }
+                    }
+                }
+                return onsets;
+            }
+
+            // Marker management
+            function addMarker(time) {
+                time = Math.max(0, Math.min(time, state.duration));
+                const offset = getBeatOffset(time);
+                state.markers.push({ time, beatOffset: offset, selected: false });
+                state.markers.sort((a, b) => a.time - b.time);
+                updateUI();
+                render();
+            }
+
+            function clearMarkers() {
+                state.markers = [];
+                updateUI();
+                render();
+            }
+
+            function removeMarker(index) {
+                state.markers.splice(index, 1);
+                updateUI();
+                render();
+            }
+
+            function resetMarkersToDetected() {
+                clearMarkers();
+                for (const t of state.detectedTimes) {
+                    addMarker(t);
+                }
+                render();
+            }
+
+            function snapAllMarkers() {
+                for (const m of state.markers) {
+                    const snapped = snapToGrid(m.time);
+                    m.time = Math.max(0, Math.min(snapped, state.duration));
+                    m.beatOffset = getBeatOffset(m.time);
+                }
+                state.markers.sort((a, b) => a.time - b.time);
+                updateUI();
+                render();
+            }
+
+            // Rendering
+            function render() {
+                const w = state.canvasWidth;
+                const h = state.canvasHeight;
+                if (w === 0 || h === 0) return;
+                ctx.clearRect(0, 0, w, h);
+                ctx.fillStyle = '#11161e';
+                ctx.fillRect(0, 0, w, h);
+
+                const data = state.bufferData;
+                if (!data || state.duration === 0) {
+                    ctx.fillStyle = '#4a5a6a';
+                    ctx.font = '16px -apple-system, sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('Load an audio file', w / 2, h / 2 - 10);
+                    ctx.font = '13px -apple-system, sans-serif';
+                    ctx.fillStyle = '#3a4a5a';
+                    ctx.fillText('Tap "Load" to import', w / 2, h / 2 + 28);
+                    return;
+                }
+
+                const totalSamples = data.length;
+                const duration = state.duration;
+                const zoom = state.zoom;
+                const offset = state.offset;
+                const startTime = offset;
+                const endTime = offset + w / zoom;
+                const startSample = Math.floor(startTime * state.sampleRate);
+                const endSample = Math.min(Math.ceil(endTime * state.sampleRate), totalSamples);
+                const visibleSamples = endSample - startSample;
+                if (visibleSamples <= 0) return;
+
+                const y0 = state.waveformY;
+                const yH = state.waveformHeight;
+                const midY = y0 + yH / 2;
+                const ampScale = yH * 0.45;
+                const step = Math.max(1, Math.floor(visibleSamples / w));
+
+                // Draw waveform
+                ctx.beginPath();
+                ctx.moveTo(0, midY);
+                let first = true;
+                for (let px = 0; px < w; px++) {
+                    const sampleIdx = startSample + px * step;
+                    if (sampleIdx >= totalSamples) break;
+                    const val = data[Math.min(sampleIdx, totalSamples - 1)];
+                    const x = px;
+                    const y = midY - val * ampScale;
+                    if (first) { ctx.moveTo(x, y);
+                        first = false; } else ctx.lineTo(x, y);
+                }
+                ctx.strokeStyle = '#4a7a9c';
+                ctx.lineWidth = 1.5;
+                ctx.stroke();
+
+                // Fill
+                ctx.beginPath();
+                ctx.moveTo(0, midY);
+                for (let px = 0; px < w; px++) {
+                    const sampleIdx = startSample + px * step;
+                    if (sampleIdx >= totalSamples) break;
+                    const val = data[Math.min(sampleIdx, totalSamples - 1)];
+                    const x = px;
+                    const y = midY - val * ampScale;
+                    ctx.lineTo(x, y);
+                }
+                ctx.lineTo(w, midY);
+                ctx.closePath();
+                ctx.fillStyle = 'rgba(42, 90, 120, 0.12)';
+                ctx.fill();
+
+                // Beat grid (quarters and eighths)
+                const beatDur = getBeatDuration();
+                const firstBeat = Math.floor(startTime / beatDur);
+                const lastBeat = Math.ceil(endTime / beatDur);
+                for (let bi = firstBeat; bi <= lastBeat; bi++) {
+                    const t = bi * beatDur;
+                    if (t < 0) continue;
+                    const px = (t - startTime) * zoom;
+                    if (px < -10 || px > w + 10) continue;
+                    ctx.beginPath();
+                    ctx.moveTo(px, y0);
+                    ctx.lineTo(px, y0 + yH);
+                    ctx.strokeStyle = 'rgba(80, 160, 220, 0.25)';
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+                    for (let i = 1; i < 2; i++) {
+                        const st = t + (i / 2) * beatDur;
+                        if (st > endTime + 0.01) break;
+                        const spx = (st - startTime) * zoom;
+                        if (spx < -5 || spx > w + 5) continue;
+                        ctx.beginPath();
+                        ctx.moveTo(spx, y0 + yH * 0.2);
+                        ctx.lineTo(spx, y0 + yH * 0.8);
+                        ctx.strokeStyle = 'rgba(80, 160, 220, 0.12)';
+                        ctx.lineWidth = 1;
+                        ctx.stroke();
+                    }
+                    if (bi % 4 === 0 && bi >= 0) {
+                        const label = (bi / 4) + 1;
+                        ctx.fillStyle = 'rgba(120, 180, 220, 0.2)';
+                        ctx.font = '9px -apple-system, sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'bottom';
+                        ctx.fillText(label, px, y0 - 2);
+                    }
+                }
+
+                // Markers
+                for (let i = 0; i < state.markers.length; i++) {
+                    const m = state.markers[i];
+                    const px = (m.time - startTime) * zoom;
+                    if (px < -20 || px > w + 20) continue;
+                    const absOff = Math.abs(m.beatOffset);
+                    let color = absOff < 0.05 ? '#4ade80' : absOff < 0.15 ? '#facc15' : absOff < 0.30 ? '#fb923c' : '#f87171';
+                    const isSelected = m.selected || (state.dragging && state.dragIndex === i);
+                    ctx.beginPath();
+                    ctx.moveTo(px, y0 + 6);
+                    ctx.lineTo(px, y0 + yH - 6);
+                    ctx.strokeStyle = isSelected ? '#ffffff' : color;
+                    ctx.lineWidth = isSelected ? 2 : 1.2;
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.arc(px, y0 + yH * 0.5, 4, 0, Math.PI * 2);
+                    ctx.fillStyle = isSelected ? '#ffffff' : color;
+                    ctx.fill();
+                    ctx.strokeStyle = '#11161e';
+                    ctx.lineWidth = 1;
+                    ctx.stroke();
+                    if (absOff > 0.02) {
+                        const label = (m.beatOffset > 0 ? '+' : '') + m.beatOffset.toFixed(2);
+                        ctx.fillStyle = absOff < 0.15 ? '#facc15' : '#fb923c';
+                        ctx.font = '8px -apple-system, monospace';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'bottom';
+                        ctx.fillText(label, px, y0 + 6);
+                    }
+                }
+
+                // Playhead
+                if (state.isPlaying || state.pauseTime > 0) {
+                    const t = state.isPlaying ? state.currentTime : state.pauseTime;
+                    const px = (t - startTime) * zoom;
+                    if (px >= 0 && px <= w) {
+                        ctx.beginPath();
+                        ctx.moveTo(px, y0);
+                        ctx.lineTo(px, y0 + yH);
+                        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+                        ctx.lineWidth = 1.5;
+                        ctx.setLineDash([3, 5]);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+                    }
+                }
+            }
+
+            // UI update
+            function updateUI() {
+                markerCount.textContent = state.markers.length;
+                markerList.innerHTML = '';
+                for (let i = 0; i < state.markers.length && i < 40; i++) {
+                    const m = state.markers[i];
+                    const chip = document.createElement('span');
+                    chip.className = 'marker-chip' + (m.selected ? ' selected' : '');
+                    const absOff = Math.abs(m.beatOffset);
+                    let dotColor = absOff < 0.05 ? '#4ade80' : absOff < 0.15 ? '#facc15' : absOff < 0.30 ? '#fb923c' :
+                    '#f87171';
+                    chip.innerHTML = `
+                    <span class="dot" style="background:${dotColor}"></span>
+                    #${i+1}
+                    <span class="offset">${m.beatOffset > 0 ? '+' : ''}${m.beatOffset.toFixed(2)}</span>
+                    <span class="del" data-index="${i}">✕</span>
+                  `;
+                    chip.addEventListener('click', (e) => {
+                        if (e.target.classList.contains('del')) return;
+                        selectMarker(i);
+                    });
+                    const del = chip.querySelector('.del');
+                    del.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        removeMarker(i);
+                    });
+                    del.addEventListener('touchend', (e) => {
+                        e.stopPropagation();
+                        removeMarker(i);
+                    });
+                    markerList.appendChild(chip);
+                }
+                zoomLevel.textContent = state.zoom.toFixed(0) + '×';
+            }
+
+            function selectMarker(index) {
+                state.markers.forEach((m, i) => m.selected = (i === index));
+                updateUI();
+                render();
+            }
+
+            // Playback
+            async function playAudio() {
+                if (!state.audioBuffer) return;
+                await resumeAudioContext();
+                const ctx = getAudioContext();
+                if (state.isPlaying) {
+                    state.isPlaying = false;
+                    state.pauseTime = state.currentTime;
+                    if (state.source) { try { state.source.stop(); } catch (_) {} }
+                    state.source = null;
+                    playBtn.textContent = '▶';
+                    render();
+                    return;
+                }
+                let startFrom = state.pauseTime > 0 ? state.pauseTime : 0;
+                if (startFrom >= state.duration - 0.01) startFrom = 0;
+                state.currentTime = startFrom;
+                state.pauseTime = 0;
+                try {
+                    state.source = ctx.createBufferSource();
+                    state.source.buffer = state.audioBuffer;
+                    const gain = ctx.createGain();
+                    gain.gain.value = 0.8;
+                    state.source.connect(gain);
+                    gain.connect(ctx.destination);
+                    state.source.start(0, startFrom);
+                    state.startTime = ctx.currentTime - startFrom;
+                    state.isPlaying = true;
+                    playBtn.textContent = '⏸';
+                    state.source.onended = () => {
+                        if (state.isPlaying) {
+                            state.isPlaying = false;
+                            state.currentTime = state.duration;
+                            state.pauseTime = state.duration;
+                            playBtn.textContent = '▶';
+                            render();
+                            updateTimeDisplay();
+                        }
+                    };
+                    updatePlayhead();
+                } catch (err) { console.error(err);
+                    state.isPlaying = false;
+                    playBtn.textContent = '▶'; }
+            }
+
+            function stopAudio() {
+                if (state.source) { try { state.source.stop(); } catch (_) {} }
+                state.source = null;
+                state.isPlaying = false;
+                state.currentTime = 0;
+                state.pauseTime = 0;
+                playBtn.textContent = '▶';
+                render();
+                updateTimeDisplay();
+            }
+
+            function updatePlayhead() {
+                if (!state.isPlaying) return;
+                const ctx = getAudioContext();
+                state.currentTime = ctx.currentTime - state.startTime;
+                if (state.currentTime >= state.duration) {
+                    state.currentTime = state.duration;
+                    state.isPlaying = false;
+                    state.pauseTime = state.duration;
+                    playBtn.textContent = '▶';
+                    render();
+                    updateTimeDisplay();
+                    return;
+                }
+                render();
+                updateTimeDisplay();
+                requestAnimationFrame(updatePlayhead);
+            }
+
+            function updateTimeDisplay() {
+                const t = state.isPlaying ? state.currentTime : (state.pauseTime || 0);
+                const mins = Math.floor(t / 60);
+                const secs = Math.floor(t % 60);
+                const tenths = Math.floor((t % 1) * 10);
+                timeDisplay.textContent = `${mins}:${String(secs).padStart(2,'0')}.${tenths}`;
+            }
+
+            // Load audio
+            async function loadAudioFile(file) {
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    try {
+                        loadingOverlay.classList.add('active');
+                        const arrayBuffer = e.target.result;
+                        const ctx = getAudioContext();
+                        const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+                        state.audioBuffer = audioBuffer;
+                        state.sampleRate = audioBuffer.sampleRate;
+                        state.duration = audioBuffer.duration;
+                        const numChannels = audioBuffer.numberOfChannels;
+                        const length = audioBuffer.length;
+                        const mono = new Float32Array(length);
+                        if (numChannels === 1) mono.set(audioBuffer.getChannelData(0));
+                        else {
+                            const l = audioBuffer.getChannelData(0);
+                            const r = audioBuffer.getChannelData(1);
+                            for (let i = 0; i < length; i++) mono[i] = (l[i] + r[i]) * 0.5;
+                        }
+                        state.bufferData = mono;
+                        state.markers = [];
+                        state.detectedTimes = [];
+                        state.currentTime = 0;
+                        state.pauseTime = 0;
+                        state.isPlaying = false;
+                        state.offset = 0;
+                        state.zoom = Math.max(60, Math.min(400, state.canvasWidth / state.duration * 0.8));
+                        playBtn.disabled = false;
+                        stopBtn.disabled = false;
+                        detectBtn.disabled = false;
+                        resetBtn.disabled = false;
+                        clearBtn.disabled = false;
+                        snapAllBtn.disabled = false;
+                        exportBtn.disabled = false;
+                        state.originalFileName = file.name.replace(/\.[^/.]+$/, '') || 'audio';
+
+                        loadingOverlay.querySelector('span').textContent = 'Detecting…';
+                        await new Promise(r => setTimeout(r, 50));
+                        state.detectedTimes = detectOnsets(state.bufferData, state.sampleRate, state.threshold);
+                        resetMarkersToDetected();
+                        loadingOverlay.classList.remove('active');
+                        updateUI();
+                        render();
+                        updateTimeDisplay();
+                    } catch (err) {
+                        loadingOverlay.classList.remove('active');
+                        alert('Error: ' + err.message);
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            }
+
+            // ---------- EXPORT ----------
+            function exportAudio() {
+                if (!state.audioBuffer) return;
+                // 1. WAV export
+                const audioBuffer = state.audioBuffer;
+                const wavData = audioBufferToWav(audioBuffer);
+                const wavBlob = new Blob([wavData], { type: 'audio/wav' });
+                const wavUrl = URL.createObjectURL(wavBlob);
+                const a = document.createElement('a');
+                a.href = wavUrl;
+                a.download = state.originalFileName + '_export.wav';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                setTimeout(() => URL.revokeObjectURL(wavUrl), 5000);
+
+                // 2. Markers JSON
+                const markersData = state.markers.map((m, i) => ({
+                    index: i,
+                    time: m.time,
+                    beatOffset: m.beatOffset,
+                }));
+                const json = JSON.stringify({ bpm: state.bpm, markers: markersData }, null, 2);
+                const jsonBlob = new Blob([json], { type: 'application/json' });
+                const jsonUrl = URL.createObjectURL(jsonBlob);
+                const a2 = document.createElement('a');
+                a2.href = jsonUrl;
+                a2.download = state.originalFileName + '_markers.json';
+                document.body.appendChild(a2);
+                a2.click();
+                document.body.removeChild(a2);
+                setTimeout(() => URL.revokeObjectURL(jsonUrl), 5000);
+            }
+
+            // Helper: convert AudioBuffer to WAV ArrayBuffer
+            function audioBufferToWav(buffer) {
+                const numChannels = buffer.numberOfChannels;
+                const sampleRate = buffer.sampleRate;
+                const length = buffer.length;
+                const samples = numChannels === 1 ? buffer.getChannelData(0) : interleaveChannels(buffer);
+                const dataLength = samples.length * 2;
+                const bufferSize = 44 + dataLength;
+                const arrayBuffer = new ArrayBuffer(bufferSize);
+                const view = new DataView(arrayBuffer);
+                writeString(view, 0, 'RIFF');
+                view.setUint32(4, 36 + dataLength, true);
+                writeString(view, 8, 'WAVE');
+                writeString(view, 12, 'fmt ');
+                view.setUint32(16, 16, true);
+                view.setUint16(20, 1, true);
+                view.setUint16(22, numChannels, true);
+                view.setUint32(24, sampleRate, true);
+                view.setUint32(28, sampleRate * numChannels * 2, true);
+                view.setUint16(32, numChannels * 2, true);
+                view.setUint16(34, 16, true);
+                writeString(view, 36, 'data');
+                view.setUint32(40, dataLength, true);
+                let offset = 44;
+                for (let i = 0; i < samples.length; i++) {
+                    const s = Math.max(-1, Math.min(1, samples[i]));
+                    const val = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                    view.setInt16(offset, val, true);
+                    offset += 2;
+                }
+                return arrayBuffer;
+            }
+
+            function interleaveChannels(buffer) {
+                const numChannels = buffer.numberOfChannels;
+                const length = buffer.length;
+                const result = new Float32Array(length * numChannels);
+                for (let i = 0; i < length; i++) {
+                    for (let ch = 0; ch < numChannels; ch++) {
+                        result[i * numChannels + ch] = buffer.getChannelData(ch)[i];
+                    }
+                }
+                return result;
+            }
+
+            function writeString(view, offset, string) {
+                for (let i = 0; i < string.length; i++) {
+                    view.setUint8(offset + i, string.charCodeAt(i));
+                }
+            }
+
+            // Interaction: drag markers
+            function getPointerPos(e) {
+                const rect = canvas.getBoundingClientRect();
+                let cx, cy;
+                if (e.touches) { cx = e.touches[0].clientX;
+                    cy = e.touches[0].clientY; } else { cx = e.clientX;
+                    cy = e.clientY; }
+                const x = (cx - rect.left) * (state.canvasWidth / rect.width);
+                const y = (cy - rect.top) * (state.canvasHeight / rect.height);
+                return { x, y, clientX: cx, clientY: cy };
+            }
+
+            function findMarkerAt(x) {
+                const tolerance = 16;
+                const startTime = state.offset;
+                const zoom = state.zoom;
+                for (let i = state.markers.length - 1; i >= 0; i--) {
+                    const px = (state.markers[i].time - startTime) * zoom;
+                    if (Math.abs(px - x) < tolerance) return i;
+                }
+                return -1;
+            }
+
+            function startDrag(e) {
+                if (!state.bufferData || state.markers.length === 0) return;
+                const pos = getPointerPos(e);
+                const idx = findMarkerAt(pos.x);
+                if (idx === -1) return;
+                e.preventDefault();
+                state.dragging = true;
+                state.dragIndex = idx;
+                state.dragStartX = pos.x;
+                state.dragStartTime = state.markers[idx].time;
+                state.markers.forEach((m, i) => m.selected = (i === idx));
+                updateUI();
+                render();
+                dragTooltip.classList.add('visible');
+                updateDragTooltip(idx, pos.clientX, pos.clientY);
+                document.body.style.overflow = 'hidden';
+            }
+
+            function moveDrag(e) {
+                if (!state.dragging || state.dragIndex === -1) return;
+                e.preventDefault();
+                const pos = getPointerPos(e);
+                const dx = pos.x - state.dragStartX;
+                const newTime = state.dragStartTime + dx / state.zoom;
+                const clamped = Math.max(0, Math.min(newTime, state.duration));
+                state.markers[state.dragIndex].time = clamped;
+                state.markers[state.dragIndex].beatOffset = getBeatOffset(clamped);
+                state.markers.sort((a, b) => a.time - b.time);
+                const newIdx = state.markers.findIndex(m => m.time === clamped && m.beatOffset === getBeatOffset(clamped));
+                if (newIdx !== -1) state.dragIndex = newIdx;
+                updateUI();
+                render();
+                updateDragTooltip(state.dragIndex, pos.clientX, pos.clientY);
+            }
+
+            function endDrag(e) {
+                if (!state.dragging) return;
+                state.dragging = false;
+                state.dragIndex = -1;
+                dragTooltip.classList.remove('visible');
+                document.body.style.overflow = '';
+                render();
+            }
+
+            function updateDragTooltip(index, cx, cy) {
+                if (index < 0 || index >= state.markers.length) return;
+                const off = state.markers[index].beatOffset;
+                dragTooltipText.textContent = (off > 0 ? '+' : '') + off.toFixed(3);
+                let left = cx + 14,
+                    top = cy - 16;
+                if (left + 120 > window.innerWidth - 10) left = cx - 120 - 14;
+                if (top + 30 > window.innerHeight - 10) top = cy - 30 - 10;
+                dragTooltip.style.left = left + 'px';
+                dragTooltip.style.top = top + 'px';
+            }
+
+            // Pinch & Pan
+            function handlePinch(e) {
+                if (!state.bufferData || e.touches.length !== 2) return;
+                e.preventDefault();
+                const t1 = e.touches[0],
+                    t2 = e.touches[1];
+                const dist = Math.hypot(t1.clientX - t2.clientX, t1.clientY - t2.clientY);
+                if (state._lastPinchDist) {
+                    const delta = dist - state._lastPinchDist;
+                    const factor = 1 + delta * 0.005;
+                    state.zoom = Math.max(20, Math.min(800, state.zoom * factor));
+                    render();
+                    updateUI();
+                }
+                state._lastPinchDist = dist;
+            }
+
+            function handlePan(e) {
+                if (state.dragging || !state.bufferData) return;
+                e.preventDefault();
+                const pos = getPointerPos(e);
+                if (state._panStartX === undefined) {
+                    state._panStartX = pos.x;
+                    state._panStartOffset = state.offset;
+                    return;
+                }
+                const dx = (state._panStartX - pos.x) / state.zoom;
+                state.offset = Math.max(0, Math.min(state.duration - state.canvasWidth / state.zoom, state._panStartOffset +
+                    dx));
+                render();
+            }
+
+            // ---- Event binding ----
+            loadBtn.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files.length) loadAudioFile(e.target.files[0]);
+                e.target.value = '';
+            });
+
+            bpmInput.addEventListener('change', () => {
+                let val = parseFloat(bpmInput.value);
+                if (isNaN(val) || val < 20) val = 20;
+                if (val > 300) val = 300;
+                state.bpm = val;
+                bpmInput.value = val;
+                for (const m of state.markers) m.beatOffset = getBeatOffset(m.time);
+                updateUI();
+                render();
+            });
+
+            thresholdSlider.addEventListener('input', () => {
+                const val = parseFloat(thresholdSlider.value);
+                thresholdValue.textContent = val.toFixed(3);
+                state.threshold = val;
+            });
+
+            playBtn.addEventListener('click', playAudio);
+            stopBtn.addEventListener('click', stopAudio);
+            snapAllBtn.addEventListener('click', snapAllMarkers);
+            detectBtn.addEventListener('click', () => {
+                if (!state.bufferData) return;
+                loadingOverlay.classList.add('active');
+                loadingOverlay.querySelector('span').textContent = 'Detecting…';
+                setTimeout(() => {
+                    state.detectedTimes = detectOnsets(state.bufferData, state.sampleRate, state.threshold);
+                    resetMarkersToDetected();
+                    loadingOverlay.classList.remove('active');
+                    updateUI();
+                    render();
+                }, 100);
+            });
+            resetBtn.addEventListener('click', resetMarkersToDetected);
+            clearBtn.addEventListener('click', clearMarkers);
+            exportBtn.addEventListener('click', exportAudio);
+
+            // Canvas events
+            canvas.addEventListener('mousedown', startDrag);
+            canvas.addEventListener('mousemove', moveDrag);
+            canvas.addEventListener('mouseup', endDrag);
+            canvas.addEventListener('mouseleave', endDrag);
+
+            canvas.addEventListener('touchstart', (e) => {
+                if (e.touches.length === 1) startDrag(e);
+                else if (e.touches.length === 2) { state._lastPinchDist = undefined;
+                    handlePinch(e); }
+            }, { passive: false });
+            canvas.addEventListener('touchmove', (e) => {
+                if (state.dragging && e.touches.length === 1) moveDrag(e);
+                else if (e.touches.length === 2) handlePinch(e);
+                else if (e.touches.length === 1 && !state.dragging) handlePan(e);
+            }, { passive: false });
+            canvas.addEventListener('touchend', (e) => {
+                if (state.dragging) endDrag(e);
+                state._panStartX = undefined;
+                state._lastPinchDist = undefined;
+            }, { passive: false });
+            canvas.addEventListener('touchcancel', (e) => {
+                if (state.dragging) endDrag(e);
+                state._panStartX = undefined;
+                state._lastPinchDist = undefined;
+            }, { passive: false });
+
+            // Resize
+            const ro = new ResizeObserver(() => {
+                clearTimeout(state.resizeTimer);
+                state.resizeTimer = setTimeout(resizeCanvas, 100);
+            });
+            ro.observe(wrap);
+
+            // Keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                if (e.target.tagName === 'INPUT') return;
+                if (e.code === 'Space') { e.preventDefault();
+                    playAudio(); }
+                if (e.code === 'Escape') stopAudio();
+                if (e.code === 'KeyS' && (e.ctrlKey || e.metaKey)) { e.preventDefault();
+                    snapAllMarkers(); }
+            });
+
+            // Init
+            function init() {
+                resizeCanvas();
+                state.zoom = Math.max(60, Math.min(400, state.canvasWidth / 8));
+                updateUI();
+                render();
+                updateTimeDisplay();
+                playBtn.disabled = true;
+                stopBtn.disabled = true;
+                detectBtn.disabled = true;
+                resetBtn.disabled = true;
+                clearBtn.disabled = true;
+                snapAllBtn.disabled = true;
+                exportBtn.disabled = true;
+                document.addEventListener('visibilitychange', () => {
+                    if (document.hidden && state.isPlaying) {
+                        state.isPlaying = false;
+                        state.pauseTime = state.currentTime;
+                        if (state.source) { try { state.source.stop(); } catch (_) {} }
+                        state.source = null;
+                        playBtn.textContent = '▶';
+                        render();
+                    }
+                });
+            }
+
+            document.addEventListener('touchstart', () => resumeAudioContext().catch(() => {}), { passive: true });
+            document.addEventListener('click', () => resumeAudioContext().catch(() => {}), { passive: true });
+
+            init();
+            window.__state = state;
+        })();
+    </script>
+</body>
+</html>

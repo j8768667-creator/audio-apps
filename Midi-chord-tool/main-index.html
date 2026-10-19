@@ -1,0 +1,1190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MIDI Pattern & Arrangement Studio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tonejs/midi@2.0.28/build/Midi.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #080c14;
+      color: #e2e8f0;
+    }
+    .mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .drop-zone {
+      border: 2px dashed #334155;
+      transition: all 0.2s ease;
+    }
+    .drop-zone.drag-over {
+      border-color: #6366f1;
+      background-color: rgba(99, 102, 241, 0.08);
+    }
+    .gradient-text {
+      background: linear-gradient(135deg, #818cf8 0%, #c084fc 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between">
+
+  <header class="border-b border-slate-800 bg-slate-900/60 backdrop-blur-md sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-indigo-600 flex items-center justify-center font-bold text-lg shadow-lg shadow-indigo-500/30">
+          ♫
+        </div>
+        <div>
+          <h1 class="text-xl font-bold tracking-tight">MIDI Studio Lab Pro</h1>
+          <p class="text-xs text-slate-400">Advanced Pattern, Chord, Bassline & Drum Composition Engine</p>
+        </div>
+      </div>
+      
+      <nav class="flex bg-slate-800/80 p-1 rounded-xl border border-slate-700/50">
+        <button id="tab-arp-btn" onclick="switchTab('arp')" class="px-4 py-1.5 rounded-lg text-sm font-semibold transition-all bg-indigo-600 text-white shadow-md">
+          1. Advanced Arpeggiator
+        </button>
+        <button id="tab-full-btn" onclick="switchTab('full')" class="px-4 py-1.5 rounded-lg text-sm font-semibold transition-all text-slate-400 hover:text-slate-200">
+          2. Full Track Arrangement Engine
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-6 py-8 flex-1 w-full">
+
+    <section id="tab-arp" class="space-y-8">
+      <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-800 pb-6">
+        <div>
+          <h2 class="text-2xl font-bold gradient-text">MIDI Chord Arpeggiator</h2>
+          <p class="text-slate-400 text-sm mt-1">Explode block chords into customizable, syncopated arpeggio patterns.</p>
+        </div>
+        <button onclick="loadSampleChords()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold rounded-lg transition-all text-indigo-300 flex items-center gap-2">
+          <span>✨</span> Load Demo Chords
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div class="lg:col-span-5 space-y-6">
+          <div id="arp-drop" class="drop-zone p-8 rounded-2xl bg-slate-900/40 text-center cursor-pointer hover:border-indigo-500/50">
+            <input type="file" id="arp-input" accept=".mid,.midi" class="hidden" onchange="handleArpUpload(event)">
+            <div class="text-3xl mb-2">🎹</div>
+            <p class="font-semibold text-slate-200 text-sm">Drop block chord MIDI file here</p>
+            <p class="text-xs text-slate-500 mt-1">or click to browse your computer</p>
+            <div id="arp-filename" class="mt-3 text-xs font-mono text-indigo-400 hidden bg-indigo-950/40 py-1.5 px-3 rounded-md inline-block"></div>
+          </div>
+
+          <div class="bg-slate-900/70 border border-slate-800 p-6 rounded-2xl space-y-5">
+            <h3 class="text-sm font-bold uppercase tracking-wider text-slate-400 border-b border-slate-800 pb-2">Pattern Parameters</h3>
+            
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs text-slate-400 mb-1">Pattern Mode</label>
+                <select id="arp-mode" onchange="toggleEuclideanUI()" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
+                  <option value="up">Up</option>
+                  <option value="down">Down</option>
+                  <option value="updown" selected>Up-Down</option>
+                  <option value="downup">Down-Up</option>
+                  <option value="converge">Converge (Outside-In)</option>
+                  <option value="diverge">Diverge (Inside-Out)</option>
+                  <option value="random">Random Order</option>
+                  <option value="euclidean">Euclidean Cycle</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs text-slate-400 mb-1">Rate Division</label>
+                <select id="arp-rate" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
+                  <option value="4">1/4 Note</option>
+                  <option value="8">1/8 Note</option>
+                  <option value="16" selected>1/16 Note</option>
+                  <option value="32">1/32 Note</option>
+                  <option value="8t">1/8 Triplet</option>
+                  <option value="16t">1/16 Triplet</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs text-slate-400 mb-1">Octave Span: <span id="arp-oct-val" class="text-indigo-400">2</span></label>
+                <input type="range" id="arp-octaves" min="1" max="4" value="2" class="w-full accent-indigo-500" oninput="document.getElementById('arp-oct-val').innerText=this.value">
+              </div>
+              <div>
+                <label class="block text-xs text-slate-400 mb-1">Gate Duration: <span id="arp-gate-val" class="text-indigo-400">80%</span></label>
+                <input type="range" id="arp-gate" min="10" max="100" value="80" class="w-full accent-indigo-500" oninput="document.getElementById('arp-gate-val').innerText=this.value+'%'">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs text-slate-400 mb-1">Transposition: <span id="arp-trans-val" class="text-indigo-400">0st</span></label>
+                <input type="range" id="arp-trans" min="-24" max="24" value="0" class="w-full accent-indigo-500" oninput="document.getElementById('arp-trans-val').innerText=(this.value>0?'+':'')+this.value+'st'">
+              </div>
+              <div>
+                <label class="block text-xs text-slate-400 mb-1">Swing / Humanize: <span id="arp-swing-val" class="text-indigo-400">0%</span></label>
+                <input type="range" id="arp-swing" min="0" max="50" value="0" class="w-full accent-indigo-500" oninput="document.getElementById('arp-swing-val').innerText=this.value+'%'">
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Velocity Profile</label>
+              <select id="arp-vel-profile" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
+                <option value="flat" selected>Flat (Consistent 85%)</option>
+                <option value="accent">Beat Accents (Strong Downbeats)</option>
+                <option value="crescendo">Crescendo Ramp</option>
+                <option value="decrescendo">Decrescendo Ramp</option>
+                <option value="human">Random Velocity Jitter</option>
+              </select>
+            </div>
+
+            <div id="euclidean-controls" class="p-4 bg-slate-950/60 rounded-xl border border-slate-800/80 space-y-3 hidden">
+              <span class="text-xs font-semibold text-indigo-400 flex items-center gap-1">⚡ Euclidean Rhythm Settings</span>
+              <div class="grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  <label class="block text-slate-400 mb-1">Pulses (Hits): <span id="euc-pulses-val" class="text-indigo-300">5</span></label>
+                  <input type="range" id="euc-pulses" min="1" max="16" value="5" class="w-full accent-indigo-500" oninput="document.getElementById('euc-pulses-val').innerText=this.value">
+                </div>
+                <div>
+                  <label class="block text-slate-400 mb-1">Steps (Grid): <span id="euc-steps-val" class="text-indigo-300">8</span></label>
+                  <input type="range" id="euc-steps" min="2" max="16" value="8" class="w-full accent-indigo-500" oninput="document.getElementById('euc-steps-val').innerText=this.value">
+                </div>
+              </div>
+            </div>
+
+            <button onclick="processArpeggiator()" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-indigo-600/30 transition-all text-sm flex items-center justify-center gap-2">
+              <span>🚀</span> Generate Arpeggio
+            </button>
+          </div>
+        </div>
+
+        <div class="lg:col-span-7 flex flex-col justify-between bg-slate-900/40 border border-slate-800 rounded-2xl p-6">
+          <div>
+            <div class="flex justify-between items-center mb-4">
+              <h3 class="text-sm font-bold uppercase tracking-wider text-slate-400">Pattern Piano Roll</h3>
+              <div id="arp-stats" class="text-xs font-mono text-slate-500">No pattern generated</div>
+            </div>
+
+            <div id="arp-piano-roll" class="h-64 bg-slate-950 border border-slate-800/80 rounded-xl p-4 overflow-hidden relative flex flex-col justify-end">
+              <div id="arp-notes-container" class="w-full h-full relative">
+                <p class="text-slate-600 text-xs text-center mt-24">Upload chords or load demo progression to generate...</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-6 pt-6 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center gap-3">
+              <button id="arp-play-btn" onclick="togglePlayArp()" disabled class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-semibold rounded-xl text-xs flex items-center gap-2 transition-all shadow-lg shadow-emerald-900/20">
+                <span>▶</span> Play Audio Preview
+              </button>
+              <button onclick="stopAudio()" class="px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-xs transition-all">
+                ⏹ Stop
+              </button>
+            </div>
+
+            <button id="arp-download-btn" onclick="downloadArpMIDI()" disabled class="px-5 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 disabled:opacity-40 text-indigo-300 font-semibold rounded-xl text-xs flex items-center gap-2 transition-all">
+              <span>💾</span> Export Arpeggio .MID
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <section id="tab-full" class="space-y-8 hidden">
+      <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-800 pb-6">
+        <div>
+          <h2 class="text-2xl font-bold gradient-text">Melody & Chord-to-Arrangement Engine</h2>
+          <p class="text-slate-400 text-sm mt-1">Generate matching Melody, Chords, Bassline, and Drum tracks from Melody MIDI, Chord MIDI, or manual String entry.</p>
+        </div>
+        <button onclick="loadSampleMelody()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-semibold rounded-lg transition-all text-purple-300 flex items-center gap-2">
+          <span>✨</span> Load Demo Track
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div class="lg:col-span-5 space-y-6">
+          
+          <div class="bg-slate-900/70 border border-slate-800 p-5 rounded-2xl space-y-4">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400">1. Select Input Source</h3>
+            
+            <div class="grid grid-cols-3 gap-2">
+              <button id="src-type-melody" onclick="setInputSource('melody')" class="py-2 px-3 rounded-lg text-xs font-semibold bg-purple-600 text-white">
+                Melody MIDI
+              </button>
+              <button id="src-type-chordfile" onclick="setInputSource('chordfile')" class="py-2 px-3 rounded-lg text-xs font-semibold bg-slate-800 text-slate-400 hover:text-slate-200">
+                Chord MIDI
+              </button>
+              <button id="src-type-chordtext" onclick="setInputSource('chordtext')" class="py-2 px-3 rounded-lg text-xs font-semibold bg-slate-800 text-slate-400 hover:text-slate-200">
+                Chord Text String
+              </button>
+            </div>
+
+            <div id="full-drop" class="drop-zone p-6 rounded-xl bg-slate-950/60 text-center cursor-pointer hover:border-purple-500/50">
+              <input type="file" id="full-input" accept=".mid,.midi" class="hidden" onchange="handleFullUpload(event)">
+              <div class="text-2xl mb-1">🎼</div>
+              <p id="full-drop-label" class="font-semibold text-slate-200 text-xs">Drop Melody MIDI File Here</p>
+              <div id="full-filename" class="mt-2 text-xs font-mono text-purple-400 hidden bg-purple-950/40 py-1 px-2 rounded-md inline-block"></div>
+            </div>
+
+            <div id="manual-chord-box" class="space-y-2 hidden">
+              <label class="block text-xs text-slate-400">Enter Chord Symbols (separated by space / hyphen):</label>
+              <input type="text" id="chord-string-input" value="Cmaj7 - Am7 - Dm7 - G7" placeholder="e.g. Cmaj7 Am7 Dm7 G7 or Fm9 Bb7 Ebmaj7" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-purple-300 focus:ring-2 focus:ring-purple-500 outline-none">
+              <p class="text-[10px] text-slate-500">Supports: maj, min, m, maj7, m7, 7, dim, aug, sus4, 9th (e.g., C, Am, Dm7, G7)</p>
+            </div>
+          </div>
+
+          <div class="bg-slate-900/70 border border-slate-800 p-6 rounded-2xl space-y-5">
+            <h3 class="text-sm font-bold uppercase tracking-wider text-slate-400 border-b border-slate-800 pb-2">2. Arrangement Controls</h3>
+
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs text-slate-400 mb-1">Tempo: <span id="full-bpm-val" class="text-purple-400">120 BPM</span></label>
+                <input type="range" id="full-bpm" min="60" max="180" value="120" class="w-full accent-purple-500" oninput="document.getElementById('full-bpm-val').innerText=this.value+' BPM'">
+              </div>
+              <div>
+                <label class="block text-xs text-slate-400 mb-1">Swing / Groove: <span id="full-swing-val" class="text-purple-400">10%</span></label>
+                <input type="range" id="full-swing" min="0" max="50" value="10" class="w-full accent-purple-500" oninput="document.getElementById('full-swing-val').innerText=this.value+'%'">
+              </div>
+            </div>
+
+            <div class="space-y-3 bg-slate-950/50 p-4 rounded-xl border border-slate-800/80">
+              <span class="text-xs font-bold text-indigo-400 flex items-center gap-1">🎷 Lead Melody Generator</span>
+              <div>
+                <label class="block text-xs text-slate-400 mb-1">Melody Density / Style</label>
+                <select id="melody-style" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-indigo-500 outline-none">
+                  <option value="syncopated" selected>Syncopated Lead Motifs</option>
+                  <option value="sparse">Sparse Melodic Accents</option>
+                  <option value="arpeggiated">Fast Arpeggiated Line</option>
+                  <option value="off">Off (Keep Melody Muted/Empty)</option>
+                </select>
+              </div>
+            </div>
+            
+            <div class="space-y-3 bg-slate-950/50 p-4 rounded-xl border border-slate-800/80">
+              <span class="text-xs font-bold text-sky-400 flex items-center gap-1">🎹 Chord Engine Settings</span>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs text-slate-400 mb-1">Voicing Style</label>
+                  <select id="chord-type" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-sky-500 outline-none">
+                    <option value="triads">Closed Triads</option>
+                    <option value="7ths" selected>7th Extensions</option>
+                    <option value="jazz">Jazz 9th Voicings</option>
+                    <option value="drop2">Drop-2 Open Voicings</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-400 mb-1">Rhythmic Pad Style</label>
+                  <select id="chord-rhythm" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-sky-500 outline-none">
+                    <option value="sustained">Sustained Whole Notes</option>
+                    <option value="offbeat">Off-Beat Stabs</option>
+                    <option value="pulsing">Pulsing 8th Notes</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="space-y-3 bg-slate-950/50 p-4 rounded-xl border border-slate-800/80">
+              <span class="text-xs font-bold text-purple-400 flex items-center gap-1">🎸 Bassline Counterpart</span>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs text-slate-400 mb-1">Bass Style</label>
+                  <select id="bass-style" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-purple-500 outline-none">
+                    <option value="syncopated" selected>Syncopated Off-Beat</option>
+                    <option value="walking">Driving 8th Notes</option>
+                    <option value="bounce">Root-Fifth Octave Bounce</option>
+                    <option value="sustained">Sustained Root Anchor</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-400 mb-1">Octave Shift</label>
+                  <select id="bass-octave" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-purple-500 outline-none">
+                    <option value="-2" selected>-2 Octaves (Standard)</option>
+                    <option value="-3">-3 Octaves (Sub Bass)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="space-y-3 bg-slate-950/50 p-4 rounded-xl border border-slate-800/80">
+              <span class="text-xs font-bold text-amber-400 flex items-center gap-1">🥁 Drum Groove Generator</span>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="block text-xs text-slate-400 mb-1">Groove Style</label>
+                  <select id="drum-style" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-amber-500 outline-none">
+                    <option value="four_floor">Four-on-the-Floor Dance</option>
+                    <option value="boombap" selected>Boom Bap Hip-Hop</option>
+                    <option value="trap">Trap 808 Groove</option>
+                    <option value="afrobeat">Afrobeat / Syncopated</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs text-slate-400 mb-1">Hi-Hat Rate</label>
+                  <select id="drum-hats" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs focus:ring-2 focus:ring-amber-500 outline-none">
+                    <option value="8th">8th Notes</option>
+                    <option value="16th" selected>16th Notes</option>
+                    <option value="offbeat">Off-Beat 8ths</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <button onclick="processFullArrangement()" class="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl shadow-lg shadow-purple-600/30 transition-all text-sm flex items-center justify-center gap-2">
+              <span>⚡</span> Generate Full Track Arrangement
+            </button>
+          </div>
+        </div>
+
+        <div class="lg:col-span-7 flex flex-col justify-between bg-slate-900/40 border border-slate-800 rounded-2xl p-6">
+          <div>
+            <div class="flex justify-between items-center mb-4">
+              <h3 class="text-sm font-bold uppercase tracking-wider text-slate-400">Multi-Track Arrangement Roll</h3>
+              <div id="full-stats" class="text-xs font-mono text-slate-500">No arrangement generated</div>
+            </div>
+
+            <div id="full-piano-roll" class="h-64 bg-slate-950 border border-slate-800/80 rounded-xl p-4 overflow-hidden relative flex flex-col justify-end">
+              <div id="full-notes-container" class="w-full h-full relative">
+                <p class="text-slate-600 text-xs text-center mt-24">Select source and generate full track arrangement...</p>
+              </div>
+            </div>
+            
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 text-xs font-mono">
+              <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-indigo-500 inline-block"></span> Lead Melody (Ch 1)</div>
+              <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-sky-400 inline-block"></span> Chords (Ch 2)</div>
+              <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-purple-500 inline-block"></span> Bassline (Ch 3)</div>
+              <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-amber-400 inline-block"></span> Drums (Ch 10)</div>
+            </div>
+          </div>
+
+          <div class="mt-6 pt-6 border-t border-slate-800/80 space-y-4">
+            <div class="flex items-center justify-between gap-3">
+              <div class="flex items-center gap-3">
+                <button id="full-play-btn" onclick="togglePlayFull()" disabled class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-semibold rounded-xl text-xs flex items-center gap-2 transition-all shadow-lg shadow-emerald-900/20">
+                  <span>▶</span> Play Full Track
+                </button>
+                <button onclick="stopAudio()" class="px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl text-xs transition-all">
+                  ⏹ Stop
+                </button>
+              </div>
+
+              <button id="full-download-all-btn" onclick="downloadAllTracksMIDI()" disabled class="px-4 py-2.5 bg-purple-600 hover:bg-purple-500 border border-purple-500 disabled:opacity-40 text-white font-semibold rounded-xl text-xs flex items-center gap-2 transition-all shadow-lg shadow-purple-900/20">
+                <span>📦</span> Export Full Multi-Track .MID
+              </button>
+            </div>
+
+            <div class="bg-slate-950/60 p-4 rounded-xl border border-slate-800/80 space-y-2">
+              <span class="text-xs font-semibold text-slate-400 block mb-2">Export Individual MIDI Tracks:</span>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <button id="exp-melody-btn" onclick="downloadSingleTrack('melody')" disabled class="py-2 px-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 disabled:opacity-30 text-indigo-300 font-mono text-[11px] rounded-lg transition-all text-center">
+                  💾 Melody .mid
+                </button>
+                <button id="exp-chord-btn" onclick="downloadSingleTrack('chords')" disabled class="py-2 px-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 disabled:opacity-30 text-sky-300 font-mono text-[11px] rounded-lg transition-all text-center">
+                  💾 Chords .mid
+                </button>
+                <button id="exp-bass-btn" onclick="downloadSingleTrack('bass')" disabled class="py-2 px-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 disabled:opacity-30 text-purple-300 font-mono text-[11px] rounded-lg transition-all text-center">
+                  💾 Bassline .mid
+                </button>
+                <button id="exp-drums-btn" onclick="downloadSingleTrack('drums')" disabled class="py-2 px-3 bg-slate-800 hover:bg-slate-700 border border-slate-700 disabled:opacity-30 text-amber-300 font-mono text-[11px] rounded-lg transition-all text-center">
+                  💾 Drums .mid
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="border-t border-slate-800 py-4 text-center text-xs text-slate-500">
+    MIDI Studio Lab Pro • Browser-Based Music Theory & Algorithmic Composition Tool
+  </footer>
+
+  <script>
+    // --- STATE MANAGEMENT ---
+    let arpMidiInput = null;
+    let arpMidiOutput = null;
+
+    let selectedInputSource = 'melody';
+    let fullMidiInput = null;
+    let melodyTrackOutput = null;
+    let chordTrackOutput = null;
+    let bassTrackOutput = null;
+    let drumTrackOutput = null;
+    let fullMultiTrackOutput = null;
+
+    let synthPoly = null;
+    let synthChord = null;
+    let synthBass = null;
+    let synthKick = null;
+    let synthSnare = null;
+    let synthHat = null;
+    let isPlaying = false;
+
+    // --- SYNTH INITIALIZATION WITH RELEASE SAFETY ---
+    function initSynths() {
+      if (!synthPoly) {
+        synthPoly = new Tone.PolySynth(Tone.Synth, {
+          oscillator: { type: 'triangle' },
+          envelope: { attack: 0.005, decay: 0.1, sustain: 0.3, release: 0.2 }
+        }).toDestination();
+        synthPoly.volume.value = -6;
+
+        synthChord = new Tone.PolySynth(Tone.Synth, {
+          oscillator: { type: 'sine' },
+          envelope: { attack: 0.04, decay: 0.2, sustain: 0.5, release: 0.4 }
+        }).toDestination();
+        synthChord.volume.value = -10;
+
+        synthBass = new Tone.PolySynth(Tone.Synth, {
+          oscillator: { type: 'sawtooth' },
+          envelope: { attack: 0.01, decay: 0.2, sustain: 0.2, release: 0.15 }
+        }).toDestination();
+        synthBass.volume.value = -2;
+
+        synthKick = new Tone.MembraneSynth({ pitchDecay: 0.05, octaves: 6, oscillator: { type: 'sine' } }).toDestination();
+        synthKick.volume.value = -2;
+
+        synthSnare = new Tone.NoiseSynth({ noise: { type: 'white' }, envelope: { attack: 0.001, decay: 0.18, sustain: 0 } }).toDestination();
+        synthSnare.volume.value = -8;
+
+        synthHat = new Tone.MetalSynth({ frequency: 200, envelope: { attack: 0.001, decay: 0.04, release: 0.04 }, harmonicity: 5.1, modulationIndex: 32 }).toDestination();
+        synthHat.volume.value = -16;
+      }
+    }
+
+    // --- CHORD SYMBOL PARSER ---
+    const NOTE_MAP = { 'C':0, 'C#':1, 'DB':1, 'D':2, 'D#':3, 'EB':3, 'E':4, 'F':5, 'F#':6, 'GB':6, 'G':7, 'G#':8, 'AB':8, 'A':9, 'A#':10, 'BB':10, 'B':11 };
+    
+    function parseChordSymbol(token) {
+      if (!token) return null;
+      let clean = token.trim().toUpperCase().replace(/[^A-Z0-9#]/g, '');
+      if (!clean) return null;
+
+      let rootStr = clean.match(/^[A-G][#B]?/)?.[0];
+      if (!rootStr || NOTE_MAP[rootStr] === undefined) return null;
+
+      let rootVal = NOTE_MAP[rootStr];
+      let qualityStr = clean.substring(rootStr.length);
+
+      let intervals = [0, 4, 7];
+
+      if (qualityStr.includes('MAJ7') || qualityStr.includes('M7')) intervals = [0, 4, 7, 11];
+      else if (qualityStr.includes('M9') || qualityStr.includes('MIN9')) intervals = [0, 3, 7, 10, 14];
+      else if (qualityStr.includes('MIN7') || qualityStr.includes('M7') || qualityStr.includes('7') && qualityStr.includes('M')) intervals = [0, 3, 7, 10];
+      else if (qualityStr.includes('MIN') || qualityStr.includes('M')) intervals = [0, 3, 7];
+      else if (qualityStr.includes('9')) intervals = [0, 4, 7, 11, 14];
+      else if (qualityStr.includes('7')) intervals = [0, 4, 7, 10];
+      else if (qualityStr.includes('DIM')) intervals = [0, 3, 6];
+      else if (qualityStr.includes('AUG')) intervals = [0, 4, 8];
+      else if (qualityStr.includes('SUS4')) intervals = [0, 5, 7];
+
+      let baseMidi = 48 + rootVal;
+      return intervals.map(i => baseMidi + i);
+    }
+
+    function parseChordProgressionString(str) {
+      let tokens = str.split(/[\s\-–,>]+/);
+      let chords = [];
+      tokens.forEach(t => {
+        let parsed = parseChordSymbol(t);
+        if (parsed) chords.push(parsed);
+      });
+      return chords.length ? chords : [[60, 64, 67, 71], [57, 60, 64, 67], [62, 65, 69, 72], [55, 59, 62, 65]];
+    }
+
+    // --- TAB & UI CONTROL ---
+    function switchTab(tab) {
+      stopAudio();
+      const arpTab = document.getElementById('tab-arp');
+      const fullTab = document.getElementById('tab-full');
+      const arpBtn = document.getElementById('tab-arp-btn');
+      const fullBtn = document.getElementById('tab-full-btn');
+
+      if (tab === 'arp') {
+        arpTab.classList.remove('hidden');
+        fullTab.classList.add('hidden');
+        arpBtn.className = "px-4 py-1.5 rounded-lg text-sm font-semibold transition-all bg-indigo-600 text-white shadow-md";
+        fullBtn.className = "px-4 py-1.5 rounded-lg text-sm font-semibold transition-all text-slate-400 hover:text-slate-200";
+      } else {
+        fullTab.classList.remove('hidden');
+        arpTab.classList.add('hidden');
+        fullBtn.className = "px-4 py-1.5 rounded-lg text-sm font-semibold transition-all bg-purple-600 text-white shadow-md";
+        arpBtn.className = "px-4 py-1.5 rounded-lg text-sm font-semibold transition-all text-slate-400 hover:text-slate-200";
+      }
+    }
+
+    function setInputSource(type) {
+      selectedInputSource = type;
+      const btnM = document.getElementById('src-type-melody');
+      const btnCF = document.getElementById('src-type-chordfile');
+      const btnCT = document.getElementById('src-type-chordtext');
+      const dropZone = document.getElementById('full-drop');
+      const manualBox = document.getElementById('manual-chord-box');
+      const dropLabel = document.getElementById('full-drop-label');
+
+      [btnM, btnCF, btnCT].forEach(b => b.className = "py-2 px-3 rounded-lg text-xs font-semibold bg-slate-800 text-slate-400 hover:text-slate-200");
+
+      if (type === 'melody') {
+        btnM.className = "py-2 px-3 rounded-lg text-xs font-semibold bg-purple-600 text-white";
+        dropZone.classList.remove('hidden');
+        manualBox.classList.add('hidden');
+        dropLabel.innerText = "Drop Melody MIDI File Here";
+      } else if (type === 'chordfile') {
+        btnCF.className = "py-2 px-3 rounded-lg text-xs font-semibold bg-purple-600 text-white";
+        dropZone.classList.remove('hidden');
+        manualBox.classList.add('hidden');
+        dropLabel.innerText = "Drop Chord MIDI File Here";
+      } else if (type === 'chordtext') {
+        btnCT.className = "py-2 px-3 rounded-lg text-xs font-semibold bg-purple-600 text-white";
+        dropZone.classList.add('hidden');
+        manualBox.classList.remove('hidden');
+      }
+    }
+
+    function toggleEuclideanUI() {
+      const mode = document.getElementById('arp-mode').value;
+      const eucBox = document.getElementById('euclidean-controls');
+      if (mode === 'euclidean') eucBox.classList.remove('hidden');
+      else eucBox.classList.add('hidden');
+    }
+
+    // --- DRAG AND DROP BINDINGS ---
+    setupDropZone('arp-drop', 'arp-input', handleArpUpload);
+    setupDropZone('full-drop', 'full-input', handleFullUpload);
+
+    function setupDropZone(zoneId, inputId, handler) {
+      const zone = document.getElementById(zoneId);
+      const input = document.getElementById(inputId);
+
+      zone.addEventListener('click', () => input.click());
+      zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('drag-over'); });
+      zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+      zone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        zone.classList.remove('drag-over');
+        if (e.dataTransfer.files.length) {
+          input.files = e.dataTransfer.files;
+          handler({ target: input });
+        }
+      });
+    }
+
+    // --- DEMO SAMPLES ---
+    function loadSampleChords() {
+      const midi = new Midi();
+      const track = midi.addTrack();
+      const chords = [
+        { time: 0, notes: [60, 64, 67, 71] },
+        { time: 2, notes: [57, 60, 64, 67] },
+        { time: 4, notes: [62, 65, 69, 72] },
+        { time: 6, notes: [55, 59, 62, 65] }
+      ];
+      chords.forEach(c => {
+        c.notes.forEach(pitch => track.addNote({ midi: pitch, time: c.time, duration: 1.9 }));
+      });
+      arpMidiInput = midi;
+      document.getElementById('arp-filename').innerText = "Loaded: Demo_Chords.mid";
+      document.getElementById('arp-filename').classList.remove('hidden');
+      processArpeggiator();
+    }
+
+    function loadSampleMelody() {
+      const midi = new Midi();
+      const track = midi.addTrack();
+      const notes = [
+        { pitch: 72, time: 0.0, duration: 0.4 },
+        { pitch: 74, time: 0.5, duration: 0.3 },
+        { pitch: 76, time: 1.0, duration: 0.6 },
+        { pitch: 72, time: 1.75, duration: 0.25 },
+        { pitch: 79, time: 2.0, duration: 0.5 },
+        { pitch: 77, time: 2.75, duration: 0.4 },
+        { pitch: 76, time: 3.25, duration: 0.5 },
+        { pitch: 74, time: 3.75, duration: 0.25 }
+      ];
+      notes.forEach(n => track.addNote({ midi: n.pitch, time: n.time, duration: n.duration }));
+      fullMidiInput = midi;
+      setInputSource('melody');
+      document.getElementById('full-filename').innerText = "Loaded: Demo_Melody.mid";
+      document.getElementById('full-filename').classList.remove('hidden');
+      processFullArrangement();
+    }
+
+    // --- UPLOAD HANDLERS ---
+    async function handleArpUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      document.getElementById('arp-filename').innerText = file.name;
+      document.getElementById('arp-filename').classList.remove('hidden');
+      const buffer = await file.arrayBuffer();
+      arpMidiInput = new Midi(buffer);
+      processArpeggiator();
+    }
+
+    async function handleFullUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      document.getElementById('full-filename').innerText = file.name;
+      document.getElementById('full-filename').classList.remove('hidden');
+      const buffer = await file.arrayBuffer();
+      fullMidiInput = new Midi(buffer);
+      processFullArrangement();
+    }
+
+    // --- EUCLIDEAN ALGORITHM ---
+    function generateEuclideanPattern(pulses, steps) {
+      if (pulses >= steps) return Array(steps).fill(1);
+      let pattern = [];
+      let bucket = 0;
+      for (let i = 0; i < steps; i++) {
+        bucket += pulses;
+        if (bucket >= steps) {
+          bucket -= steps;
+          pattern.push(1);
+        } else {
+          pattern.push(0);
+        }
+      }
+      return pattern;
+    }
+
+    // --- 1. ARPEGGIATOR CORE ENGINE ---
+    function processArpeggiator() {
+      if (!arpMidiInput || !arpMidiInput.tracks.length) return;
+
+      const mode = document.getElementById('arp-mode').value;
+      const rateDiv = document.getElementById('arp-rate').value;
+      const octaves = parseInt(document.getElementById('arp-octaves').value);
+      const gate = parseInt(document.getElementById('arp-gate').value) / 100;
+      const trans = parseInt(document.getElementById('arp-trans').value);
+      const swing = parseInt(document.getElementById('arp-swing').value) / 100;
+      const velProfile = document.getElementById('arp-vel-profile').value;
+
+      const pulses = parseInt(document.getElementById('euc-pulses').value);
+      const steps = parseInt(document.getElementById('euc-steps').value);
+      const eucPattern = generateEuclideanPattern(pulses, steps);
+
+      const bpm = arpMidiInput.header.bpm || 120;
+      let stepDuration = (60 / bpm);
+      if (rateDiv === '4') stepDuration *= 1;
+      else if (rateDiv === '8') stepDuration /= 2;
+      else if (rateDiv === '16') stepDuration /= 4;
+      else if (rateDiv === '32') stepDuration /= 8;
+      else if (rateDiv === '8t') stepDuration /= 3;
+      else if (rateDiv === '16t') stepDuration /= 6;
+
+      const outputMidi = new Midi();
+      const outTrack = outputMidi.addTrack();
+      outTrack.name = "Arpeggio Pattern";
+
+      let allInputNotes = [];
+      arpMidiInput.tracks.forEach(track => allInputNotes.push(...track.notes));
+      allInputNotes.sort((a, b) => a.time - b.time);
+
+      if (allInputNotes.length === 0) return;
+
+      const totalTime = allInputNotes[allInputNotes.length - 1].time + allInputNotes[allInputNotes.length - 1].duration;
+      let stepCount = 0;
+      let upDownDirection = 1;
+      let patternIdx = 0;
+
+      for (let t = 0; t < totalTime; t += stepDuration) {
+        const activeNotes = allInputNotes.filter(n => t >= n.time - 0.05 && t < (n.time + n.duration));
+        
+        if (activeNotes.length > 0) {
+          let pitches = [...new Set(activeNotes.map(n => n.midi + trans))].sort((a, b) => a - b);
+          let expandedPitches = [];
+          for (let o = 0; o < octaves; o++) {
+            pitches.forEach(p => expandedPitches.push(p + (o * 12)));
+          }
+
+          let selectedPitch = null;
+
+          if (mode === 'up') {
+            selectedPitch = expandedPitches[patternIdx % expandedPitches.length];
+            patternIdx++;
+          } else if (mode === 'down') {
+            selectedPitch = expandedPitches[expandedPitches.length - 1 - (patternIdx % expandedPitches.length)];
+            patternIdx++;
+          } else if (mode === 'updown') {
+            selectedPitch = expandedPitches[patternIdx];
+            patternIdx += upDownDirection;
+            if (patternIdx >= expandedPitches.length - 1) upDownDirection = -1;
+            if (patternIdx <= 0) upDownDirection = 1;
+          } else if (mode === 'downup') {
+            selectedPitch = expandedPitches[expandedPitches.length - 1 - patternIdx];
+            patternIdx += upDownDirection;
+            if (patternIdx >= expandedPitches.length - 1) upDownDirection = -1;
+            if (patternIdx <= 0) upDownDirection = 1;
+          } else if (mode === 'converge') {
+            let left = patternIdx % Math.ceil(expandedPitches.length / 2);
+            let isEven = (stepCount % 2 === 0);
+            selectedPitch = isEven ? expandedPitches[left] : expandedPitches[expandedPitches.length - 1 - left];
+            patternIdx++;
+          } else if (mode === 'diverge') {
+            let mid = Math.floor(expandedPitches.length / 2);
+            let offset = Math.floor((patternIdx % expandedPitches.length) / 2);
+            let isEven = (stepCount % 2 === 0);
+            let idx = isEven ? mid + offset : mid - offset;
+            idx = Math.max(0, Math.min(expandedPitches.length - 1, idx));
+            selectedPitch = expandedPitches[idx];
+            patternIdx++;
+          } else if (mode === 'random') {
+            selectedPitch = expandedPitches[Math.floor(Math.random() * expandedPitches.length)];
+          } else if (mode === 'euclidean') {
+            const hit = eucPattern[stepCount % eucPattern.length];
+            if (hit) {
+              selectedPitch = expandedPitches[patternIdx % expandedPitches.length];
+              patternIdx++;
+            }
+          }
+
+          if (selectedPitch !== null) {
+            let swingOffset = (stepCount % 2 === 1) ? stepDuration * swing * 0.5 : 0;
+            
+            let velocity = 0.85;
+            if (velProfile === 'accent') velocity = (stepCount % 4 === 0) ? 0.98 : 0.72;
+            else if (velProfile === 'crescendo') velocity = 0.4 + (0.55 * ((stepCount % 16) / 16));
+            else if (velProfile === 'decrescendo') velocity = 0.95 - (0.55 * ((stepCount % 16) / 16));
+            else if (velProfile === 'human') velocity = 0.7 + (Math.random() * 0.25);
+
+            outTrack.addNote({
+              midi: selectedPitch,
+              time: t + swingOffset,
+              duration: stepDuration * gate,
+              velocity: velocity
+            });
+          }
+        } else {
+          patternIdx = 0;
+        }
+        stepCount++;
+      }
+
+      arpMidiOutput = outputMidi;
+      renderPianoRoll('arp-notes-container', outTrack.notes, '#818cf8');
+      document.getElementById('arp-stats').innerText = `${outTrack.notes.length} notes generated`;
+      document.getElementById('arp-play-btn').disabled = false;
+      document.getElementById('arp-download-btn').disabled = false;
+    }
+
+
+    // --- HUMANIZATION UTILITIES ---
+
+    function humanizeTime(time, jitterAmount = 0.012) {
+      return Math.max(0, time + (Math.random() - 0.5) * jitterAmount);
+    }
+
+    function humanizeVelocity(baseVel, variance = 0.12) {
+      const vel = baseVel + (Math.random() - 0.5) * variance;
+      return Math.min(1.0, Math.max(0.15, vel));
+    }
+
+    function getRandomItem(arr) {
+      return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    // --- 2. UPGRADED FULL ARRANGEMENT ENGINE ---
+    function processFullArrangement() {
+      const bpm = parseInt(document.getElementById('full-bpm').value);
+      const swing = parseInt(document.getElementById('full-swing').value) / 100;
+      const melodyStyle = document.getElementById('melody-style').value;
+      const chordType = document.getElementById('chord-type').value;
+      const chordRhythm = document.getElementById('chord-rhythm').value;
+      const bassStyle = document.getElementById('bass-style').value;
+      const bassOctave = parseInt(document.getElementById('bass-octave').value);
+      const drumStyle = document.getElementById('drum-style').value;
+      const drumHats = document.getElementById('drum-hats').value;
+
+      const beatDur = 60 / bpm;
+      const barDur = beatDur * 4;
+
+      let leadNotes = [];
+      let chordProgressionPitches = [];
+      let totalDuration = barDur * 4;
+
+      if (selectedInputSource === 'melody' && fullMidiInput && fullMidiInput.tracks.length) {
+        fullMidiInput.tracks.forEach(track => leadNotes.push(...track.notes));
+        leadNotes.sort((a, b) => a.time - b.time);
+        if (leadNotes.length) totalDuration = leadNotes[leadNotes.length - 1].time + leadNotes[leadNotes.length - 1].duration;
+      } else if (selectedInputSource === 'chordfile' && fullMidiInput && fullMidiInput.tracks.length) {
+        let fileNotes = [];
+        fullMidiInput.tracks.forEach(track => fileNotes.push(...track.notes));
+        fileNotes.sort((a, b) => a.time - b.time);
+        if (fileNotes.length) totalDuration = fileNotes[fileNotes.length - 1].time + fileNotes[fileNotes.length - 1].duration;
+      } else if (selectedInputSource === 'chordtext') {
+        const textStr = document.getElementById('chord-string-input').value;
+        chordProgressionPitches = parseChordProgressionString(textStr);
+        totalDuration = barDur * chordProgressionPitches.length;
+      }
+
+      // Multi-Track Outputs
+      melodyTrackOutput = new Midi();
+      const mTrack = melodyTrackOutput.addTrack(); mTrack.name = "Lead Melody"; mTrack.channel = 0;
+
+      chordTrackOutput = new Midi();
+      const cTrack = chordTrackOutput.addTrack(); cTrack.name = "Auto Chords"; cTrack.channel = 1;
+
+      bassTrackOutput = new Midi();
+      const bTrack = bassTrackOutput.addTrack(); bTrack.name = "Bassline"; bTrack.channel = 2;
+
+      drumTrackOutput = new Midi();
+      const dTrack = drumTrackOutput.addTrack(); dTrack.name = "Drums"; dTrack.channel = 9;
+
+      let totalBars = Math.ceil(totalDuration / barDur);
+
+      // 1. GENERATE CHORDS (With Organic Keyboard Strumming)
+      for (let bar = 0; bar < totalBars; bar++) {
+        let barTime = bar * barDur;
+        let baseChordPitches = [60, 64, 67, 71];
+
+        if (selectedInputSource === 'chordtext' && chordProgressionPitches.length) {
+          baseChordPitches = chordProgressionPitches[bar % chordProgressionPitches.length];
+        } else if (leadNotes.length > 0) {
+          const barMelody = leadNotes.filter(n => n.time >= barTime && n.time < barTime + barDur);
+          let root = barMelody.length ? barMelody[0].midi % 12 : 0;
+          baseChordPitches = [48 + root, 48 + root + 4, 48 + root + 7, 48 + root + 11];
+        }
+
+        let root = baseChordPitches[0];
+        let voicings = [...baseChordPitches];
+
+        if (chordType === 'triads') voicings = [root, root + 4, root + 7];
+        else if (chordType === '7ths') voicings = [root, root + 4, root + 7, root + 11];
+        else if (chordType === 'jazz') voicings = [root, root + 4, root + 7, root + 11, root + 14];
+        else if (chordType === 'drop2') voicings = [root - 12, root + 4, root + 7, root + 11];
+
+        let hitTimes = [];
+        if (chordRhythm === 'sustained') {
+          hitTimes.push({ time: barTime, dur: barDur * 0.92 });
+        } else if (chordRhythm === 'offbeat') {
+          [0.5, 1.5, 2.5, 3.5].forEach(beat => hitTimes.push({ time: barTime + beat * beatDur, dur: beatDur * 0.45 }));
+        } else if (chordRhythm === 'pulsing') {
+          for (let b = 0; b < 4; b += 0.5) hitTimes.push({ time: barTime + b * beatDur, dur: beatDur * 0.38 });
+        }
+
+        hitTimes.forEach(hit => {
+          voicings.sort((a,b) => a - b).forEach((p, idx) => {
+            let strumOffset = idx * 0.008;
+            cTrack.addNote({
+              midi: p,
+              time: humanizeTime(hit.time + strumOffset, 0.01),
+              duration: hit.dur * (0.9 + Math.random() * 0.15),
+              velocity: humanizeVelocity(0.65, 0.1)
+            });
+          });
+        });
+      }
+
+      // 2. GENERATE ORGANIC MELODY
+      if (selectedInputSource !== 'melody' && melodyStyle !== 'off') {
+        let currentPitch = 72;
+
+        for (let bar = 0; bar < totalBars; bar++) {
+          let barTime = bar * barDur;
+          let barChords = cTrack.notes.filter(n => n.time >= barTime && n.time < barTime + barDur).map(n => n.midi);
+          if (!barChords.length) barChords = [60, 64, 67, 71];
+
+          let rhythmRatios = [0, 0.75, 1.5, 2.25, 3.0];
+          if (melodyStyle === 'sparse') rhythmRatios = [0.5, 2.25];
+          else if (melodyStyle === 'arpeggiated') rhythmRatios = [0, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0, 3.25, 3.5, 3.75];
+
+          rhythmRatios.forEach((beatOffset, idx) => {
+            if (Math.random() < 0.18 && melodyStyle !== 'arpeggiated') return;
+
+            let targetChordPitch = barChords[idx % barChords.length] + 12;
+            if (Math.random() < 0.65) {
+              currentPitch += (targetChordPitch > currentPitch) ? 2 : -2;
+            } else {
+              currentPitch = targetChordPitch;
+            }
+
+            while (currentPitch < 60) currentPitch += 12;
+            while (currentPitch > 91) currentPitch -= 12;
+
+            let isAccent = (beatOffset === 0 || beatOffset === 2.0);
+            let noteLength = (melodyStyle === 'arpeggiated') ? beatDur * 0.22 : beatDur * (0.35 + Math.random() * 0.3);
+
+            mTrack.addNote({
+              midi: currentPitch,
+              time: humanizeTime(barTime + beatOffset * beatDur, 0.015),
+              duration: noteLength,
+              velocity: humanizeVelocity(isAccent ? 0.88 : 0.72, 0.12)
+            });
+          });
+        }
+      } else if (selectedInputSource === 'melody') {
+        leadNotes.forEach(n => mTrack.addNote({ midi: n.midi, time: n.time, duration: n.duration, velocity: n.velocity }));
+      }
+
+      // 3. GENERATE HUMANIZED BASSLINE
+      const bassStep = beatDur / 2;
+      const totalBassSteps = Math.floor(totalDuration / bassStep);
+
+      for (let s = 0; s < totalBassSteps; s++) {
+        let t = s * bassStep;
+        let activeChordNotes = cTrack.notes.filter(n => t >= n.time - 0.05 && t < (n.time + n.duration));
+        let rootPitch = activeChordNotes.length ? activeChordNotes[0].midi % 12 : 0;
+        let bassPitch = (rootPitch + 36) + (bassOctave + 2) * 12;
+
+        const barTime = t % barDur;
+        const isDownbeat = (barTime < 0.05) || (Math.abs(barTime - beatDur * 2) < 0.05);
+        let play = false;
+
+        if (bassStyle === 'sustained' && isDownbeat) play = true;
+        else if (bassStyle === 'walking') play = true;
+        else if (bassStyle === 'syncopated') play = isDownbeat || (s % 2 === 1 && Math.random() < 0.45);
+        else if (bassStyle === 'bounce') {
+          play = true;
+          if (s % 2 === 1) bassPitch += 7;
+        }
+
+        if (play) {
+          while (bassPitch > 52) bassPitch -= 12;
+          while (bassPitch < 28) bassPitch += 12;
+
+          let swingOffset = (s % 2 === 1) ? bassStep * swing * 0.5 : 0;
+          let gateLen = (bassStyle === 'walking' || bassStyle === 'bounce') ? bassStep * 0.75 : bassStep * 1.4;
+
+          bTrack.addNote({
+            midi: bassPitch,
+            time: humanizeTime(t + swingOffset, 0.008),
+            duration: gateLen * (0.85 + Math.random() * 0.2),
+            velocity: humanizeVelocity(isDownbeat ? 0.92 : 0.72, 0.1)
+          });
+        }
+      }
+
+      // 4. GENERATE DYNAMIC DRUM GROOVE
+      const step16th = beatDur / 4;
+      const total16ths = Math.floor(totalDuration / step16th);
+
+      for (let s = 0; s < total16ths; s++) {
+        let t = s * step16th;
+        const stepIndex = s % 16;
+        let swingOffset = (stepIndex % 2 === 1) ? step16th * swing * 0.5 : 0;
+
+        let kickHit = false;
+        let snareHit = false;
+        let hatHit = false;
+
+        if (drumStyle === 'four_floor') {
+          if (stepIndex % 4 === 0) kickHit = true;
+          if (stepIndex === 4 || stepIndex === 12) snareHit = true;
+        } else if (drumStyle === 'boombap') {
+          if (stepIndex === 0 || stepIndex === 10 || stepIndex === 14) kickHit = true;
+          if (stepIndex === 4 || stepIndex === 12) snareHit = true;
+        } else if (drumStyle === 'trap') {
+          if (stepIndex === 0 || stepIndex === 8) kickHit = true;
+          if (stepIndex === 8) snareHit = true;
+        } else if (drumStyle === 'afrobeat') {
+          if (stepIndex === 0 || stepIndex === 6 || stepIndex === 10) kickHit = true;
+          if (stepIndex === 4 || stepIndex === 12) snareHit = true;
+        }
+
+        if (drumHats === '8th' && stepIndex % 2 === 0) hatHit = true;
+        else if (drumHats === '16th') hatHit = true;
+        else if (drumHats === 'offbeat' && stepIndex % 2 === 1) hatHit = true;
+
+        if (kickHit) {
+          dTrack.addNote({ midi: 36, time: humanizeTime(t + swingOffset, 0.005), duration: step16th, velocity: humanizeVelocity(0.92, 0.08) });
+        }
+        if (snareHit) {
+          dTrack.addNote({ midi: 38, time: humanizeTime(t + swingOffset, 0.006), duration: step16th, velocity: humanizeVelocity(0.88, 0.08) });
+        }
+        if (hatHit) {
+          let hatBaseVel = (stepIndex % 4 === 0) ? 0.8 : (stepIndex % 2 === 0 ? 0.65 : 0.45);
+          dTrack.addNote({ midi: 42, time: humanizeTime(t + swingOffset, 0.009), duration: step16th * 0.8, velocity: humanizeVelocity(hatBaseVel, 0.1) });
+        }
+      }
+
+      // Combine Multi-Track MIDI Output
+      fullMultiTrackOutput = new Midi();
+      [mTrack, cTrack, bTrack, dTrack].forEach(srcTrk => {
+        let newTrk = fullMultiTrackOutput.addTrack();
+        newTrk.name = srcTrk.name;
+        newTrk.channel = srcTrk.channel;
+        srcTrk.notes.forEach(n => newTrk.addNote({ midi: n.midi, time: n.time, duration: n.duration, velocity: n.velocity }));
+      });
+
+      renderMultiTrackPianoRoll('full-notes-container', mTrack.notes, cTrack.notes, bTrack.notes, dTrack.notes);
+      
+      const totalNotes = mTrack.notes.length + cTrack.notes.length + bTrack.notes.length + dTrack.notes.length;
+      document.getElementById('full-stats').innerText = `${totalNotes} total notes across 4 separate tracks`;
+
+      document.getElementById('full-play-btn').disabled = false;
+      document.getElementById('full-download-all-btn').disabled = false;
+      document.getElementById('exp-melody-btn').disabled = false;
+      document.getElementById('exp-chord-btn').disabled = false;
+      document.getElementById('exp-bass-btn').disabled = false;
+      document.getElementById('exp-drums-btn').disabled = false;
+    }
+
+
+    // --- PIANO ROLL VISUALIZERS ---
+    function renderPianoRoll(containerId, notes, colorHex) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = '';
+      if (!notes || !notes.length) return;
+
+      const maxTime = Math.max(...notes.map(n => n.time + n.duration));
+      const pitches = notes.map(n => n.midi);
+      const minPitch = Math.min(...pitches) - 2;
+      const maxPitch = Math.max(...pitches) + 2;
+      const pitchRange = maxPitch - minPitch || 12;
+
+      notes.forEach(note => {
+        const left = (note.time / maxTime) * 100;
+        const width = (note.duration / maxTime) * 100;
+        const bottom = ((note.midi - minPitch) / pitchRange) * 100;
+
+        const noteEl = document.createElement('div');
+        noteEl.style.left = `${left}%`;
+        noteEl.style.width = `${Math.max(width, 0.5)}%`;
+        noteEl.style.bottom = `${bottom}%`;
+        noteEl.style.height = `6px`;
+        noteEl.style.backgroundColor = colorHex;
+        noteEl.className = "absolute rounded-sm opacity-80 hover:opacity-100 transition-all";
+        container.appendChild(noteEl);
+      });
+    }
+
+    function renderMultiTrackPianoRoll(containerId, mNotes, cNotes, bNotes, dNotes) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = '';
+
+      const allNotes = [...mNotes, ...cNotes, ...bNotes, ...dNotes];
+      if (!allNotes.length) return;
+
+      const maxTime = Math.max(...allNotes.map(n => n.time + n.duration));
+      const pitches = allNotes.map(n => n.midi);
+      const minPitch = Math.min(...pitches) - 2;
+      const maxPitch = Math.max(...pitches) + 2;
+      const pitchRange = maxPitch - minPitch || 12;
+
+      const drawTrack = (notes, colorHex) => {
+        notes.forEach(note => {
+          const left = (note.time / maxTime) * 100;
+          const width = (note.duration / maxTime) * 100;
+          const bottom = ((note.midi - minPitch) / pitchRange) * 100;
+
+          const noteEl = document.createElement('div');
+          noteEl.style.left = `${left}%`;
+          noteEl.style.width = `${Math.max(width, 0.5)}%`;
+          noteEl.style.bottom = `${bottom}%`;
+          noteEl.style.height = `5px`;
+          noteEl.style.backgroundColor = colorHex;
+          noteEl.className = "absolute rounded-sm opacity-80 hover:opacity-100 transition-all";
+          container.appendChild(noteEl);
+        });
+      };
+
+      drawTrack(mNotes, '#818cf8'); // Indigo (Melody)
+      drawTrack(cNotes, '#38bdf8'); // Sky (Chords)
+      drawTrack(bNotes, '#a855f7'); // Purple (Bass)
+      drawTrack(dNotes, '#fbbf24'); // Amber (Drums)
+    }
+
+
+    // --- AUDIO PLAYBACK WITH HUNG NOTE PROTECTION ---
+    async function togglePlayArp() {
+      if (isPlaying) { stopAudio(); return; }
+      initSynths();
+      await Tone.start();
+
+      if (!arpMidiOutput) return;
+      const notes = arpMidiOutput.tracks[0].notes;
+      isPlaying = true;
+      document.getElementById('arp-play-btn').innerHTML = "<span>⏹</span> Stop Audio";
+
+      notes.forEach(note => {
+        Tone.Transport.schedule((time) => {
+          synthPoly.triggerAttackRelease(Tone.Frequency(note.midi, "midi").toNote(), note.duration * 0.95, time, note.velocity);
+        }, note.time);
+      });
+
+      Tone.Transport.start();
+    }
+
+    async function togglePlayFull() {
+      if (isPlaying) { stopAudio(); return; }
+      initSynths();
+      await Tone.start();
+
+      if (!fullMultiTrackOutput) return;
+      isPlaying = true;
+      document.getElementById('full-play-btn').innerHTML = "<span>⏹</span> Stop Audio";
+
+      fullMultiTrackOutput.tracks.forEach(track => {
+        track.notes.forEach(note => {
+          Tone.Transport.schedule((time) => {
+            if (track.channel === 0) {
+              synthPoly.triggerAttackRelease(Tone.Frequency(note.midi, "midi").toNote(), note.duration * 0.9, time, note.velocity);
+            } else if (track.channel === 1) {
+              synthChord.triggerAttackRelease(Tone.Frequency(note.midi, "midi").toNote(), note.duration * 0.9, time, 0.4);
+            } else if (track.channel === 2) {
+              synthBass.triggerAttackRelease(Tone.Frequency(note.midi, "midi").toNote(), note.duration * 0.85, time, note.velocity);
+            } else if (track.channel === 9) {
+              if (note.midi === 36) synthKick.triggerAttackRelease("C1", "8n", time);
+              else if (note.midi === 38) synthSnare.triggerAttackRelease("16n", time);
+              else if (note.midi === 42) synthHat.triggerAttackRelease("16n", time);
+            }
+          }, note.time);
+        });
+      });
+
+      Tone.Transport.start();
+    }
+
+    function stopAudio() {
+      Tone.Transport.stop();
+      Tone.Transport.cancel();
+      if (synthPoly) synthPoly.releaseAll();
+      if (synthChord) synthChord.releaseAll();
+      if (synthBass) synthBass.releaseAll();
+      isPlaying = false;
+      document.getElementById('arp-play-btn').innerHTML = "<span>▶</span> Play Audio Preview";
+      document.getElementById('full-play-btn').innerHTML = "<span>▶</span> Play Full Track";
+    }
+
+
+    // --- MIDI EXPORT FILE GENERATION ---
+    function downloadArpMIDI() {
+      if (!arpMidiOutput) return;
+      downloadBlob(arpMidiOutput.toArray(), 'Arpeggiated_Pattern.mid');
+    }
+
+    function downloadAllTracksMIDI() {
+      if (!fullMultiTrackOutput) return;
+      downloadBlob(fullMultiTrackOutput.toArray(), 'Full_Arrangement_Multitrack.mid');
+    }
+
+    function downloadSingleTrack(type) {
+      let targetMidi = null;
+      let name = '';
+      if (type === 'melody') { targetMidi = melodyTrackOutput; name = 'Track_1_Melody.mid'; }
+      else if (type === 'chords') { targetMidi = chordTrackOutput; name = 'Track_2_Chords.mid'; }
+      else if (type === 'bass') { targetMidi = bassTrackOutput; name = 'Track_3_Bassline.mid'; }
+      else if (type === 'drums') { targetMidi = drumTrackOutput; name = 'Track_4_Drums.mid'; }
+
+      if (targetMidi) {
+        downloadBlob(targetMidi.toArray(), name);
+      }
+    }
+
+    function downloadBlob(bytes, filename) {
+      const blob = new Blob([bytes], { type: 'audio/midi' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+    }
+  </script>
+</body>
+</html>

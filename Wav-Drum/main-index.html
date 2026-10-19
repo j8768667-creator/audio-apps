@@ -1,0 +1,1754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Multi‑Channel WAV‑to‑MIDI Drum Trigger &amp; Replacer</title>
+    <script src="https://cdn.tailwindcss.com">
+    </script>
+    <style>
+        /* ── dark studio theme ── */
+        body {
+            background: #0b0b0e;
+            color: #e8e8ea;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+        }
+        .app-card {
+            background: #141418;
+            border-radius: 28px;
+            border: 1px solid #28282e;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+            max-width: 1360px;
+            width: 100%;
+            padding: 24px 28px 32px;
+            transition: border-color 0.2s;
+        }
+        .glow-red {
+            text-shadow: 0 0 12px rgba(255, 68, 68, 0.35);
+        }
+        .glow-green {
+            text-shadow: 0 0 12px rgba(68, 255, 68, 0.30);
+        }
+        .glow-blue {
+            text-shadow: 0 0 12px rgba(68, 136, 255, 0.35);
+        }
+        .border-red {
+            border-color: #ff4444;
+        }
+        .border-green {
+            border-color: #44ff44;
+        }
+        .border-blue {
+            border-color: #4488ff;
+        }
+        .bg-red-soft {
+            background: rgba(255, 68, 68, 0.08);
+        }
+        .bg-green-soft {
+            background: rgba(68, 255, 68, 0.08);
+        }
+        .bg-blue-soft {
+            background: rgba(68, 136, 255, 0.08);
+        }
+        .channel-card {
+            background: #1a1a1f;
+            border-radius: 16px;
+            border: 1px solid #2a2a30;
+            padding: 16px 18px;
+            transition: border-color 0.25s, box-shadow 0.25s;
+        }
+        .channel-card:hover {
+            border-color: #3a3a44;
+        }
+        .channel-card.kick-active {
+            border-color: #ff4444;
+            box-shadow: 0 0 20px rgba(255, 68, 68, 0.08);
+        }
+        .channel-card.snare-active {
+            border-color: #44ff44;
+            box-shadow: 0 0 20px rgba(68, 255, 68, 0.08);
+        }
+        .channel-card.hh-active {
+            border-color: #4488ff;
+            box-shadow: 0 0 20px rgba(68, 136, 255, 0.08);
+        }
+        .waveform-wrap {
+            background: #0e0e12;
+            border-radius: 16px;
+            border: 1px solid #22222a;
+            padding: 8px;
+            position: relative;
+        }
+        .waveform-wrap canvas {
+            display: block;
+            width: 100%;
+            height: auto;
+            border-radius: 12px;
+            cursor: pointer;
+            background: #0a0a0e;
+        }
+        .slider-thumb::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #e0e0e8;
+            cursor: pointer;
+            border: 2px solid #2a2a32;
+            transition: 0.1s;
+        }
+        .slider-thumb::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+        }
+        .slider-thumb::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #e0e0e8;
+            cursor: pointer;
+            border: 2px solid #2a2a32;
+        }
+        input[type="range"] {
+            background: transparent;
+        }
+        .drop-zone {
+            border: 2px dashed #2a2a32;
+            border-radius: 16px;
+            padding: 28px 16px;
+            text-align: center;
+            transition: 0.2s;
+            cursor: pointer;
+        }
+        .drop-zone.dragover {
+            border-color: #6666ff;
+            background: rgba(102, 102, 255, 0.05);
+        }
+        .drop-zone.has-file {
+            border-color: #3a3a48;
+            background: rgba(255, 255, 255, 0.015);
+        }
+        .btn-primary {
+            background: #2a2a32;
+            border: 1px solid #3a3a44;
+            color: #e0e0e8;
+            padding: 10px 22px;
+            border-radius: 12px;
+            font-weight: 500;
+            transition: 0.15s;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-primary:hover {
+            background: #34343e;
+            border-color: #4a4a56;
+        }
+        .btn-primary:active {
+            transform: scale(0.97);
+        }
+        .btn-primary.accent-red {
+            border-color: #ff4444;
+            color: #ff4444;
+        }
+        .btn-primary.accent-red:hover {
+            background: rgba(255, 68, 68, 0.10);
+        }
+        .btn-primary.accent-green {
+            border-color: #44ff44;
+            color: #44ff44;
+        }
+        .btn-primary.accent-green:hover {
+            background: rgba(68, 255, 68, 0.10);
+        }
+        .btn-primary.accent-blue {
+            border-color: #4488ff;
+            color: #4488ff;
+        }
+        .btn-primary.accent-blue:hover {
+            background: rgba(68, 136, 255, 0.10);
+        }
+        .btn-primary.accent-gold {
+            border-color: #ffbb44;
+            color: #ffbb44;
+        }
+        .btn-primary.accent-gold:hover {
+            background: rgba(255, 187, 68, 0.10);
+        }
+        .btn-primary:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .stat-badge {
+            font-size: 13px;
+            font-weight: 500;
+            padding: 4px 12px;
+            border-radius: 20px;
+            background: #1e1e26;
+            border: 1px solid #2a2a34;
+            color: #a0a0aa;
+        }
+        .stat-badge .num {
+            font-weight: 700;
+            color: #e0e0e8;
+        }
+        .midi-note-tag {
+            font-size: 11px;
+            font-weight: 500;
+            padding: 2px 10px;
+            border-radius: 12px;
+            background: #1a1a22;
+            border: 1px solid #2a2a34;
+            color: #8888aa;
+        }
+        .filter-tag {
+            font-size: 11px;
+            font-weight: 500;
+            padding: 2px 10px;
+            border-radius: 12px;
+            background: #14141c;
+            border: 1px solid #2a2a34;
+            color: #9999bb;
+            font-family: monospace;
+        }
+        .marker-legend span {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border-radius: 4px;
+            margin-right: 4px;
+        }
+        .marker-legend .leg-kick {
+            background: #ff4444;
+        }
+        .marker-legend .leg-snare {
+            background: #44ff44;
+        }
+        .marker-legend .leg-hh {
+            background: #4488ff;
+        }
+        .transport-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            border: 1px solid #2a2a34;
+            background: #1a1a22;
+            color: #c0c0c8;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            transition: 0.15s;
+            cursor: pointer;
+        }
+        .transport-btn:hover {
+            background: #282832;
+            border-color: #3a3a48;
+        }
+        .transport-btn:active {
+            transform: scale(0.92);
+        }
+        .transport-btn.playing {
+            border-color: #ffbb44;
+            color: #ffbb44;
+        }
+        .scrollbar-thin::-webkit-scrollbar {
+            width: 4px;
+            height: 4px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .scrollbar-thin::-webkit-scrollbar-thumb {
+            background: #3a3a48;
+            border-radius: 4px;
+        }
+        @media (max-width: 768px) {
+            .app-card {
+                padding: 16px;
+            }
+            .channel-card {
+                padding: 12px 14px;
+            }
+        }
+        /* glitch‑free canvas sizing */
+        .waveform-wrap canvas {
+            image-rendering: auto;
+        }
+        .freq-display {
+            font-size: 12px;
+            color: #8888aa;
+            font-family: 'JetBrains Mono', monospace;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-card" id="app">
+
+        <!-- ─── HEADER ─────────────────────────────────────────────── -->
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-5">
+            <div>
+                <h1 class="text-xl font-bold tracking-tight flex items-center gap-2">
+                    <span class="text-2xl">🥁</span>
+                    <span>Drum Trigger &amp; Replacer</span>
+                    <span class="text-sm font-normal text-zinc-500 ml-1">WAV → MIDI</span>
+                </h1>
+                <p class="text-xs text-zinc-500 mt-0.5">Multi‑channel transient detection · Type 0 MIDI export</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <div class="flex flex-wrap items-center gap-2">
+                <label class="text-xs text-zinc-500 flex items-center gap-2">BPM
+                    <input id="bpmInput" type="number" min="30" max="300" step="1" value="120"
+                        class="w-20 rounded-lg bg-zinc-900 border border-zinc-700 px-2 py-2 text-zinc-200" />
+                </label>
+                <button id="btnPreviewMidi" class="btn-primary accent-blue text-sm px-4 py-2.5" disabled>
+                    <span>▶</span> Preview Triggers
+                </button>
+                <button id="btnGenerateMidi"
+                    class="btn-primary accent-gold text-sm px-5 py-2.5 border border-amber-600/40 hover:border-amber-500/70"
+                    disabled>
+                    <span>🎹</span> Generate &amp; Export MIDI
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── DROP ZONE ──────────────────────────────────────────────── -->
+    <div id="dropZone" class="drop-zone mb-4">
+        <div class="flex flex-col items-center gap-2">
+            <div class="text-3xl">📂</div>
+            <div class="text-sm font-medium text-zinc-300">Drop one or more WAV files here, or click to browse</div>
+            <div class="text-xs text-zinc-500">Supports mono / stereo · 44.1 / 48 kHz</div>
+            <div id="fileInfo" class="text-xs text-emerald-400/70 mt-1 hidden"></div>
+        </div>
+        <input type="file" id="fileInput" class="hidden" accept=".wav,.wave" multiple />
+    </div>
+
+    <!-- ─── LOADED FILES / MERGE ─────────────────────────────────── -->
+    <div id="multiFilePanel" class="channel-card mb-4 hidden">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="min-w-0 flex-1">
+                <div class="text-sm font-semibold text-zinc-200 mb-2">Loaded WAV files</div>
+                <select id="fileSelect" class="w-full rounded-lg bg-zinc-900 border border-zinc-700 px-3 py-2 text-sm text-zinc-200"></select>
+            </div>
+            <div class="flex flex-wrap items-end gap-2">
+                <label class="text-xs text-zinc-500">Merge layout
+                    <select id="mergeMode" class="block mt-1 rounded-lg bg-zinc-900 border border-zinc-700 px-3 py-2 text-zinc-200">
+                        <option value="overlay">Overlay from 0:00</option>
+                        <option value="sequence">Place one after another</option>
+                    </select>
+                </label>
+                <button id="btnExportSelected" class="btn-primary text-sm" disabled>Export Selected</button>
+                <button id="btnMergeMidi" class="btn-primary accent-gold text-sm" disabled>Merge MIDI</button>
+                <button id="btnRemoveFile" class="btn-primary text-sm" disabled>Remove Selected</button>
+            </div>
+        </div>
+        <div id="multiFileSummary" class="text-xs text-zinc-500 mt-2"></div>
+    </div>
+
+    <!-- ─── WAVEFORM + TRANSPORT ──────────────────────────────────── -->
+    <div class="waveform-wrap mb-4">
+        <canvas id="waveCanvas" height="180" style="width:100%; height:auto; aspect-ratio: 1200/180;"></canvas>
+        <div class="flex flex-wrap items-center justify-between gap-3 mt-3 px-1">
+            <div class="flex items-center gap-2">
+                <button id="btnPlay" class="transport-btn" title="Play / Pause">▶</button>
+                <button id="btnStop" class="transport-btn" title="Stop">⏹</button>
+                <button id="btnReset" class="transport-btn" title="Reset view">↺</button>
+                <span id="timeDisplay" class="text-xs text-zinc-500 font-mono ml-1">0:00.00 / 0:00.00</span>
+            </div>
+            <div class="flex items-center gap-3 marker-legend text-xs text-zinc-400">
+                <span><span class="leg-kick"></span> Kick</span>
+                <span><span class="leg-snare"></span> Snare</span>
+                <span><span class="leg-hh"></span> Hi‑Hat</span>
+                <span id="detectCount" class="text-zinc-500 ml-1">0 hits</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ─── 3 CHANNEL CARDS ────────────────────────────────────────── -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+
+        <!-- KICK -->
+        <div class="channel-card kick-active" id="cardKick">
+            <div class="flex items-center justify-between mb-2">
+                <span class="font-semibold text-sm flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full bg-red-500 inline-block"></span>
+                    Kick
+                    <span class="midi-note-tag">C1 (36)</span>
+                </span>
+                <span class="filter-tag" id="kickFilterTag">LP 150Hz</span>
+            </div>
+            <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                <div>
+                    <label class="text-zinc-400 block">Frequency</label>
+                    <input type="range" id="kickFreq" min="40" max="400" value="150" step="1"
+                    class="w-full slider-thumb accent-red-500" />
+                    <span class="freq-display" id="kickFreqVal">150 Hz</span>
+                </div>
+                <div>
+                    <label class="text-zinc-400 block">Q</label>
+                    <input type="range" id="kickQ" min="0.5" max="5" value="1.0" step="0.05"
+                    class="w-full slider-thumb accent-red-500" />
+                    <span class="freq-display" id="kickQVal">1.00</span>
+                </div>
+                <div>
+                    <label class="text-zinc-400 block">Threshold</label>
+                    <input type="range" id="kickThresh" min="0" max="100" value="45" step="0.5"
+                    class="w-full slider-thumb accent-red-500" />
+                    <span class="freq-display" id="kickThreshVal">45%</span>
+                </div>
+                <div>
+                    <label class="text-zinc-400 block">Sensitivity</label>
+                    <input type="range" id="kickSens" min="5" max="200" value="50" step="1"
+                    class="w-full slider-thumb accent-red-500" />
+                    <span class="freq-display" id="kickSensVal">50 ms</span>
+                </div>
+            </div>
+            <div class="flex items-center justify-between mt-2 pt-2 border-t border-zinc-800/60">
+                <span class="text-xs text-zinc-500">Detections</span>
+                <span class="text-sm font-bold text-red-400" id="kickCount">0</span>
+            </div>
+        </div>
+
+        <!-- SNARE -->
+        <div class="channel-card snare-active" id="cardSnare">
+            <div class="flex items-center justify-between mb-2">
+                <span class="font-semibold text-sm flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full bg-green-500 inline-block"></span>
+                    Snare
+                    <span class="midi-note-tag">D1 (38)</span>
+                </span>
+                <span class="filter-tag" id="snareFilterTag">BP 1000Hz</span>
+            </div>
+            <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                <div>
+                    <label class="text-zinc-400 block">Frequency</label>
+                    <input type="range" id="snareFreq" min="200" max="4000" value="1000" step="5"
+                    class="w-full slider-thumb accent-green-500" />
+                    <span class="freq-display" id="snareFreqVal">1000 Hz</span>
+                </div>
+                <div>
+                    <label class="text-zinc-400 block">Q</label>
+                    <input type="range" id="snareQ" min="0.5" max="5" value="1.2" step="0.05"
+                    class="w-full slider-thumb accent-green-500" />
+                    <span class="freq-display" id="snareQVal">1.20</span>
+                </div>
+                <div>
+                    <label class="text-zinc-400 block">Threshold</label>
+                    <input type="range" id="snareThresh" min="0" max="100" value="40" step="0.5"
+                    class="w-full slider-thumb accent-green-500" />
+                    <span class="freq-display" id="snareThreshVal">40%</span>
+                </div>
+                <div>
+                    <label class="text-zinc-400 block">Sensitivity</label>
+                    <input type="range" id="snareSens" min="5" max="200" value="50" step="1"
+                    class="w-full slider-thumb accent-green-500" />
+                    <span class="freq-display" id="snareSensVal">50 ms</span>
+                </div>
+            </div>
+            <div class="flex items-center justify-between mt-2 pt-2 border-t border-zinc-800/60">
+                <span class="text-xs text-zinc-500">Detections</span>
+                <span class="text-sm font-bold text-green-400" id="snareCount">0</span>
+            </div>
+        </div>
+
+        <!-- HI‑HAT -->
+        <div class="channel-card hh-active" id="cardHh">
+            <div class="flex items-center justify-between mb-2">
+                <span class="font-semibold text-sm flex items-center gap-2">
+                    <span class="w-3 h-3 rounded-full bg-blue-500 inline-block"></span>
+                    Hi‑Hat
+                    <span class="midi-note-tag">F#1 (42)</span>
+                </span>
+                <span class="filter-tag" id="hhFilterTag">HP 5000Hz</span>
+            </div>
+            <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                <div>
+                    <label class="text-zinc-400 block">Frequency</label>
+                    <input type="range" id="hhFreq" min="1000" max="12000" value="5000" step="10"
+                    class="w-full slider-thumb accent-blue-500" />
+                    <span class="freq-display" id="hhFreqVal">5000 Hz</span>
+                </div>
+                <div>
+                    <label class="text-zinc-400 block">Q</label>
+                    <input type="range" id="hhQ" min="0.5" max="5" value="0.8" step="0.05"
+                    class="w-full slider-thumb accent-blue-500" />
+                    <span class="freq-display" id="hhQVal">0.80</span>
+                </div>
+                <div>
+                    <label class="text-zinc-400 block">Threshold</label>
+                    <input type="range" id="hhThresh" min="0" max="100" value="35" step="0.5"
+                    class="w-full slider-thumb accent-blue-500" />
+                    <span class="freq-display" id="hhThreshVal">35%</span>
+                </div>
+                <div>
+                    <label class="text-zinc-400 block">Sensitivity</label>
+                    <input type="range" id="hhSens" min="5" max="200" value="40" step="1"
+                    class="w-full slider-thumb accent-blue-500" />
+                    <span class="freq-display" id="hhSensVal">40 ms</span>
+                </div>
+            </div>
+            <div class="flex items-center justify-between mt-2 pt-2 border-t border-zinc-800/60">
+                <span class="text-xs text-zinc-500">Detections</span>
+                <span class="text-sm font-bold text-blue-400" id="hhCount">0</span>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4 p-3 rounded-xl border border-zinc-800 bg-zinc-950/40">
+        <label class="text-xs text-zinc-400">Adaptive threshold
+            <input id="adaptiveAmount" type="range" min="0" max="100" value="55" step="1" class="w-full slider-thumb" />
+            <span id="adaptiveAmountVal" class="freq-display">55%</span>
+        </label>
+        <label class="text-xs text-zinc-400">Cross-channel suppression
+            <input id="crossMaskMs" type="range" min="0" max="50" value="14" step="1" class="w-full slider-thumb" />
+            <span id="crossMaskMsVal" class="freq-display">14 ms</span>
+        </label>
+        <label class="text-xs text-zinc-400">MIDI note length
+            <input id="noteLengthMs" type="range" min="10" max="250" value="60" step="5" class="w-full slider-thumb" />
+            <span id="noteLengthMsVal" class="freq-display">60 ms</span>
+        </label>
+        <div class="flex items-end gap-2">
+            <button id="btnResetAnalysis" class="btn-primary text-sm flex-1">Reset Analysis</button>
+        </div>
+    </div>
+
+    <!-- ─── STATUS BAR ─────────────────────────────────────────────── -->
+    <div class="flex flex-wrap items-center justify-between gap-2 mt-1 pt-3 border-t border-zinc-800/40">
+        <div class="text-xs text-zinc-500" id="statusMsg">Ready — load a WAV file to begin.</div>
+        <div class="flex items-center gap-3 text-xs text-zinc-500">
+            <span id="fileStats">—</span>
+            <button id="btnClear" class="text-xs text-zinc-600 hover:text-zinc-300 transition">Clear</button>
+        </div>
+    </div>
+
+</div>
+
+<!-- ──────────────────────────────────────────────────────────────── -->
+<script>
+    // ═══════════════════════════════════════════════════════════════════
+    //  MULTI‑CHANNEL WAV‑to‑MIDI DRUM TRIGGER & REPLACER
+    //  Pure JavaScript · Web Audio API · Offline filtering
+    // ═══════════════════════════════════════════════════════════════════
+
+    (() => {
+        'use strict';
+
+        // ─── DOM refs ────────────────────────────────────────────────────
+        const $ = (s) => document.querySelector(s);
+        const $$ = (s) => document.querySelectorAll(s);
+
+        const dropZone = $('#dropZone');
+        const fileInput = $('#fileInput');
+        const fileInfo = $('#fileInfo');
+        const canvas = $('#waveCanvas');
+        const ctx = canvas.getContext('2d');
+        const btnPlay = $('#btnPlay');
+        const btnStop = $('#btnStop');
+        const btnReset = $('#btnReset');
+        const btnClear = $('#btnClear');
+        const btnGenerateMidi = $('#btnGenerateMidi');
+        const btnPreviewMidi = $('#btnPreviewMidi');
+        const bpmInput = $('#bpmInput');
+        const adaptiveAmount = $('#adaptiveAmount');
+        const adaptiveAmountVal = $('#adaptiveAmountVal');
+        const crossMaskMs = $('#crossMaskMs');
+        const crossMaskMsVal = $('#crossMaskMsVal');
+        const noteLengthMs = $('#noteLengthMs');
+        const noteLengthMsVal = $('#noteLengthMsVal');
+        const btnResetAnalysis = $('#btnResetAnalysis');
+        const timeDisplay = $('#timeDisplay');
+        const detectCount = $('#detectCount');
+        const statusMsg = $('#statusMsg');
+        const fileStats = $('#fileStats');
+        const multiFilePanel = $('#multiFilePanel');
+        const fileSelect = $('#fileSelect');
+        const mergeMode = $('#mergeMode');
+        const btnExportSelected = $('#btnExportSelected');
+        const btnMergeMidi = $('#btnMergeMidi');
+        const btnRemoveFile = $('#btnRemoveFile');
+        const multiFileSummary = $('#multiFileSummary');
+
+        // ─── Channel DOM refs ──────────────────────────────────────────
+        const channelConfigs = [{
+            id: 'kick',
+            label: 'Kick',
+            midiNote: 36,
+            filterType: 'lowpass',
+            defaultFreq: 150,
+            defaultQ: 1.0,
+            defaultThresh: 45,
+            defaultSens: 50,
+            color: '#ff4444',
+            colorDim: 'rgba(255,68,68,0.35)',
+            countEl: $('#kickCount'),
+            freqEl: $('#kickFreq'),
+            qEl: $('#kickQ'),
+            threshEl: $('#kickThresh'),
+            sensEl: $('#kickSens'),
+            freqVal: $('#kickFreqVal'),
+            qVal: $('#kickQVal'),
+            threshVal: $('#kickThreshVal'),
+            sensVal: $('#kickSensVal'),
+            filterTag: $('#kickFilterTag'),
+            card: $('#cardKick'),
+        }, {
+            id: 'snare',
+            label: 'Snare',
+            midiNote: 38,
+            filterType: 'bandpass',
+            defaultFreq: 1000,
+            defaultQ: 1.2,
+            defaultThresh: 40,
+            defaultSens: 50,
+            color: '#44ff44',
+            colorDim: 'rgba(68,255,68,0.35)',
+            countEl: $('#snareCount'),
+            freqEl: $('#snareFreq'),
+            qEl: $('#snareQ'),
+            threshEl: $('#snareThresh'),
+            sensEl: $('#snareSens'),
+            freqVal: $('#snareFreqVal'),
+            qVal: $('#snareQVal'),
+            threshVal: $('#snareThreshVal'),
+            sensVal: $('#snareSensVal'),
+            filterTag: $('#snareFilterTag'),
+            card: $('#cardSnare'),
+        }, {
+            id: 'hh',
+            label: 'Hi-Hat',
+            midiNote: 42,
+            filterType: 'highpass',
+            defaultFreq: 5000,
+            defaultQ: 0.8,
+            defaultThresh: 35,
+            defaultSens: 40,
+            color: '#4488ff',
+            colorDim: 'rgba(68,136,255,0.35)',
+            countEl: $('#hhCount'),
+            freqEl: $('#hhFreq'),
+            qEl: $('#hhQ'),
+            threshEl: $('#hhThresh'),
+            sensEl: $('#hhSens'),
+            freqVal: $('#hhFreqVal'),
+            qVal: $('#hhQVal'),
+            threshVal: $('#hhThreshVal'),
+            sensVal: $('#hhSensVal'),
+            filterTag: $('#hhFilterTag'),
+            card: $('#cardHh'),
+        }];
+
+        // ─── State ──────────────────────────────────────────────────────
+        let audioBuffer = null; // AudioBuffer from decoded file
+        let filteredData = {}; // { kick: Float32Array, snare: Float32Array, hh: Float32Array }
+        let detections = { kick: [], snare: [], hh: [] }; // [{ time, velocity }]
+        let isPlaying = false;
+        let playStartTime = 0;
+        let playPauseOffset = 0;
+        let playSource = null;
+        let playCtx = null;
+        let currentTime = 0;
+        let animFrame = null;
+        let canvasWidth = 1200;
+        let canvasHeight = 180;
+        let waveformData = null; // Float32Array (mono for display)
+        let fileLoaded = false;
+        let processing = false;
+        let needsRedraw = true;
+        let loadedFileName = 'drum_trigger';
+        let sharedAudioCtx = null;
+        let previewNodes = [];
+        let previewTimers = [];
+        let playbackGeneration = 0;
+        let loadGeneration = 0;
+        let projects = [];
+        let currentProjectIndex = -1;
+
+        // ─── Resize canvas ──────────────────────────────────────────────
+        function resizeCanvas() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            const w = rect.width - 16;
+            const ratio = 180 / 1200;
+            canvas.width = Math.max(400, w * devicePixelRatio);
+            canvas.height = canvas.width * ratio;
+            canvas.style.width = '100%';
+            canvas.style.height = 'auto';
+            canvasWidth = canvas.width;
+            canvasHeight = canvas.height;
+            if (waveformData) redrawWaveform();
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        // ─── Helpers ────────────────────────────────────────────────────
+        function formatTime(sec) {
+            const m = Math.floor(sec / 60);
+            const s = Math.floor(sec % 60);
+            const ms = Math.floor((sec % 1) * 100);
+            return `${m}:${String(s).padStart(2,'0')}.${String(ms).padStart(2,'0')}`;
+        }
+
+        function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+        function lerp(a, b, t) { return a + (b - a) * t; }
+
+        // ─── MIDI File Generation ──────────────────────────────────────
+        function encodeVarLen(value) {
+            let buffer = value & 0x7f;
+            const out = [];
+            while ((value >>= 7) > 0) {
+                buffer <<= 8;
+                buffer |= ((value & 0x7f) | 0x80);
+            }
+            while (true) {
+                out.push(buffer & 0xff);
+                if (buffer & 0x80) buffer >>= 8;
+                else break;
+            }
+            return out;
+        }
+
+        function buildMIDIFile(events, bpm = 120, ticksPerQuarter = 480, noteLengthMsValue = 60) {
+            if (!events || events.length === 0) return null;
+
+            bpm = clamp(Number(bpm) || 120, 30, 300);
+            const tempo = Math.round(60000000 / bpm);
+            const secPerTick = tempo / 1e6 / ticksPerQuarter;
+            const noteLengthTicks = Math.max(1, Math.round((noteLengthMsValue / 1000) / secPerTick));
+
+            const midiEvents = [];
+            for (const e of events) {
+                const onTick = Math.max(0, Math.round(e.time / secPerTick));
+                midiEvents.push({ tick: onTick, type: 'on', note: e.note, velocity: clamp(Math.round(e.velocity), 1, 127) });
+                midiEvents.push({ tick: onTick + noteLengthTicks, type: 'off', note: e.note, velocity: 0 });
+            }
+            midiEvents.sort((a, b) => (a.tick - b.tick) || (a.type === 'off' ? -1 : 1) || (a.note - b.note));
+
+            const track = [];
+            const push = (...bytes) => track.push(...bytes.map(v => v & 0xff));
+            const delta = v => track.push(...encodeVarLen(Math.max(0, v)));
+
+            delta(0); push(0xff, 0x51, 0x03, (tempo >> 16) & 0xff, (tempo >> 8) & 0xff, tempo & 0xff);
+            delta(0); push(0xff, 0x58, 0x04, 0x04, 0x02, 0x18, 0x08);
+            delta(0); push(0xff, 0x03, 0x0c, ...new TextEncoder().encode('Drum Trigger'));
+
+            let lastTick = 0;
+            for (const ev of midiEvents) {
+                delta(ev.tick - lastTick);
+                lastTick = ev.tick;
+                const status = (ev.type === 'on' ? 0x99 : 0x89); // GM drum channel 10
+                push(status, ev.note, ev.velocity);
+            }
+            delta(0); push(0xff, 0x2f, 0x00);
+
+            const header = [
+                0x4d,0x54,0x68,0x64, 0x00,0x00,0x00,0x06,
+                0x00,0x00, 0x00,0x01,
+                (ticksPerQuarter >> 8) & 0xff, ticksPerQuarter & 0xff
+            ];
+            const len = track.length;
+            const trackHeader = [0x4d,0x54,0x72,0x6b, (len>>24)&255,(len>>16)&255,(len>>8)&255,len&255];
+            return new Uint8Array([...header, ...trackHeader, ...track]);
+        }
+
+        // ─── Audio Processing ──────────────────────────────────────────
+        async function applyFilter(audioBuf, filterType, freq, Q) {
+            const sr = audioBuf.sampleRate;
+            const len = audioBuf.length;
+            const ch = audioBuf.numberOfChannels;
+            const OfflineCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+            if (!OfflineCtx) throw new Error('Offline audio processing is not supported in this browser.');
+            const offlineCtx = new OfflineCtx(ch, len, sr);
+            const source = offlineCtx.createBufferSource();
+            source.buffer = audioBuf;
+
+            const filter = offlineCtx.createBiquadFilter();
+            filter.type = filterType;
+            filter.frequency.value = freq;
+            filter.Q.value = Q;
+
+            source.connect(filter);
+            filter.connect(offlineCtx.destination);
+            source.start(0);
+
+            const rendered = await offlineCtx.startRendering();
+            // Return mono (mix channels if stereo)
+            if (rendered.numberOfChannels === 1) {
+                return rendered.getChannelData(0);
+            } else {
+                const left = rendered.getChannelData(0);
+                const right = rendered.getChannelData(1);
+                const mono = new Float32Array(left.length);
+                for (let i = 0; i < left.length; i++) {
+                    mono[i] = (left[i] + right[i]) * 0.5;
+                }
+                return mono;
+            }
+        }
+
+        // ─── Transient Detection ──────────────────────────────────────
+        function detectTransients(filteredData, sampleRate, thresholdPercent, sensMs, adaptivePercent = 55) {
+            const data = filteredData;
+            const len = data.length;
+            if (!len) return [];
+
+            const attackWin = Math.max(1, Math.round(0.004 * sampleRate));
+            const releaseWin = Math.max(attackWin + 1, Math.round(0.030 * sampleRate));
+            const refractory = Math.max(1, Math.round(sensMs / 1000 * sampleRate));
+            const adaptiveMix = clamp(adaptivePercent / 100, 0, 1);
+
+            const fast = new Float32Array(len);
+            const slow = new Float32Array(len);
+            let sf = 0, ss = 0;
+            for (let i = 0; i < len; i++) {
+                const a = Math.abs(data[i]);
+                sf += a;
+                ss += a;
+                if (i >= attackWin) sf -= Math.abs(data[i - attackWin]);
+                if (i >= releaseWin) ss -= Math.abs(data[i - releaseWin]);
+                fast[i] = sf / Math.min(i + 1, attackWin);
+                slow[i] = ss / Math.min(i + 1, releaseWin);
+            }
+
+            let maxFast = 0;
+            for (let i = 0; i < len; i++) if (fast[i] > maxFast) maxFast = fast[i];
+            if (maxFast < 1e-9) return [];
+
+            const baseThreshold = clamp(thresholdPercent / 100, 0.005, 0.99);
+            const detections = [];
+            let lastHit = -refractory;
+
+            for (let i = 1; i < len - 1; i++) {
+                if (i - lastHit < refractory) continue;
+                const normalized = fast[i] / maxFast;
+                const localFloor = slow[i] / maxFast;
+                const adaptiveThreshold = baseThreshold * (1 - adaptiveMix) +
+                    clamp(localFloor * 2.2 + baseThreshold * 0.35, baseThreshold * 0.45, 0.98) * adaptiveMix;
+                const onsetStrength = Math.max(0, fast[i] - slow[i] * 0.72) / maxFast;
+
+                if (normalized >= adaptiveThreshold && onsetStrength > baseThreshold * 0.16 && fast[i] >= fast[i-1]) {
+                    const searchEnd = Math.min(len, i + Math.round(0.018 * sampleRate));
+                    let peakIdx = i, peakVal = fast[i];
+                    for (let j = i + 1; j < searchEnd; j++) {
+                        if (fast[j] > peakVal) { peakVal = fast[j]; peakIdx = j; }
+                    }
+                    const peakNorm = clamp(peakVal / maxFast, 0, 1);
+                    const velocity = clamp(Math.round(18 + Math.pow(peakNorm, 0.72) * 109), 1, 127);
+                    detections.push({ time: peakIdx / sampleRate, velocity, peakIdx, confidence: onsetStrength });
+                    lastHit = peakIdx;
+                    i = peakIdx;
+                }
+            }
+            return detections;
+        }
+
+        function applyCrossChannelSuppression(allDetections, maskMs) {
+            const mask = Math.max(0, Number(maskMs) || 0) / 1000;
+            if (mask <= 0) return allDetections;
+            const priority = { kick: 3, snare: 2, hh: 1 };
+            const merged = [];
+            for (const ch of channelConfigs) {
+                for (const d of allDetections[ch.id] || []) merged.push({ ...d, channel: ch.id });
+            }
+            merged.sort((a,b) => a.time - b.time || priority[b.channel] - priority[a.channel] || b.velocity - a.velocity);
+            const kept = [];
+            for (const hit of merged) {
+                const nearby = kept.filter(k => Math.abs(k.time - hit.time) <= mask && k.channel !== hit.channel);
+                if (!nearby.length) {
+                    kept.push(hit);
+                    continue;
+                }
+                // Preserve legitimate kick+snare layers. Mainly reject weaker hi-hat bleed,
+                // and reject a much weaker snare that coincides with a dominant kick.
+                const dominant = nearby.reduce((best, k) => k.velocity > best.velocity ? k : best, nearby[0]);
+                const rejectHatBleed = hit.channel === 'hh' && dominant.velocity >= hit.velocity * 0.85;
+                const rejectWeakSnareBleed = hit.channel === 'snare' && dominant.channel === 'kick' && dominant.velocity >= hit.velocity * 1.55;
+                if (!rejectHatBleed && !rejectWeakSnareBleed) kept.push(hit);
+            }
+            const result = { kick: [], snare: [], hh: [] };
+            for (const hit of kept) {
+                const { channel, ...rest } = hit;
+                result[channel].push(rest);
+            }
+            return result;
+        }
+
+        // ─── Process all channels ─────────────────────────────────────
+        async function processAllChannels() {
+            if (!audioBuffer) return;
+            processing = true;
+            setStatus('Processing filters…', 'processing');
+
+            try {
+                // Get current params
+                const params = {};
+                for (const ch of channelConfigs) {
+                    const freq = parseFloat(ch.freqEl.value) || ch.defaultFreq;
+                    const q = parseFloat(ch.qEl.value) || ch.defaultQ;
+                    const thresh = parseFloat(ch.threshEl.value) || ch.defaultThresh;
+                    const sens = parseFloat(ch.sensEl.value) || ch.defaultSens;
+                    params[ch.id] = { freq, q, thresh, sens };
+                }
+
+                // Apply filters in parallel
+                const filterPromises = channelConfigs.map(ch =>
+                    applyFilter(audioBuffer, ch.filterType, params[ch.id].freq, params[ch.id].q)
+                );
+                const results = await Promise.all(filterPromises);
+
+                // Store filtered data and detect transients
+                for (let i = 0; i < channelConfigs.length; i++) {
+                    const ch = channelConfigs[i];
+                    const data = results[i];
+                    filteredData[ch.id] = data;
+                    const det = detectTransients(
+                        data,
+                        audioBuffer.sampleRate,
+                        params[ch.id].thresh,
+                        params[ch.id].sens,
+                        parseFloat(adaptiveAmount.value) || 0
+                    );
+                    detections[ch.id] = det;
+                    ch.countEl.textContent = det.length;
+                }
+
+                detections = applyCrossChannelSuppression(detections, parseFloat(crossMaskMs.value) || 0);
+
+                // Update UI
+                updateDetectionCounts();
+                fileLoaded = true;
+                btnGenerateMidi.disabled = false;
+                btnPreviewMidi.disabled = false;
+                setStatus(`✅ Detected ${totalDetections()} transients.`, 'ok');
+                needsRedraw = true;
+                redrawWaveform();
+                saveCurrentProject();
+
+            } catch (err) {
+                console.error(err);
+                setStatus('❌ Processing error: ' + err.message, 'error');
+            } finally {
+                processing = false;
+            }
+        }
+
+        function totalDetections() {
+            let sum = 0;
+            for (const ch of channelConfigs) sum += detections[ch.id].length;
+            return sum;
+        }
+
+        function updateDetectionCounts() {
+            for (const ch of channelConfigs) {
+                ch.countEl.textContent = detections[ch.id].length;
+            }
+            detectCount.textContent = totalDetections() + ' hits';
+        }
+
+        // ─── Waveform Rendering ──────────────────────────────────────
+        function redrawWaveform() {
+            if (!waveformData || waveformData.length === 0) {
+                ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+                return;
+            }
+
+            const w = canvasWidth;
+            const h = canvasHeight;
+            ctx.clearRect(0, 0, w, h);
+
+            // Background
+            const grad = ctx.createLinearGradient(0, 0, 0, h);
+            grad.addColorStop(0, '#0c0c10');
+            grad.addColorStop(1, '#101016');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, w, h);
+
+            // Draw waveform
+            const data = waveformData;
+            const len = data.length;
+            const step = Math.max(1, Math.floor(len / w));
+            const mid = h / 2;
+            const amp = (h - 12) / 2;
+
+            ctx.beginPath();
+            ctx.strokeStyle = '#2a2a36';
+            ctx.lineWidth = 1.5;
+
+            // Draw positive and negative sides
+            ctx.beginPath();
+            for (let x = 0; x < w; x++) {
+                const idx = Math.min(len - 1, Math.floor(x * step));
+                const val = data[idx] || 0;
+                const y = mid - val * amp;
+                if (x === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.strokeStyle = '#2e2e3c';
+            ctx.lineWidth = 1.2;
+            ctx.stroke();
+
+            // Fill under waveform (subtle)
+            ctx.beginPath();
+            ctx.moveTo(0, mid);
+            for (let x = 0; x < w; x++) {
+                const idx = Math.min(len - 1, Math.floor(x * step));
+                const val = data[idx] || 0;
+                const y = mid - val * amp;
+                ctx.lineTo(x, y);
+            }
+            ctx.lineTo(w, mid);
+            ctx.closePath();
+            ctx.fillStyle = 'rgba(255,255,255,0.015)';
+            ctx.fill();
+
+            // ─── Draw detection markers ──────────────────────────────
+            const sr = audioBuffer ? audioBuffer.sampleRate : 44100;
+            const duration = audioBuffer ? audioBuffer.duration : 1;
+
+            // Draw each channel's markers
+            const channelColors = {
+                kick: { color: '#ff4444', glow: 'rgba(255,68,68,0.3)' },
+                snare: { color: '#44ff44', glow: 'rgba(68,255,68,0.3)' },
+                hh: { color: '#4488ff', glow: 'rgba(68,136,255,0.3)' },
+            };
+
+            // Draw velocity as vertical lines with varying height
+            for (const ch of channelConfigs) {
+                const dets = detections[ch.id] || [];
+                const col = channelColors[ch.id];
+                if (!dets.length) continue;
+
+                ctx.beginPath();
+                for (const det of dets) {
+                    const x = (det.time / duration) * w;
+                    const vel = det.velocity / 127;
+                    const lineH = 4 + vel * (h * 0.35);
+                    const y0 = mid - lineH / 2;
+                    const y1 = mid + lineH / 2;
+
+                    // Glow line
+                    ctx.shadowColor = col.glow;
+                    ctx.shadowBlur = 12;
+                    ctx.strokeStyle = col.color;
+                    ctx.lineWidth = 2.0;
+                    ctx.beginPath();
+                    ctx.moveTo(x, y0);
+                    ctx.lineTo(x, y1);
+                    ctx.stroke();
+                    // Glow dot at top
+                    ctx.shadowBlur = 20;
+                    ctx.fillStyle = col.color;
+                    ctx.beginPath();
+                    ctx.arc(x, y0, 2.5, 0, Math.PI * 2);
+                    ctx.fill();
+                    // Reset shadow for next
+                    ctx.shadowBlur = 0;
+                }
+                ctx.shadowBlur = 0;
+            }
+
+            // Draw time ruler (subtle)
+            ctx.fillStyle = 'rgba(255,255,255,0.04)';
+            ctx.font = '9px monospace';
+            ctx.textAlign = 'center';
+            for (let t = 0; t <= duration; t += 0.5) {
+                const x = (t / duration) * w;
+                ctx.fillRect(x, h - 12, 1, 8);
+                if (t > 0 && t < duration) {
+                    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+                    ctx.fillText(t.toFixed(1) + 's', x, h - 2);
+                    ctx.fillStyle = 'rgba(255,255,255,0.04)';
+                }
+            }
+
+            // Play cursor
+            if (isPlaying || playPauseOffset > 0) {
+                const cursorX = (currentTime / duration) * w;
+                ctx.shadowColor = '#ffbb44';
+                ctx.shadowBlur = 16;
+                ctx.strokeStyle = '#ffbb44';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(cursorX, 4);
+                ctx.lineTo(cursorX, h - 4);
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            }
+
+            // Update time display
+            const dur = audioBuffer ? audioBuffer.duration : 0;
+            timeDisplay.textContent = `${formatTime(currentTime)} / ${formatTime(dur)}`;
+        }
+
+        function cloneDetections(source) {
+            const out = { kick: [], snare: [], hh: [] };
+            for (const ch of channelConfigs) out[ch.id] = (source[ch.id] || []).map(d => ({ ...d }));
+            return out;
+        }
+
+        function saveCurrentProject() {
+            if (currentProjectIndex < 0 || !projects[currentProjectIndex] || !audioBuffer) return;
+            const project = projects[currentProjectIndex];
+            project.audioBuffer = audioBuffer;
+            project.waveformData = waveformData;
+            project.filteredData = filteredData;
+            project.detections = cloneDetections(detections);
+            project.duration = audioBuffer.duration;
+            project.sampleRate = audioBuffer.sampleRate;
+            project.channels = audioBuffer.numberOfChannels;
+            project.hitCount = totalDetections();
+            renderProjectList();
+        }
+
+        function renderProjectList() {
+            fileSelect.innerHTML = '';
+            projects.forEach((project, index) => {
+                const option = document.createElement('option');
+                option.value = String(index);
+                option.textContent = `${index + 1}. ${project.displayName} — ${project.hitCount || 0} hits · ${project.duration.toFixed(1)}s`;
+                fileSelect.appendChild(option);
+            });
+            if (currentProjectIndex >= 0 && projects[currentProjectIndex]) fileSelect.value = String(currentProjectIndex);
+            const hasFiles = projects.length > 0;
+            multiFilePanel.classList.toggle('hidden', !hasFiles);
+            btnExportSelected.disabled = !hasFiles;
+            btnRemoveFile.disabled = !hasFiles;
+            btnMergeMidi.disabled = projects.length < 2;
+            const totalHits = projects.reduce((sum, p) => sum + (p.hitCount || 0), 0);
+            const totalDuration = projects.reduce((sum, p) => sum + p.duration, 0);
+            multiFileSummary.textContent = hasFiles ? `${projects.length} WAV file${projects.length === 1 ? '' : 's'} · ${totalHits} detected hits · ${totalDuration.toFixed(1)}s combined duration` : '';
+        }
+
+        function selectProject(index) {
+            if (!projects[index]) return;
+            stopPreview();
+            stopPlayback();
+            currentProjectIndex = index;
+            const project = projects[index];
+            audioBuffer = project.audioBuffer;
+            waveformData = project.waveformData;
+            filteredData = project.filteredData || {};
+            detections = cloneDetections(project.detections || { kick: [], snare: [], hh: [] });
+            loadedFileName = project.safeName;
+            fileLoaded = true;
+            currentTime = 0;
+            fileInfo.textContent = `${project.displayName} · ${project.duration.toFixed(2)}s · ${project.channels}ch · ${project.sampleRate}Hz`;
+            fileInfo.classList.remove('hidden');
+            dropZone.classList.add('has-file');
+            fileStats.textContent = `${project.displayName}  ·  ${project.duration.toFixed(1)}s  ·  ${project.channels}ch`;
+            btnGenerateMidi.disabled = false;
+            btnPreviewMidi.disabled = totalDetections() === 0;
+            btnPlay.disabled = false;
+            btnStop.disabled = false;
+            updateDetectionCounts();
+            resizeCanvas();
+            redrawWaveform();
+            renderProjectList();
+            setStatus(`Selected ${project.displayName}.`, 'ok');
+        }
+
+        async function loadAudioFiles(fileList) {
+            const valid = Array.from(fileList || []).filter(file => ((file.type || '').toLowerCase().includes('wav') || /\.wave?$/i.test(file.name || '')));
+            if (!valid.length) {
+                setStatus('⚠️ Please select one or more WAV files.', 'warn');
+                return;
+            }
+            for (let i = 0; i < valid.length; i++) {
+                setStatus(`Loading ${i + 1} of ${valid.length}: ${valid[i].name}`, 'processing');
+                await loadAudio(valid[i], true);
+            }
+            setStatus(`✅ Loaded and analysed ${valid.length} WAV file${valid.length === 1 ? '' : 's'}.`, 'ok');
+        }
+
+        // ─── Load Audio ────────────────────────────────────────────────
+        async function loadAudio(file, addToProjects = true) {
+            const thisLoad = ++loadGeneration;
+            // Stop every node belonging to the previous file before decoding/replacing it.
+            stopPreview();
+            stopPlayback();
+            const isWav = file && ((file.type || '').toLowerCase().includes('wav') || /\.wave?$/i.test(file.name || ''));
+            if (!isWav) {
+                setStatus('⚠️ Please select a WAV file.', 'warn');
+                return;
+            }
+
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                const audioCtx = new AudioCtx();
+                const buf = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
+                try { await audioCtx.close(); } catch (e) {}
+                if (thisLoad !== loadGeneration) return;
+                loadedFileName = (file.name || 'drum_trigger').replace(/\.[^.]+$/, '').replace(/[^a-z0-9_-]+/gi, '_');
+                if (addToProjects) currentProjectIndex = -1;
+                audioBuffer = buf;
+
+                // Extract mono waveform for display
+                const ch = buf.numberOfChannels;
+                const len = buf.length;
+                const mono = new Float32Array(len);
+                if (ch === 1) {
+                    const d = buf.getChannelData(0);
+                    for (let i = 0; i < len; i++) mono[i] = d[i];
+                } else {
+                    const left = buf.getChannelData(0);
+                    const right = buf.getChannelData(1);
+                    for (let i = 0; i < len; i++) mono[i] = (left[i] + right[i]) * 0.5;
+                }
+                waveformData = mono;
+
+                // Show file info
+                fileInfo.textContent = `${file.name} · ${buf.duration.toFixed(2)}s · ${ch}ch · ${buf.sampleRate}Hz`;
+                fileInfo.classList.remove('hidden');
+                dropZone.classList.add('has-file');
+                fileStats.textContent = `${file.name}  ·  ${buf.duration.toFixed(1)}s  ·  ${ch}ch`;
+
+                setStatus('🔍 Analysing audio…', 'processing');
+                resizeCanvas();
+
+                // Playback was already stopped before decoding.
+                currentTime = 0;
+
+                // Process channels
+                await processAllChannels();
+
+                if (addToProjects) {
+                    const project = {
+                        displayName: file.name || 'Untitled.wav',
+                        safeName: loadedFileName,
+                        audioBuffer, waveformData, filteredData,
+                        detections: cloneDetections(detections),
+                        duration: buf.duration,
+                        sampleRate: buf.sampleRate,
+                        channels: buf.numberOfChannels,
+                        hitCount: totalDetections()
+                    };
+                    projects.push(project);
+                    currentProjectIndex = projects.length - 1;
+                    renderProjectList();
+                }
+
+                // Enable playback
+                btnPlay.disabled = false;
+                btnStop.disabled = false;
+
+            } catch (err) {
+                console.error(err);
+                setStatus('❌ Failed to load audio: ' + err.message, 'error');
+                fileInfo.classList.add('hidden');
+                dropZone.classList.remove('has-file');
+            }
+        }
+
+        // ─── Playback ──────────────────────────────────────────────────
+        async function startPlayback() {
+            if (!audioBuffer || isPlaying) return;
+            if (currentTime >= audioBuffer.duration) {
+                currentTime = 0;
+                playPauseOffset = 0;
+            }
+
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') sharedAudioCtx = new AudioCtx();
+            const audioCtx = sharedAudioCtx;
+            try {
+                if (audioCtx.state !== 'running') await audioCtx.resume();
+            } catch (err) {
+                console.error(err);
+                setStatus('⚠️ Audio could not be resumed. Tap Play again.', 'warn');
+                return;
+            }
+            if (audioCtx.state !== 'running') {
+                setStatus('⚠️ Audio is suspended. Tap Play again.', 'warn');
+                return;
+            }
+            playCtx = audioCtx;
+            const myGeneration = ++playbackGeneration;
+
+            const source = audioCtx.createBufferSource();
+            source.buffer = audioBuffer;
+
+            const gain = audioCtx.createGain();
+            gain.gain.value = 0.8;
+            source.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            source.start(0, currentTime);
+            playSource = source;
+            isPlaying = true;
+            playStartTime = audioCtx.currentTime - currentTime;
+            btnPlay.textContent = '⏸';
+            btnPlay.classList.add('playing');
+
+            // Schedule stop at end
+            const endTime = audioBuffer.duration;
+            source.onended = () => {
+                if (myGeneration !== playbackGeneration || source !== playSource) return;
+                playSource = null;
+                if (isPlaying) {
+                    currentTime = endTime;
+                    isPlaying = false;
+                    btnPlay.textContent = '▶';
+                    btnPlay.classList.remove('playing');
+                    redrawWaveform();
+                }
+            };
+
+            // Update cursor
+            function updateCursor() {
+                if (!isPlaying || myGeneration !== playbackGeneration || source !== playSource) return;
+                const now = audioCtx.currentTime;
+                currentTime = now - playStartTime;
+                if (currentTime >= audioBuffer.duration) {
+                    currentTime = audioBuffer.duration;
+                    isPlaying = false;
+                    btnPlay.textContent = '▶';
+                    btnPlay.classList.remove('playing');
+                    redrawWaveform();
+                    return;
+                }
+                redrawWaveform();
+                animFrame = requestAnimationFrame(updateCursor);
+            }
+            updateCursor();
+            setStatus('▶️ Playing…', 'ok');
+        }
+
+        function pausePlayback() {
+            if (!isPlaying || !playCtx) return;
+            const now = playCtx.currentTime;
+            currentTime = now - playStartTime;
+            if (currentTime >= audioBuffer.duration) currentTime = audioBuffer.duration;
+            if (playSource) {
+                try { playSource.stop(); } catch (e) {}
+                playSource = null;
+            }
+            isPlaying = false;
+            btnPlay.textContent = '▶';
+            btnPlay.classList.remove('playing');
+            if (animFrame) {
+                cancelAnimationFrame(animFrame);
+                animFrame = null;
+            }
+            redrawWaveform();
+            setStatus('⏸ Paused', 'ok');
+        }
+
+        function stopPlayback() {
+            playbackGeneration++;
+            const sourceToStop = playSource;
+            playSource = null;
+            if (sourceToStop) {
+                try { sourceToStop.onended = null; } catch (e) {}
+                try { sourceToStop.stop(); } catch (e) {}
+                try { sourceToStop.disconnect(); } catch (e) {}
+            }
+            playCtx = null;
+            isPlaying = false;
+            btnPlay.textContent = '▶';
+            btnPlay.classList.remove('playing');
+            if (animFrame) {
+                cancelAnimationFrame(animFrame);
+                animFrame = null;
+            }
+            currentTime = 0;
+            playPauseOffset = 0;
+            redrawWaveform();
+        }
+
+        function seekToCanvas(x) {
+            if (!audioBuffer) return;
+            const rect = canvas.getBoundingClientRect();
+            const relX = (x - rect.left) / rect.width;
+            const time = clamp(relX, 0, 1) * audioBuffer.duration;
+            currentTime = time;
+            if (isPlaying) {
+                // If playing, restart from new position
+                const wasPlaying = isPlaying;
+                pausePlayback();
+                if (wasPlaying) startPlayback().catch(console.error);
+            } else {
+                redrawWaveform();
+            }
+            setStatus(`🎯 Seek to ${formatTime(time)}`, 'ok');
+        }
+
+        // ─── UI helpers ─────────────────────────────────────────────────
+        function setStatus(msg, type = 'ok') {
+            statusMsg.textContent = msg;
+            statusMsg.className = 'text-xs ';
+            if (type === 'error') statusMsg.className += 'text-red-400';
+            else if (type === 'warn') statusMsg.className += 'text-amber-400';
+            else if (type === 'processing') statusMsg.className += 'text-blue-400';
+            else if (type === 'ok') statusMsg.className += 'text-emerald-400';
+            else statusMsg.className += 'text-zinc-500';
+        }
+
+        // ─── Re-run detection on slider change ──────────────────────
+        function scheduleReDetect() {
+            if (processing) return;
+            if (!audioBuffer) return;
+            // Debounce
+            if (window._redetectTimer) clearTimeout(window._redetectTimer);
+            window._redetectTimer = setTimeout(() => {
+                processAllChannels();
+                window._redetectTimer = null;
+            }, 120);
+        }
+
+        // ─── Export MIDI ──────────────────────────────────────────────
+        function exportMIDI() {
+            if (!fileLoaded) return;
+            saveCurrentProject();
+            // Collect all detections
+            const allEvents = [];
+            for (const ch of channelConfigs) {
+                const dets = detections[ch.id] || [];
+                for (const d of dets) {
+                    allEvents.push({
+                        time: d.time,
+                        note: ch.midiNote,
+                        velocity: d.velocity,
+                    });
+                }
+            }
+            if (allEvents.length === 0) {
+                setStatus('⚠️ No transients detected — adjust thresholds.', 'warn');
+                return;
+            }
+
+            const midiData = buildMIDIFile(
+                allEvents,
+                parseFloat(bpmInput.value) || 120,
+                480,
+                parseFloat(noteLengthMs.value) || 60
+            );
+            if (!midiData) {
+                setStatus('❌ Failed to build MIDI file.', 'error');
+                return;
+            }
+
+            // Download
+            const blob = new Blob([midiData], { type: 'audio/midi' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${loadedFileName || 'drum_trigger'}_drums.mid`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
+            setStatus(`🎹 Exported MIDI with ${allEvents.length} notes.`, 'ok');
+        }
+
+        function collectProjectEvents(project, offsetSeconds = 0) {
+            const events = [];
+            for (const ch of channelConfigs) {
+                for (const d of project.detections[ch.id] || []) {
+                    events.push({ time: d.time + offsetSeconds, note: ch.midiNote, velocity: d.velocity });
+                }
+            }
+            return events;
+        }
+
+        function downloadMidiEvents(events, fileName) {
+            if (!events.length) {
+                setStatus('⚠️ No transients are available to export.', 'warn');
+                return;
+            }
+            const midiData = buildMIDIFile(events, parseFloat(bpmInput.value) || 120, 480, parseFloat(noteLengthMs.value) || 60);
+            const blob = new Blob([midiData], { type: 'audio/midi' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
+        }
+
+        function mergeAndExportMIDI() {
+            if (projects.length < 2) return;
+            saveCurrentProject();
+            const events = [];
+            let offset = 0;
+            for (const project of projects) {
+                events.push(...collectProjectEvents(project, mergeMode.value === 'sequence' ? offset : 0));
+                if (mergeMode.value === 'sequence') offset += project.duration;
+            }
+            downloadMidiEvents(events, `merged_${mergeMode.value}_drums.mid`);
+            setStatus(`🎹 Merged ${projects.length} files into one MIDI with ${events.length} notes.`, 'ok');
+        }
+
+        function removeSelectedProject() {
+            if (currentProjectIndex < 0 || !projects[currentProjectIndex]) return;
+            const removed = projects[currentProjectIndex].displayName;
+            projects.splice(currentProjectIndex, 1);
+            if (projects.length) selectProject(Math.min(currentProjectIndex, projects.length - 1));
+            else clearAll();
+            renderProjectList();
+            setStatus(`Removed ${removed}.`, 'ok');
+        }
+
+        function stopPreview() {
+            for (const timer of previewTimers) clearTimeout(timer);
+            previewTimers = [];
+            for (const node of previewNodes) {
+                try { node.stop(); } catch (e) {}
+                try { node.disconnect(); } catch (e) {}
+            }
+            previewNodes = [];
+            btnPreviewMidi.textContent = '▶ Preview Triggers';
+        }
+
+        function triggerPreviewSound(channelId, velocity) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!sharedAudioCtx || sharedAudioCtx.state === 'closed') sharedAudioCtx = new AudioCtx();
+            if (sharedAudioCtx.state === 'suspended') sharedAudioCtx.resume();
+            const ac = sharedAudioCtx;
+            const now = ac.currentTime;
+            const gain = ac.createGain();
+            gain.gain.setValueAtTime(Math.max(0.03, velocity / 127 * 0.45), now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + (channelId === 'hh' ? 0.07 : 0.18));
+            gain.connect(ac.destination);
+
+            if (channelId === 'hh') {
+                const length = Math.floor(ac.sampleRate * 0.08);
+                const buffer = ac.createBuffer(1, length, ac.sampleRate);
+                const d = buffer.getChannelData(0);
+                for (let i=0;i<length;i++) d[i] = Math.random()*2-1;
+                const src = ac.createBufferSource(); src.buffer = buffer;
+                const hp = ac.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=6500;
+                src.connect(hp); hp.connect(gain); src.start(now); previewNodes.push(src);
+            } else {
+                const osc = ac.createOscillator();
+                osc.type = channelId === 'kick' ? 'sine' : 'triangle';
+                osc.frequency.setValueAtTime(channelId === 'kick' ? 95 : 210, now);
+                osc.frequency.exponentialRampToValueAtTime(channelId === 'kick' ? 42 : 120, now + 0.12);
+                osc.connect(gain); osc.start(now); osc.stop(now + 0.2); previewNodes.push(osc);
+            }
+        }
+
+        function previewTriggers() {
+            stopPreview();
+            if (!audioBuffer || totalDetections() === 0) return;
+            const hits = [];
+            for (const ch of channelConfigs) for (const d of detections[ch.id]) hits.push({ ...d, channelId: ch.id });
+            hits.sort((a,b) => a.time-b.time);
+            const maxPreview = Math.min(audioBuffer.duration, 30);
+            for (const hit of hits) {
+                if (hit.time > maxPreview) break;
+                previewTimers.push(setTimeout(() => triggerPreviewSound(hit.channelId, hit.velocity), hit.time * 1000));
+            }
+            btnPreviewMidi.textContent = '■ Stop Preview';
+            previewTimers.push(setTimeout(stopPreview, maxPreview * 1000 + 250));
+            setStatus(`▶ Previewing ${Math.min(maxPreview, audioBuffer.duration).toFixed(1)} seconds of triggers.`, 'ok');
+        }
+
+        function resetAnalysis() {
+            for (const ch of channelConfigs) {
+                ch.freqEl.value = ch.defaultFreq;
+                ch.qEl.value = ch.defaultQ;
+                ch.threshEl.value = ch.defaultThresh;
+                ch.sensEl.value = ch.defaultSens;
+                ch.freqEl.dispatchEvent(new Event('input'));
+                ch.qEl.dispatchEvent(new Event('input'));
+                ch.threshEl.dispatchEvent(new Event('input'));
+                ch.sensEl.dispatchEvent(new Event('input'));
+            }
+            adaptiveAmount.value = 55;
+            crossMaskMs.value = 14;
+            noteLengthMs.value = 60;
+            adaptiveAmountVal.textContent = '55%';
+            crossMaskMsVal.textContent = '14 ms';
+            noteLengthMsVal.textContent = '60 ms';
+            if (audioBuffer) processAllChannels();
+            setStatus('↺ Analysis settings reset.', 'ok');
+        }
+
+        // ─── Clear ──────────────────────────────────────────────────────
+        function clearAll() {
+            stopPreview();
+            stopPlayback();
+            audioBuffer = null;
+            waveformData = null;
+            projects = [];
+            currentProjectIndex = -1;
+            renderProjectList();
+            filteredData = {};
+            detections = { kick: [], snare: [], hh: [] };
+            fileLoaded = false;
+            btnGenerateMidi.disabled = true;
+            btnPreviewMidi.disabled = true;
+            fileInfo.classList.add('hidden');
+            dropZone.classList.remove('has-file');
+            fileStats.textContent = '—';
+            for (const ch of channelConfigs) {
+                ch.countEl.textContent = '0';
+            }
+            detectCount.textContent = '0 hits';
+            currentTime = 0;
+            ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+            timeDisplay.textContent = '0:00.00 / 0:00.00';
+            setStatus('🗑 Cleared — load a WAV file to begin.', 'ok');
+            if (window._redetectTimer) {
+                clearTimeout(window._redetectTimer);
+                window._redetectTimer = null;
+            }
+        }
+
+        // ─── Init ──────────────────────────────────────────────────────
+        function init() {
+            // Set up canvas
+            resizeCanvas();
+
+            // Drop zone
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('dragover');
+            });
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('dragover');
+            });
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                if (files.length) loadAudioFiles(files);
+            });
+            dropZone.addEventListener('click', () => fileInput.click());
+
+            fileInput.addEventListener('change', () => {
+                if (fileInput.files.length) loadAudioFiles(fileInput.files);
+                fileInput.value = '';
+            });
+
+            fileSelect.addEventListener('change', () => selectProject(parseInt(fileSelect.value, 10)));
+            btnExportSelected.addEventListener('click', exportMIDI);
+            btnMergeMidi.addEventListener('click', mergeAndExportMIDI);
+            btnRemoveFile.addEventListener('click', removeSelectedProject);
+
+            // Transport
+            btnPlay.addEventListener('click', () => {
+                if (isPlaying) pausePlayback();
+                else startPlayback().catch(console.error);
+            });
+            btnStop.addEventListener('click', stopPlayback);
+            btnReset.addEventListener('click', () => {
+                stopPlayback();
+                currentTime = 0;
+                redrawWaveform();
+                setStatus('↺ Reset', 'ok');
+            });
+
+            // Canvas click to seek
+            canvas.addEventListener('click', (e) => {
+                if (audioBuffer) seekToCanvas(e.clientX);
+            });
+
+            // Preview and Generate MIDI
+            btnPreviewMidi.addEventListener('click', () => {
+                if (previewTimers.length) stopPreview(); else previewTriggers();
+            });
+            btnGenerateMidi.addEventListener('click', exportMIDI);
+            btnResetAnalysis.addEventListener('click', resetAnalysis);
+            adaptiveAmount.addEventListener('input', () => { adaptiveAmountVal.textContent = adaptiveAmount.value + '%'; });
+            crossMaskMs.addEventListener('input', () => { crossMaskMsVal.textContent = crossMaskMs.value + ' ms'; });
+            noteLengthMs.addEventListener('input', () => { noteLengthMsVal.textContent = noteLengthMs.value + ' ms'; });
+            adaptiveAmount.addEventListener('change', scheduleReDetect);
+            crossMaskMs.addEventListener('change', scheduleReDetect);
+
+            // Clear
+            btnClear.addEventListener('click', clearAll);
+
+            // Channel sliders: update display and re-detect
+            for (const ch of channelConfigs) {
+                const updateDisplay = () => {
+                    const freq = parseFloat(ch.freqEl.value) || ch.defaultFreq;
+                    const q = parseFloat(ch.qEl.value) || ch.defaultQ;
+                    const thresh = parseFloat(ch.threshEl.value) || ch.defaultThresh;
+                    const sens = parseFloat(ch.sensEl.value) || ch.defaultSens;
+                    ch.freqVal.textContent = (freq >= 1000 ? (freq / 1000).toFixed(1) + 'k' : freq) + ' Hz';
+                    ch.qVal.textContent = q.toFixed(2);
+                    ch.threshVal.textContent = Math.round(thresh) + '%';
+                    ch.sensVal.textContent = Math.round(sens) + ' ms';
+                    // Update filter tag
+                    const typeMap = { lowpass: 'LP', bandpass: 'BP', highpass: 'HP' };
+                    ch.filterTag.textContent =
+                        `${typeMap[ch.filterType] || ''} ${freq >= 1000 ? (freq/1000).toFixed(1)+'k' : freq}Hz`;
+                };
+
+                ch.freqEl.addEventListener('input', updateDisplay);
+                ch.qEl.addEventListener('input', updateDisplay);
+                ch.threshEl.addEventListener('input', updateDisplay);
+                ch.sensEl.addEventListener('input', updateDisplay);
+
+                // Change events trigger re-processing
+                ch.freqEl.addEventListener('change', scheduleReDetect);
+                ch.qEl.addEventListener('change', scheduleReDetect);
+                ch.threshEl.addEventListener('change', scheduleReDetect);
+                ch.sensEl.addEventListener('change', scheduleReDetect);
+
+                // Initial display
+                updateDisplay();
+            }
+
+            // Keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                if (e.target.tagName === 'INPUT') return;
+                if (e.key === ' ' || e.key === 'Space') {
+                    e.preventDefault();
+                    if (isPlaying) pausePlayback();
+                    else startPlayback().catch(console.error);
+                }
+                if (e.key === 'r' || e.key === 'R') {
+                    stopPlayback();
+                    currentTime = 0;
+                    redrawWaveform();
+                }
+            });
+
+            setStatus('🎧 Ready — load a WAV file to begin.', 'ok');
+            btnPlay.disabled = true;
+            btnStop.disabled = true;
+            btnPreviewMidi.disabled = true;
+            btnGenerateMidi.disabled = true;
+
+            // Check Web Audio support
+            if (!window.AudioContext && !window.webkitAudioContext) {
+                setStatus('❌ Web Audio API not supported in this browser.', 'error');
+            }
+        }
+
+        // ─── Handle window resize ─────────────────────────────────────
+        window.addEventListener('resize', () => {
+            if (waveformData) {
+                resizeCanvas();
+                redrawWaveform();
+            }
+        });
+
+        // ─── Start ────────────────────────────────────────────────────
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            init();
+        } else {
+            document.addEventListener('DOMContentLoaded', init);
+        }
+
+        // Expose for debugging
+        window.__drum = { audioBuffer, detections, filteredData, projects, processAllChannels, exportMIDI, mergeAndExportMIDI };
+
+    })();
+</script>
+
+</body>
+</html>

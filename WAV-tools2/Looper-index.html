@@ -1,0 +1,1148 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full w-full overflow-hidden bg-slate-950 text-slate-100 select-none">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Looper</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    * {
+      touch-action: manipulation;
+      -webkit-user-select: none;
+      user-select: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      height: 100dvh;
+      width: 100dvw;
+      overflow: hidden;
+      background-color: #0b0f19;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    /* Safe-area aware padding so controls never sit under iPad rounded corners /
+       Smart HDR camera housing in split-view, and consistent 12px minimum elsewhere. */
+    body {
+      padding-top: max(0.75rem, env(safe-area-inset-top));
+      padding-right: max(0.75rem, env(safe-area-inset-right));
+      padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+      padding-left: max(0.75rem, env(safe-area-inset-left));
+    }
+
+    /* Hex pad size scales with the smaller viewport dimension (vmin) so the same
+       markup fits iPad portrait, landscape, and Split View / Slide Over widths
+       without a fixed-pixel + magic-number scale() hack. Sized for TWO grids
+       side by side (or stacked on narrow widths). */
+    :root {
+      --hex-w: clamp(40px, 7vmin, 84px);
+      --hex-h: clamp(47px, 8.15vmin, 96px);
+    }
+
+    .banks-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: center;
+      gap: 1.25rem;
+      width: 100%;
+      height: 100%;
+    }
+
+    .bank-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.5rem;
+      border-radius: 1rem;
+      border: 1px solid transparent;
+      transition: border-color 0.2s ease, background-color 0.2s ease;
+    }
+
+    .bank-panel.bank-active {
+      border-color: rgba(245, 158, 11, 0.35);
+      background: rgba(245, 158, 11, 0.04);
+    }
+
+    .bank-label {
+      font-family: ui-monospace, monospace;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #64748b;
+      padding: 0.2rem 0.6rem;
+      border-radius: 9999px;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid #1e293b;
+    }
+
+    .bank-panel.bank-active .bank-label {
+      color: #f59e0b;
+      border-color: rgba(245, 158, 11, 0.4);
+    }
+
+    .hex-grid {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .hex-row {
+      display: flex;
+      flex-direction: row;
+      justify-content: center;
+      margin-top: calc(var(--hex-h) * -0.1167);
+    }
+
+    .hex-row:first-child {
+      margin-top: 0;
+    }
+
+    .hex-cell {
+      width: var(--hex-w);
+      height: var(--hex-h);
+      clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+      margin: 0 3px;
+      position: relative;
+      transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), filter 0.2s ease;
+      background: #111827;
+    }
+
+    .hex-cell-inner {
+      position: absolute;
+      inset: 2px;
+      clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+      background: #1e293b;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 4px;
+      text-align: center;
+      cursor: pointer;
+    }
+
+    .hex-cell:active {
+      transform: scale(0.92);
+    }
+
+    .hex-cell.selected .hex-cell-inner {
+      border: 2px solid #f59e0b;
+    }
+
+    .hex-active {
+      background: #3b82f6 !important;
+      filter: drop-shadow(0 0 10px rgba(59, 130, 246, 0.7));
+    }
+    
+    .hex-active .hex-cell-inner {
+      background: #1e1b4b;
+    }
+
+    .hex-queued {
+      animation: hex-pulse 0.8s infinite alternate;
+      background: #f59e0b !important;
+    }
+
+    .hex-center {
+      background: #334155;
+    }
+    
+    .hex-center .hex-cell-inner {
+      background: #0f172a;
+    }
+
+    @keyframes hex-pulse {
+      0% { opacity: 0.6; transform: scale(0.98); }
+      100% { opacity: 1; transform: scale(1.02); }
+    }
+  </style>
+</head>
+<body class="h-[100dvh] w-screen flex flex-col justify-between box-border overflow-hidden">
+
+  <div id="unlock-overlay" class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-950/95 backdrop-blur-md transition-opacity duration-300">
+    <div class="max-w-md p-8 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl text-center space-y-6">
+      <div class="w-16 h-16 mx-auto bg-amber-500/10 text-amber-400 rounded-full flex items-center justify-center">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-2v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12 0c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-2" />
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-2xl font-bold tracking-tight text-white">Looper</h1>
+        <p class="text-sm text-slate-400 mt-2">Tap below to start the audio engine</p>
+      </div>
+      <button id="btn-start" class="w-full min-h-11 py-4 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl shadow-lg shadow-amber-500/20 active:scale-95 transition">
+        Start Looper
+      </button>
+    </div>
+  </div>
+
+  <header class="flex flex-wrap items-center justify-between gap-2 px-4 py-2 bg-slate-900/80 backdrop-blur-md rounded-xl border border-slate-800/80 shrink-0">
+    <div class="flex items-center space-x-3">
+      <div class="w-3 h-3 rounded-full bg-amber-500 animate-pulse"></div>
+      <span class="font-bold text-base tracking-wider text-slate-200">LOOPER <span class="text-amber-500 text-[10px] font-mono uppercase px-2 py-0.5 bg-amber-500/10 rounded">v1.0</span></span>
+    </div>
+
+    <div class="flex flex-wrap items-center gap-2">
+      <div class="flex items-center space-x-2 bg-slate-950/60 px-2.5 py-1.5 rounded-lg border border-slate-800">
+        <label for="master-bpm" class="text-[11px] font-mono text-slate-400">BPM</label>
+        <input type="number" id="master-bpm" value="120" min="40" max="240" aria-label="Master tempo in beats per minute" class="w-12 bg-transparent text-amber-400 font-bold font-mono text-center focus:outline-none text-sm">
+      </div>
+
+      <div class="flex items-center space-x-2 bg-slate-950/60 px-2.5 py-1.5 rounded-lg border border-slate-800">
+        <label for="master-key" class="text-[11px] font-mono text-slate-400">KEY</label>
+        <select id="master-key" aria-label="Master key" class="bg-transparent text-amber-400 font-bold font-mono text-sm focus:outline-none cursor-pointer">
+          <option value="C">C</option>
+          <option value="C#">C#</option>
+          <option value="D">D</option>
+          <option value="D#">D#</option>
+          <option value="E">E</option>
+          <option value="F">F</option>
+          <option value="F#">F#</option>
+          <option value="G">G</option>
+          <option value="G#">G#</option>
+          <option value="A">A</option>
+          <option value="A#">A#</option>
+          <option value="B">B</option>
+        </select>
+        <span id="pitch-lock-status" class="text-[9px] font-mono uppercase tracking-tight text-slate-600" title="Whether key changes are independent of tempo">—</span>
+      </div>
+
+      <div class="flex items-center space-x-2 bg-slate-950/60 px-2.5 py-1.5 rounded-lg border border-slate-800">
+        <label for="master-bars" class="text-[11px] font-mono text-slate-400">BARS</label>
+        <select id="master-bars" aria-label="Bars per pattern" class="bg-transparent text-amber-400 font-bold font-mono text-sm focus:outline-none cursor-pointer">
+          <option value="1">1 Bar</option>
+          <option value="2">2 Bars</option>
+          <option value="4" selected>4 Bars</option>
+          <option value="8">8 Bars</option>
+        </select>
+      </div>
+
+      <button id="btn-record" class="min-h-11 px-3 py-2 bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 border border-rose-500/40 rounded-lg text-xs font-bold tracking-wider uppercase transition active:scale-95 flex items-center space-x-1.5">
+        <div id="rec-dot" class="w-2 h-2 rounded-full bg-rose-500"></div>
+        <span id="rec-text">Record</span>
+      </button>
+
+      <button id="btn-stop-all" class="min-h-11 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg text-xs font-bold tracking-wider uppercase transition active:scale-95">
+        Stop All
+      </button>
+
+      <button id="btn-clear-all" class="min-h-11 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg text-xs font-bold tracking-wider uppercase transition active:scale-95">
+        Clear Bank
+      </button>
+    </div>
+  </header>
+
+  <main class="flex-1 flex items-center justify-center relative overflow-hidden">
+    <div class="banks-row">
+      <div class="bank-panel" data-bank="0">
+        <span class="bank-label">Bank A</span>
+        <div class="hex-grid" data-bank="0">
+          <div class="hex-row">
+            <div class="hex-cell" data-pad="0"><div class="hex-cell-inner"></div></div>
+            <div class="hex-cell" data-pad="1"><div class="hex-cell-inner"></div></div>
+            <div class="hex-cell" data-pad="2"><div class="hex-cell-inner"></div></div>
+          </div>
+          <div class="hex-row">
+            <div class="hex-cell" data-pad="3"><div class="hex-cell-inner"></div></div>
+            <div class="hex-cell" data-pad="4"><div class="hex-cell-inner"></div></div>
+            <div class="hex-cell" data-pad="5"><div class="hex-cell-inner"></div></div>
+            <div class="hex-cell" data-pad="6"><div class="hex-cell-inner"></div></div>
+          </div>
+          <div class="hex-row">
+            <div class="hex-cell" data-pad="7"><div class="hex-cell-inner"></div></div>
+            <div class="hex-cell hex-center">
+              <div class="hex-cell-inner pointer-events-none">
+                <span class="center-bpm-display text-xl font-black text-amber-400 font-mono tracking-tighter">120</span>
+                <span class="text-[9px] text-slate-400 font-mono tracking-widest uppercase">BPM</span>
+                <div class="heartbeat-indicator w-1.5 h-1.5 rounded-full bg-amber-500/40 mt-1 transition-all duration-75"></div>
+              </div>
+            </div>
+            <div class="hex-cell" data-pad="8"><div class="hex-cell-inner"></div></div>
+          </div>
+          <div class="hex-row">
+            <div class="hex-cell" data-pad="9"><div class="hex-cell-inner"></div></div>
+            <div class="hex-cell" data-pad="10"><div class="hex-cell-inner"></div></div>
+            <div class="hex-cell" data-pad="11"><div class="hex-cell-inner"></div></div>
+            <div class="hex-cell" data-pad="12"><div class="hex-cell-inner"></div></div>
+          </div>
+          <div class="hex-row">
+            <div class="hex-cell" data-pad="13"><div class="hex-cell-inner"></div></div>
+            <div class="hex-cell" data-pad="14"><div class="hex-cell-inner"></div></div>
+            <div class="hex-cell" data-pad="15"><div class="hex-cell-inner"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bank-panel" data-bank="1">
+        <span class="bank-label">Bank B</span>
+        <div class="hex-grid" data-bank="1">
+          <div class="hex-row">
+            <div class="hex-cell" data-pad="0"><div class="hex-cell-inner"></div></div>
+            <div class="hex-cell" data-pad="1"><div class="hex-cell-inner"></div></div>
+            <div class="hex-cell" data-pad="2"><div class="hex-cell-inner"></div></div>
+          </div>
+          <div class="hex-row">
+            <div class="hex-cell" data-pad="3"><div class="hex-cell-inner"></div></div>
+            <div class="hex-cell" data-pad="4"><div class="hex-cell-inner"></div></div>
+            <div class="hex-cell" data-pad="5"><div class="hex-cell-inner"></div></div>
+            <div class="hex-cell" data-pad="6"><div class="hex-cell-inner"></div></div>
+          </div>
+          <div class="hex-row">
+            <div class="hex-cell" data-pad="7"><div class="hex-cell-inner"></div></div>
+            <div class="hex-cell hex-center">
+              <div class="hex-cell-inner pointer-events-none">
+                <span class="center-bpm-display text-xl font-black text-amber-400 font-mono tracking-tighter">120</span>
+                <span class="text-[9px] text-slate-400 font-mono tracking-widest uppercase">BPM</span>
+                <div class="heartbeat-indicator w-1.5 h-1.5 rounded-full bg-amber-500/40 mt-1 transition-all duration-75"></div>
+              </div>
+            </div>
+            <div class="hex-cell" data-pad="8"><div class="hex-cell-inner"></div></div>
+          </div>
+          <div class="hex-row">
+            <div class="hex-cell" data-pad="9"><div class="hex-cell-inner"></div></div>
+            <div class="hex-cell" data-pad="10"><div class="hex-cell-inner"></div></div>
+            <div class="hex-cell" data-pad="11"><div class="hex-cell-inner"></div></div>
+            <div class="hex-cell" data-pad="12"><div class="hex-cell-inner"></div></div>
+          </div>
+          <div class="hex-row">
+            <div class="hex-cell" data-pad="13"><div class="hex-cell-inner"></div></div>
+            <div class="hex-cell" data-pad="14"><div class="hex-cell-inner"></div></div>
+            <div class="hex-cell" data-pad="15"><div class="hex-cell-inner"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="bg-slate-900/80 backdrop-blur-md rounded-xl border border-slate-800 p-3 shrink-0 flex flex-wrap items-center justify-between gap-2">
+    <div class="flex items-center space-x-3">
+      <span id="selected-pad-label" class="text-xs font-bold text-amber-400 font-mono bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800 truncate max-w-[180px]">Pad 1</span>
+    </div>
+
+    <input type="file" id="audio-upload" multiple accept="audio/wav,audio/x-wav,audio/mpeg,audio/mp3,audio/m4a,audio/x-m4a,audio/aac,audio/mp4" class="hidden" />
+
+    <div class="flex flex-wrap items-center gap-2">
+      <button id="btn-trigger-file" class="min-h-11 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-bold tracking-wider uppercase transition active:scale-95 flex items-center space-x-1.5">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+        </svg>
+        <span>Load File(s)</span>
+      </button>
+
+      <div class="flex items-center space-x-2 bg-slate-950 px-2 py-2 rounded-lg border border-slate-800">
+        <span class="text-[10px] font-mono text-slate-400">ORIG BPM</span>
+        <input type="number" id="pad-bpm" value="120" min="40" max="240" aria-label="Original tempo of loaded sample" class="w-10 bg-transparent text-amber-400 font-bold font-mono text-center text-xs focus:outline-none">
+      </div>
+
+      <div class="flex items-center space-x-2 bg-slate-950 px-2 py-2 rounded-lg border border-slate-800">
+        <span class="text-[10px] font-mono text-slate-400">ORIG KEY</span>
+        <select id="pad-key" aria-label="Original key of loaded sample" class="bg-transparent text-amber-400 font-bold font-mono text-xs focus:outline-none cursor-pointer">
+          <option value="C">C</option>
+          <option value="C#">C#</option>
+          <option value="D">D</option>
+          <option value="D#">D#</option>
+          <option value="E">E</option>
+          <option value="F">F</option>
+          <option value="F#">F#</option>
+          <option value="G">G</option>
+          <option value="G#">G#</option>
+          <option value="A">A</option>
+          <option value="A#">A#</option>
+          <option value="B">B</option>
+        </select>
+      </div>
+
+      <div class="flex items-center bg-slate-950 p-1 rounded-lg border border-slate-800">
+        <button id="btn-mode-loop" class="min-h-9 px-2.5 py-1 bg-amber-500 text-slate-950 font-bold text-[11px] rounded transition">Loop</button>
+        <button id="btn-mode-oneshot" class="min-h-9 px-2.5 py-1 text-slate-400 hover:text-slate-200 font-bold text-[11px] rounded transition">One-Shot</button>
+      </div>
+
+      <div class="flex items-center space-x-2 bg-slate-950 px-2.5 py-2 rounded-lg border border-slate-800">
+        <span class="text-[10px] font-mono text-slate-400">VOL</span>
+        <input type="range" id="pad-volume" min="0" max="1" step="0.01" value="0.8" aria-label="Pad volume" class="w-24 h-6 accent-amber-500 cursor-pointer" style="touch-action: pan-x;">
+        <span id="pad-volume-readout" class="text-[10px] font-mono text-amber-400 w-8 text-right">80%</span>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      let audioCtx = null;
+      let masterGainNode = null;
+
+      // Web Audio Stream Recording Nodes
+      let recDestination = null;
+      let mediaRecorder = null;
+      let recordedChunks = [];
+      let isRecording = false;
+
+      const KEY_MAP = { "C": 0, "C#": 1, "D": 2, "D#": 3, "E": 4, "F": 5, "F#": 6, "G": 7, "G#": 8, "A": 9, "A#": 10, "B": 11 };
+
+      // Two honeycomb loop banks (A/B), 16 pads each, both visible on screen
+      // at once as two side-by-side grids. Pads keep playing regardless of
+      // anything else happening on screen, so you can layer a loop from
+      // Bank A under a loop from Bank B.
+      const PADS_PER_BANK = 16;
+      const BANK_COUNT = 2;
+      const BANK_LABELS = ['A', 'B'];
+      const TOTAL_PADS = PADS_PER_BANK * BANK_COUNT;
+
+      const pads = Array.from({ length: TOTAL_PADS }, (_, i) => ({
+        id: i,
+        bank: Math.floor(i / PADS_PER_BANK),
+        cell: i % PADS_PER_BANK,
+        name: `Empty Pad ${(i % PADS_PER_BANK) + 1}`,
+        buffer: null,
+        mode: 'loop',
+        volume: 0.8,
+        active: false,
+        queued: false,
+        sourceNode: null,
+        gainNode: null,
+        pitchNode: null,
+        originalBpm: 120,
+        originalKey: 'C'
+      }));
+
+      // The most recently tapped pad (0-31). Its bank doubles as the "active"
+      // bank for Load File(s) / Clear Bank, shown via a highlighted panel border.
+      let selectedPadId = 0;
+
+      // Every pad has a permanent DOM cell — both grids are always in the
+      // page — so this is just a lookup, never a visibility check.
+      function cellElFor(pad) {
+        return document.querySelector(`.hex-grid[data-bank="${pad.bank}"] .hex-cell[data-pad="${pad.cell}"]`);
+      }
+
+      let masterBpm = 120;
+      let masterKey = 'C';
+      let masterBars = 4;
+      let currentBeat = 0;
+
+      // True independent pitch correction ---------------------------------
+      // AudioBufferSourceNode.playbackRate necessarily changes speed AND pitch
+      // together (like a vinyl pitch control). To match tempo without dragging
+      // pitch along with it, we run playback through a small custom
+      // AudioWorkletProcessor that re-shifts pitch back to where it should be.
+      // It's self-contained (loaded from an in-page Blob, no CDN/build step)
+      // using a classic dual-tap granular pitch shifter with a Hann crossfade —
+      // simpler and more predictable to get right than a full phase vocoder,
+      // and well suited to musical/pitched loop material.
+      const PITCH_WORKLET_NAME = 'looper-pitch-shift';
+      let pitchShiftAvailable = false;
+      let pitchWorkletRegistrationStarted = false;
+
+      const PITCH_WORKLET_SOURCE = `
+        class LooperPitchShiftProcessor extends AudioWorkletProcessor {
+          static get parameterDescriptors() {
+            return [{ name: 'pitchRatio', defaultValue: 1.0, minValue: 0.25, maxValue: 4.0, automationRate: 'k-rate' }];
+          }
+          constructor() {
+            super();
+            this.grainSize = Math.round(sampleRate * 0.08);
+            this.bufferSize = this.grainSize * 4;
+            this.buf = [new Float32Array(this.bufferSize), new Float32Array(this.bufferSize)];
+            this.writePos = 0;
+            this.age1 = 0;
+            this.age2 = this.grainSize / 2;
+            this.readPos1 = 0;
+            this.readPos2 = this.grainSize / 2;
+          }
+          readInterp(ch, pos) {
+            const buf = this.buf[ch];
+            const n = this.bufferSize;
+            let p = pos % n;
+            if (p < 0) p += n;
+            const i0 = Math.floor(p);
+            const i1 = (i0 + 1) % n;
+            const frac = p - i0;
+            return buf[i0] * (1 - frac) + buf[i1] * frac;
+          }
+          process(inputs, outputs, parameters) {
+            const input = inputs[0];
+            const output = outputs[0];
+            if (!output || !output[0]) return true;
+            const pitchParam = parameters.pitchRatio;
+            const numCh = Math.min(output.length, 2);
+            const blockLen = output[0].length;
+            for (let i = 0; i < blockLen; i++) {
+              const pitchRatio = pitchParam.length > 1 ? pitchParam[i] : pitchParam[0];
+              for (let ch = 0; ch < numCh; ch++) {
+                const inSample = (input[ch] && input[ch][i] !== undefined) ? input[ch][i] : 0;
+                this.buf[ch][this.writePos % this.bufferSize] = inSample;
+              }
+              this.writePos++;
+              const w1 = 0.5 - 0.5 * Math.cos((2 * Math.PI * this.age1) / this.grainSize);
+              const w2 = 0.5 - 0.5 * Math.cos((2 * Math.PI * this.age2) / this.grainSize);
+              for (let ch = 0; ch < numCh; ch++) {
+                const s1 = this.readInterp(ch, this.readPos1);
+                const s2 = this.readInterp(ch, this.readPos2);
+                output[ch][i] = s1 * w1 + s2 * w2;
+              }
+              this.age1 += 1;
+              this.readPos1 += pitchRatio;
+              if (this.age1 >= this.grainSize) {
+                this.age1 -= this.grainSize;
+                this.readPos1 = this.writePos - this.grainSize;
+              }
+              this.age2 += 1;
+              this.readPos2 += pitchRatio;
+              if (this.age2 >= this.grainSize) {
+                this.age2 -= this.grainSize;
+                this.readPos2 = this.writePos - this.grainSize;
+              }
+            }
+            return true;
+          }
+        }
+        registerProcessor('${PITCH_WORKLET_NAME}', LooperPitchShiftProcessor);
+      `;
+
+      async function registerPitchShiftWorklet() {
+        const statusEl = document.getElementById('pitch-lock-status');
+        if (!audioCtx.audioWorklet) {
+          // Most likely cause: the page isn't served over HTTPS (or localhost).
+          // AudioWorklet requires a secure context, so file:// won't work.
+          pitchShiftAvailable = false;
+          if (statusEl) { statusEl.textContent = 'pitch tied to tempo'; statusEl.title = 'Independent pitch correction needs HTTPS hosting — key changes will also shift tempo'; }
+          return;
+        }
+        try {
+          const blob = new Blob([PITCH_WORKLET_SOURCE], { type: 'application/javascript' });
+          const url = URL.createObjectURL(blob);
+          await audioCtx.audioWorklet.addModule(url);
+          URL.revokeObjectURL(url);
+          pitchShiftAvailable = true;
+          if (statusEl) { statusEl.textContent = 'pitch-locked'; statusEl.title = 'Key changes are independent of tempo'; }
+        } catch (err) {
+          console.error('Pitch-shift worklet failed to load, falling back to linked pitch/tempo:', err);
+          pitchShiftAvailable = false;
+          if (statusEl) { statusEl.textContent = 'pitch tied to tempo'; statusEl.title = 'Independent pitch correction unavailable — key changes will also shift tempo'; }
+        }
+      }
+
+      // Lookahead scheduler state (see startBeatScheduler / schedulerTick below).
+      // audioCtx.currentTime is the only clock we trust for beat timing; setInterval
+      // alone drifts and can stall when Safari throttles a backgrounded/locked tab.
+      let nextBeatTime = 0;
+      let schedulerTimerID = null;
+      const SCHEDULER_LOOKAHEAD_MS = 25;
+      const SCHEDULE_AHEAD_TIME = 0.1; // seconds
+
+      const unlockOverlay = document.getElementById('unlock-overlay');
+      const btnStart = document.getElementById('btn-start');
+      const fileInput = document.getElementById('audio-upload');
+      const btnTriggerFile = document.getElementById('btn-trigger-file');
+      const selectedPadLabel = document.getElementById('selected-pad-label');
+      const masterBpmInput = document.getElementById('master-bpm');
+      const masterKeySelect = document.getElementById('master-key');
+      const masterBarsSelect = document.getElementById('master-bars');
+      const btnStopAll = document.getElementById('btn-stop-all');
+      const btnClearAll = document.getElementById('btn-clear-all');
+      const btnModeLoop = document.getElementById('btn-mode-loop');
+      const btnModeOneshot = document.getElementById('btn-mode-oneshot');
+      const padVolumeSlider = document.getElementById('pad-volume');
+      const padVolumeReadout = document.getElementById('pad-volume-readout');
+      const padBpmInput = document.getElementById('pad-bpm');
+      const padKeySelect = document.getElementById('pad-key');
+      const btnRecord = document.getElementById('btn-record');
+      const recDot = document.getElementById('rec-dot');
+      const recText = document.getElementById('rec-text');
+
+      // Both grids have their own BPM readout / heartbeat dot (they always
+      // show the same master BPM and pulse in sync); update them together.
+      function setCenterBpmDisplay(bpm) {
+        document.querySelectorAll('.center-bpm-display').forEach(el => { el.textContent = bpm; });
+      }
+      function pulseHeartbeats() {
+        document.querySelectorAll('.heartbeat-indicator').forEach(el => {
+          el.style.transform = 'scale(1.8)';
+          el.style.backgroundColor = '#f59e0b';
+        });
+        setTimeout(() => {
+          document.querySelectorAll('.heartbeat-indicator').forEach(el => {
+            el.style.transform = 'scale(1.0)';
+            el.style.backgroundColor = 'rgba(245, 158, 11, 0.4)';
+          });
+        }, 100);
+      }
+
+      const initAudioContext = async () => {
+        if (!audioCtx) {
+          const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+          audioCtx = new AudioCtxClass();
+          masterGainNode = audioCtx.createGain();
+          masterGainNode.gain.setValueAtTime(0.9, audioCtx.currentTime);
+          
+          // Connect to Speaker Output & Stream Recorder Node
+          masterGainNode.connect(audioCtx.destination);
+          recDestination = audioCtx.createMediaStreamDestination();
+          masterGainNode.connect(recDestination);
+        }
+
+        // Resume must happen synchronously within this click handler, before
+        // any `await` — iOS Safari only honors AudioContext.resume() as part
+        // of the direct user gesture; once an await has yielded control back
+        // to the event loop, a resume() call can be silently ignored and the
+        // context stays suspended (no sound, no error).
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+
+        unlockOverlay.classList.add('opacity-0', 'pointer-events-none');
+        setTimeout(() => unlockOverlay.remove(), 300);
+        startBeatScheduler();
+
+        // Worklet registration can happen in the background — it doesn't
+        // need to block unlocking audio.
+        if (!pitchWorkletRegistrationStarted) {
+          pitchWorkletRegistrationStarted = true;
+          registerPitchShiftWorklet();
+        }
+      };
+
+      btnStart.addEventListener('click', initAudioContext);
+
+      document.querySelectorAll('.hex-grid').forEach(gridEl => {
+        const bank = parseInt(gridEl.dataset.bank, 10);
+        gridEl.querySelectorAll('.hex-cell:not(.hex-center)').forEach(cell => {
+          const cellIndex = parseInt(cell.dataset.pad, 10);
+          const pad = pads[bank * PADS_PER_BANK + cellIndex];
+          renderPad(pad);
+          cell.addEventListener('click', () => {
+            selectPad(pad.id);
+            togglePadPlayback(pad.id);
+          });
+        });
+      });
+      selectPad(0);
+
+      function renderPad(pad) {
+        const cell = cellElFor(pad)?.querySelector('.hex-cell-inner');
+        if (!cell) return;
+
+        if (!pad.buffer) {
+          cell.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-slate-600 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+            </svg>
+            <span class="text-[9px] font-mono text-slate-500 font-bold uppercase tracking-tighter">Empty</span>
+          `;
+        } else {
+          cell.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 ${pad.active ? 'text-amber-400' : 'text-slate-300'} mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-2v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12 0c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z" />
+            </svg>
+            <span class="text-[10px] font-bold text-slate-200 line-clamp-1 break-all leading-tight">${pad.name}</span>
+            <span class="text-[8px] font-mono text-amber-500/80 mt-0.5 uppercase">${pad.mode}</span>
+          `;
+        }
+      }
+
+      function selectPad(padId) {
+        selectedPadId = padId;
+        const pad = pads[padId];
+        selectedPadLabel.innerText = `${BANK_LABELS[pad.bank]}${pad.cell + 1} - ${pad.name}`;
+
+        document.querySelectorAll('.hex-cell').forEach(c => c.classList.remove('selected'));
+        const cellEl = cellElFor(pad);
+        if (cellEl) cellEl.classList.add('selected');
+
+        // Highlight whichever bank panel Load File(s) / Clear Bank will act on.
+        document.querySelectorAll('.bank-panel').forEach(panel => {
+          panel.classList.toggle('bank-active', parseInt(panel.dataset.bank, 10) === pad.bank);
+        });
+
+        if (pad.mode === 'loop') {
+          btnModeLoop.className = "px-2.5 py-0.5 bg-amber-500 text-slate-950 font-bold text-[11px] rounded transition";
+          btnModeOneshot.className = "px-2.5 py-0.5 text-slate-400 hover:text-slate-200 font-bold text-[11px] rounded transition";
+        } else {
+          btnModeOneshot.className = "px-2.5 py-0.5 bg-amber-500 text-slate-950 font-bold text-[11px] rounded transition";
+          btnModeLoop.className = "px-2.5 py-0.5 text-slate-400 hover:text-slate-200 font-bold text-[11px] rounded transition";
+        }
+
+        padVolumeSlider.value = pad.volume;
+        padVolumeReadout.textContent = `${Math.round(pad.volume * 100)}%`;
+        padBpmInput.value = pad.originalBpm;
+        padKeySelect.value = pad.originalKey;
+      }
+
+      btnTriggerFile.addEventListener('click', () => {
+        if (!audioCtx) initAudioContext();
+        fileInput.click();
+      });
+
+      // Loudness leveling (NOT musical key/tempo normalization — see updatePadPlaybackRate
+      // for the actual BPM/key sync). This only boosts quiet samples up to a consistent
+      // peak so pads feel balanced; it never alters pitch or duration.
+      function levelPeakLoudness(buffer) {
+        let maxPeak = 0;
+        for (let c = 0; c < buffer.numberOfChannels; c++) {
+          const channelData = buffer.getChannelData(c);
+          for (let i = 0; i < channelData.length; i++) {
+            const abs = Math.abs(channelData[i]);
+            if (abs > maxPeak) maxPeak = abs;
+          }
+        }
+        if (maxPeak > 0 && maxPeak < 0.98) {
+          const factor = 0.95 / maxPeak;
+          for (let c = 0; c < buffer.numberOfChannels; c++) {
+            const channelData = buffer.getChannelData(c);
+            for (let i = 0; i < channelData.length; i++) {
+              channelData[i] *= factor;
+            }
+          }
+        }
+      }
+
+      // Manual WAV decoder ---------------------------------------------------
+      // Safari's native decodeAudioData is unreliable with 24-bit integer PCM
+      // WAV files specifically — it can fail outright or decode silence/noise,
+      // even though the file itself is perfectly valid. WAV is a simple,
+      // fully-documented format, so for any WAV file we parse the PCM data
+      // ourselves and build the AudioBuffer by hand: bit-perfect, no browser
+      // decoder quirks, and it works for 8/16/24/32-bit int and 32-bit float.
+      // Compressed formats (mp3/m4a/aac) still go through decodeAudioData,
+      // since hand-decoding those isn't practical here.
+      function looksLikeWav(arrayBuffer) {
+        if (arrayBuffer.byteLength < 12) return false;
+        const v = new DataView(arrayBuffer);
+        return v.getUint32(0, false) === 0x52494646 /* "RIFF" */
+            && v.getUint32(8, false) === 0x57415645 /* "WAVE" */;
+      }
+
+      function parseWavBuffer(arrayBuffer) {
+        const view = new DataView(arrayBuffer);
+        let pos = 12;
+        let fmt = null;
+        let dataOffset = -1, dataLength = 0;
+
+        while (pos + 8 <= view.byteLength) {
+          const chunkId = String.fromCharCode(
+            view.getUint8(pos), view.getUint8(pos + 1), view.getUint8(pos + 2), view.getUint8(pos + 3)
+          );
+          const chunkSize = view.getUint32(pos + 4, true);
+          const chunkStart = pos + 8;
+
+          if (chunkId === 'fmt ') {
+            const audioFormat = view.getUint16(chunkStart, true);
+            const numChannels = view.getUint16(chunkStart + 2, true);
+            const sampleRate = view.getUint32(chunkStart + 4, true);
+            const bitsPerSample = view.getUint16(chunkStart + 14, true);
+            // WAVE_FORMAT_EXTENSIBLE: real format code lives in the sub-format GUID.
+            const actualFormat = (audioFormat === 0xFFFE && chunkSize >= 40)
+              ? view.getUint16(chunkStart + 24, true)
+              : audioFormat;
+            fmt = { audioFormat: actualFormat, numChannels, sampleRate, bitsPerSample };
+          } else if (chunkId === 'data') {
+            dataOffset = chunkStart;
+            dataLength = Math.min(chunkSize, view.byteLength - chunkStart);
+          }
+
+          pos = chunkStart + chunkSize + (chunkSize % 2); // chunks are word-aligned
+        }
+
+        if (!fmt || dataOffset === -1) throw new Error('Not a readable WAV file (missing fmt or data chunk)');
+        if (![1, 3].includes(fmt.audioFormat)) throw new Error(`Unsupported WAV compression (format code ${fmt.audioFormat})`);
+        if (![8, 16, 24, 32].includes(fmt.bitsPerSample)) throw new Error(`Unsupported WAV bit depth (${fmt.bitsPerSample}-bit)`);
+
+        const bytesPerSample = fmt.bitsPerSample / 8;
+        const numFrames = Math.floor(dataLength / (bytesPerSample * fmt.numChannels));
+        const isFloat = fmt.audioFormat === 3;
+        const channelData = Array.from({ length: fmt.numChannels }, () => new Float32Array(numFrames));
+
+        for (let frame = 0; frame < numFrames; frame++) {
+          for (let ch = 0; ch < fmt.numChannels; ch++) {
+            const byteOffset = dataOffset + (frame * fmt.numChannels + ch) * bytesPerSample;
+            let sample;
+            if (isFloat && fmt.bitsPerSample === 32) {
+              sample = view.getFloat32(byteOffset, true);
+            } else if (fmt.bitsPerSample === 8) {
+              sample = (view.getUint8(byteOffset) - 128) / 128;
+            } else if (fmt.bitsPerSample === 16) {
+              sample = view.getInt16(byteOffset, true) / 32768;
+            } else if (fmt.bitsPerSample === 24) {
+              const b0 = view.getUint8(byteOffset);
+              const b1 = view.getUint8(byteOffset + 1);
+              const b2 = view.getUint8(byteOffset + 2);
+              let val = b0 | (b1 << 8) | (b2 << 16);
+              if (val & 0x800000) val -= 0x1000000; // sign-extend 24-bit
+              sample = val / 8388608;
+            } else { // 32-bit int
+              sample = view.getInt32(byteOffset, true) / 2147483648;
+            }
+            channelData[ch][frame] = sample;
+          }
+        }
+
+        return { numChannels: fmt.numChannels, sampleRate: fmt.sampleRate, numFrames, channelData };
+      }
+
+      async function decodeAudioFile(file, ctx) {
+        const arrayBuffer = await file.arrayBuffer();
+
+        if (looksLikeWav(arrayBuffer)) {
+          try {
+            const parsed = parseWavBuffer(arrayBuffer);
+            const audioBuffer = ctx.createBuffer(parsed.numChannels, parsed.numFrames, parsed.sampleRate);
+            for (let ch = 0; ch < parsed.numChannels; ch++) {
+              audioBuffer.copyToChannel(parsed.channelData[ch], ch);
+            }
+            return audioBuffer;
+          } catch (err) {
+            console.warn('Manual WAV parse failed, falling back to decodeAudioData:', err);
+            return await ctx.decodeAudioData(arrayBuffer.slice(0));
+          }
+        }
+
+        return await ctx.decodeAudioData(arrayBuffer);
+      }
+
+      // Multi-File Batch Loader — fills empty pads in the "active" bank (the
+      // bank of whichever pad was most recently selected).
+      fileInput.addEventListener('change', async (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length === 0) return;
+
+        const bank = pads[selectedPadId].bank;
+        let targetCellIndex = pads[selectedPadId].cell;
+
+        for (const file of files) {
+          // Search every cell in the active bank starting from the current
+          // target, wrapping around, instead of silently overwriting the
+          // selected pad when the bank is full.
+          let found = -1;
+          for (let offset = 0; offset < PADS_PER_BANK; offset++) {
+            const idx = (targetCellIndex + offset) % PADS_PER_BANK;
+            if (!pads[bank * PADS_PER_BANK + idx].buffer) { found = idx; break; }
+          }
+          if (found === -1) {
+            alert(`All ${PADS_PER_BANK} pads in Bank ${BANK_LABELS[bank]} are full. Clear the bank, or select a pad in the other bank before loading more samples.`);
+            break;
+          }
+          targetCellIndex = found;
+
+          const pad = pads[bank * PADS_PER_BANK + targetCellIndex];
+          pad.name = file.name.replace(/\.[^/.]+$/, "");
+
+          try {
+            const decodedData = await decodeAudioFile(file, audioCtx);
+
+            // Level loudness only — never re-pitch or re-time the source material.
+            levelPeakLoudness(decodedData);
+
+            pad.buffer = decodedData;
+            renderPad(pad);
+            selectPad(pad.id);
+            targetCellIndex = (targetCellIndex + 1) % PADS_PER_BANK;
+          } catch (err) {
+            console.error("Audio processing failed for file:", file.name, err);
+            alert(`Couldn't load "${file.name}". It may not be a supported audio format.`);
+          }
+        }
+      });
+
+      function updatePadPlaybackRate(pad) {
+        if (!pad.sourceNode || !audioCtx) return;
+        const tempoRatio = masterBpm / pad.originalBpm;
+        const desiredPitchRatio = Math.pow(2, shortestSemitoneShift(pad.originalKey, masterKey) / 12);
+
+        if (pad.pitchNode) {
+          // Independent correction: source only handles tempo, the worklet
+          // cancels the incidental pitch shift and applies the desired one.
+          pad.sourceNode.playbackRate.setValueAtTime(tempoRatio, audioCtx.currentTime);
+          pad.pitchNode.parameters.get('pitchRatio').setValueAtTime(desiredPitchRatio / tempoRatio, audioCtx.currentTime);
+        } else {
+          // Fallback: tempo and pitch are linked (vinyl-style).
+          pad.sourceNode.playbackRate.setValueAtTime(tempoRatio * desiredPitchRatio, audioCtx.currentTime);
+        }
+      }
+
+      // Shortest signed semitone distance between two keys (e.g. B -> C is +1, not -11).
+      // Keeps the pitch correction as small as possible, which is the closest a simple
+      // playbackRate-based engine can get to "not changing the original sound" — see the
+      // note in the writeup about true independent pitch/tempo control.
+      function shortestSemitoneShift(fromKey, toKey) {
+        const raw = KEY_MAP[toKey] - KEY_MAP[fromKey];
+        return ((raw + 6) % 12 + 12) % 12 - 6;
+      }
+
+      function togglePadPlayback(padId) {
+        const pad = pads[padId];
+        if (!pad.buffer) return;
+
+        const cellElement = cellElFor(pad);
+
+        if (pad.active) {
+          stopPad(pad, cellElement);
+        } else if (pad.queued) {
+          // Tapping a pad that's already cued but hasn't landed on the beat yet
+          // cancels the cue instead of doing nothing.
+          pad.queued = false;
+          cellElement.classList.remove('hex-queued');
+        } else {
+          // Quantized On-Beat Triggering (Queue sample for upcoming beat boundary)
+          pad.queued = true;
+          cellElement.classList.add('hex-queued');
+        }
+      }
+
+      function playPad(pad, cellElement, when) {
+        if (!audioCtx || !pad.buffer) return;
+        const startTime = when || audioCtx.currentTime;
+
+        if (pad.sourceNode) {
+          try { pad.sourceNode.stop(); } catch(e) {}
+        }
+        if (pad.pitchNode) {
+          try { pad.pitchNode.disconnect(); } catch(e) {}
+        }
+
+        const source = audioCtx.createBufferSource();
+        source.buffer = pad.buffer;
+
+        // Calculate synchronized playback speed and pitch transpose
+        const tempoRatio = masterBpm / pad.originalBpm;
+        const desiredPitchRatio = Math.pow(2, shortestSemitoneShift(pad.originalKey, masterKey) / 12);
+
+        const gainNode = audioCtx.createGain();
+        gainNode.gain.setValueAtTime(pad.volume, startTime);
+
+        let pitchNode = null;
+        if (pitchShiftAvailable) {
+          // Tempo lives entirely on the source's playbackRate; the worklet
+          // cancels the pitch shift that comes along with it and applies the
+          // key correction on its own, so tempo and pitch move independently.
+          source.playbackRate.setValueAtTime(tempoRatio, startTime);
+          pitchNode = new AudioWorkletNode(audioCtx, PITCH_WORKLET_NAME, {
+            numberOfInputs: 1,
+            numberOfOutputs: 1,
+            outputChannelCount: [2],
+            channelCount: 2,
+            channelCountMode: 'explicit',
+            channelInterpretation: 'speakers'
+          });
+          pitchNode.parameters.get('pitchRatio').setValueAtTime(desiredPitchRatio / tempoRatio, startTime);
+          source.connect(pitchNode);
+          pitchNode.connect(gainNode);
+        } else {
+          // Fallback: speed and pitch are linked, as they physically must be
+          // without a time-stretch/pitch-shift stage.
+          source.playbackRate.setValueAtTime(tempoRatio * desiredPitchRatio, startTime);
+          source.connect(gainNode);
+        }
+
+        gainNode.connect(masterGainNode);
+
+        if (pad.mode === 'loop') {
+          source.loop = true;
+        } else {
+          source.loop = false;
+          source.onended = () => {
+            pad.active = false;
+            if (cellElement) cellElement.classList.remove('hex-active');
+          };
+        }
+
+        source.start(startTime);
+        pad.sourceNode = source;
+        pad.gainNode = gainNode;
+        pad.pitchNode = pitchNode;
+        pad.active = true;
+        pad.queued = false;
+
+        if (cellElement) {
+          cellElement.classList.remove('hex-queued');
+          cellElement.classList.add('hex-active');
+          renderPad(pad);
+        }
+      }
+
+      function stopPad(pad, cellElement) {
+        if (pad.sourceNode) {
+          try { pad.sourceNode.stop(); } catch(e) {}
+          pad.sourceNode = null;
+        }
+        if (pad.pitchNode) {
+          try { pad.pitchNode.disconnect(); } catch(e) {}
+          pad.pitchNode = null;
+        }
+        pad.active = false;
+        pad.queued = false;
+        if (cellElement) {
+          cellElement.classList.remove('hex-active', 'hex-queued');
+          renderPad(pad);
+        }
+      }
+
+      // Lookahead Beat Scheduler
+      // Runs a cheap setTimeout tick every ~25ms that looks a little ahead on the
+      // *audio clock* (audioCtx.currentTime) and schedules anything due using
+      // source.start(exactTime) / gain.setValueAtTime(exactTime). This is the
+      // standard fix for the old setInterval-only approach, which is not
+      // sample-accurate and can stall when iOS Safari throttles a background tab.
+      function startBeatScheduler() {
+        if (schedulerTimerID) clearTimeout(schedulerTimerID);
+        nextBeatTime = audioCtx.currentTime;
+        schedulerTick();
+      }
+
+      function schedulerTick() {
+        while (nextBeatTime < audioCtx.currentTime + SCHEDULE_AHEAD_TIME) {
+          scheduleBeat(nextBeatTime);
+          nextBeatTime += 60 / masterBpm;
+        }
+        schedulerTimerID = setTimeout(schedulerTick, SCHEDULER_LOOKAHEAD_MS);
+      }
+
+      function scheduleBeat(time) {
+        const msUntilBeat = Math.max(0, (time - audioCtx.currentTime) * 1000);
+        setTimeout(pulseHeartbeats, msUntilBeat);
+
+        // Trigger queued samples precisely on the beat boundary — both banks
+        // are always on screen now, so every pad always has a real cell.
+        pads.forEach((pad) => {
+          if (pad.queued) {
+            playPad(pad, cellElFor(pad), time);
+          }
+        });
+
+        currentBeat = (currentBeat + 1) % (masterBars * 4);
+      }
+
+      // Master Control Updates
+      masterBpmInput.addEventListener('change', (e) => {
+        masterBpm = Math.max(40, Math.min(240, parseInt(e.target.value) || 120));
+        setCenterBpmDisplay(masterBpm);
+        pads.forEach(pad => updatePadPlaybackRate(pad));
+        // No scheduler restart needed: schedulerTick reads masterBpm on every
+        // iteration, so tempo changes take effect smoothly without a phase jump.
+      });
+
+      masterKeySelect.addEventListener('change', (e) => {
+        masterKey = e.target.value;
+        pads.forEach(pad => updatePadPlaybackRate(pad));
+      });
+
+      masterBarsSelect.addEventListener('change', (e) => {
+        masterBars = parseInt(e.target.value);
+        currentBeat = 0;
+      });
+
+      padBpmInput.addEventListener('change', (e) => {
+        const pad = pads[selectedPadId];
+        pad.originalBpm = parseInt(e.target.value) || 120;
+        updatePadPlaybackRate(pad);
+      });
+
+      padKeySelect.addEventListener('change', (e) => {
+        const pad = pads[selectedPadId];
+        pad.originalKey = e.target.value;
+        updatePadPlaybackRate(pad);
+      });
+
+      btnModeLoop.addEventListener('click', () => {
+        const pad = pads[selectedPadId];
+        pad.mode = 'loop';
+        selectPad(selectedPadId);
+        renderPad(pad);
+      });
+
+      btnModeOneshot.addEventListener('click', () => {
+        const pad = pads[selectedPadId];
+        pad.mode = 'oneshot';
+        selectPad(selectedPadId);
+        renderPad(pad);
+      });
+
+      // Per-pad volume. Each pad keeps its own `volume` value and gets its own
+      // GainNode when it plays (see playPad), so this only ever affects the
+      // pad currently selected — every other pad's level is untouched.
+      padVolumeSlider.addEventListener('input', (e) => {
+        const val = parseFloat(e.target.value);
+        const pad = pads[selectedPadId];
+        pad.volume = val;
+        padVolumeReadout.textContent = `${Math.round(val * 100)}%`;
+        if (pad.gainNode && audioCtx) {
+          pad.gainNode.gain.setValueAtTime(val, audioCtx.currentTime);
+        }
+      });
+
+      // Stops every pad in both banks — anything audible, whether or not
+      // its grid currently has focus.
+      btnStopAll.addEventListener('click', () => {
+        pads.forEach((pad) => stopPad(pad, cellElFor(pad)));
+      });
+
+      // Stops and clears every pad in the "active" bank only (the bank of
+      // whichever pad is currently selected), so clearing Bank A can't wipe
+      // out samples you've loaded into Bank B.
+      btnClearAll.addEventListener('click', () => {
+        const bank = pads[selectedPadId].bank;
+        if (!confirm(`Clear Bank ${BANK_LABELS[bank]}? This removes every loaded sample in this bank.`)) return;
+        for (let i = 0; i < PADS_PER_BANK; i++) {
+          const pad = pads[bank * PADS_PER_BANK + i];
+          stopPad(pad, cellElFor(pad));
+          pad.buffer = null;
+          pad.name = `Empty Pad ${i + 1}`;
+          pad.mode = 'loop';
+          pad.volume = 0.8;
+          pad.originalBpm = 120;
+          pad.originalKey = 'C';
+          renderPad(pad);
+        }
+        selectPad(selectedPadId);
+      });
+
+      // Recording Output Feature
+      btnRecord.addEventListener('click', () => {
+        if (!audioCtx) initAudioContext();
+
+        if (!isRecording) {
+          // Start Recording Master Audio Stream
+          recordedChunks = [];
+          const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+          mediaRecorder = new MediaRecorder(recDestination.stream, { mimeType });
+
+          mediaRecorder.ondataavailable = (evt) => {
+            if (evt.data.size > 0) recordedChunks.push(evt.data);
+          };
+
+          mediaRecorder.onstop = () => {
+            const blob = new Blob(recordedChunks, { type: mediaRecorder.mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `looper-mix-${Date.now()}.${mediaRecorder.mimeType.includes('webm') ? 'webm' : 'mp4'}`;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+            }, 100);
+          };
+
+          mediaRecorder.start();
+          isRecording = true;
+          recDot.classList.add('animate-ping');
+          recText.innerText = "Stop & Save";
+        } else {
+          // Stop Recording and Download File
+          mediaRecorder.stop();
+          isRecording = false;
+          recDot.classList.remove('animate-ping');
+          recText.innerText = "Record";
+        }
+      });
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Pulsark Kit & Sequence WAV Exporter — Clean</title>
+  <link rel="stylesheet" href="styles/main.css">
+  <!-- Vendored JSZip (local file) -->
+  <script defer src="vendor/jszip.min.js"></script>
+  <script type="module" defer src="js/main.js"></script>
+</head>
+<body>
+  <header>
+    <h1>Pulsark Kit & Sequence WAV Exporter</h1>
+    <div class="header-actions">
+      <button id="exportSeqWavBtn" class="btn" disabled>Export Sequence as WAV</button>
+      <button id="exportPkbankBtn" class="btn btn-secondary" disabled>Export .pkbank</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="drop-zone" id="dropZone" role="button" tabindex="0" aria-label="Drop .pkbank or zip file here">
+      <p class="drop-title">Drop your <code>.pkbank</code> file here or click to browse</p>
+      <input type="file" id="fileInput" accept=".pkbank,.zip" aria-hidden="true">
+    </div>
+
+    <section class="workspace container">
+      <div class="main-workspace">
+        <div class="pads-grid" id="padsGrid" aria-label="Drum pads"></div>
+
+        <div class="sequencer-card">
+          <div class="seq-header">
+            <h3>Pattern Step Sequencer</h3>
+            <div class="seq-controls">
+              <label for="bpmInput">BPM</label>
+              <input type="number" id="bpmInput" value="120" min="40" max="240">
+              <button id="playSeqBtn" class="btn btn-secondary" disabled>Play Sequence</button>
+            </div>
+          </div>
+
+          <div class="seq-grid-container">
+            <div class="seq-grid" id="seqGrid" role="grid" aria-label="Sequencer Grid"></div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="editor-panel">
+        <h2 id="editorTitle">Select a Pad</h2>
+        <div id="editorControls" hidden>
+          <div class="control-group">
+            <label>Volume <span id="val-volume">100%</span></label>
+            <input type="range" id="param-volume" min="0" max="150" value="100">
+          </div>
+
+          <div class="control-group">
+            <label>Pitch <span id="val-pitch">0</span></label>
+            <input type="range" id="param-pitch" min="-12" max="12" value="0" step="1">
+          </div>
+
+          <div style="margin-top:12px;">
+            <button id="previewBtn" class="btn">Preview Pad</button>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <div id="toastContainer" aria-live="polite" class="toast-root"></div>
+  </main>
+</body>
+</html>

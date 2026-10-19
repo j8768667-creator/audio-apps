@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>PromptWeaver — AI Music Prompt Studio</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+:root{color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);-webkit-tap-highlight-color:transparent}
+html,body{background:#0a0d12;color:#f0f4f9;font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+.card{background:#11151ce6;border:1px solid #1e2633;border-radius:16px;padding:20px}
+.inp{width:100%;background:#0a0d12;border:1px solid #1e2633;border-radius:12px;padding:9px 12px;font-size:12px;color:#fff;outline:none}
+.inp:focus{border-color:#f59e0b}.inp:disabled{opacity:.45}
+.lbl{display:block;font-size:12px;font-weight:500;color:#8494ab;margin-bottom:6px}
+.h{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#f59e0b}
+.hint{font-size:11px;color:#8494ab}
+.chip{min-height:32px;padding:4px 12px;border-radius:12px;border:1px solid #1e2633;font-size:12px;color:#8494ab;transition:all .12s;touch-action:manipulation;user-select:none}
+.chip:hover{color:#fff}.chip.on{background:#f59e0b2e;border-color:#f59e0b;color:#fbbf24}
+.btn{min-height:36px;padding:0 14px;border-radius:10px;font-size:12px;font-weight:600;background:#1e2633;transition:.12s}.btn:hover{background:#2b3648}.btn:active{transform:scale(.95)}
+.out{width:100%;background:#0a0d12;border:1px solid #1e2633;border-radius:12px;padding:14px;font:12px/1.6 ui-monospace,Menlo,monospace;color:#d4dce7;outline:none;resize:none}
+</style>
+</head>
+<body class="min-h-screen antialiased pb-12">
+
+<header style="background:#11151cf2;border-bottom:1px solid #1e2633" class="sticky top-0 z-40 backdrop-blur">
+  <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+    <div class="flex items-center gap-3">
+      <div style="background:linear-gradient(135deg,#f59e0b,#b45309);color:#0a0d12" class="w-9 h-9 rounded-lg flex items-center justify-center font-black text-sm shrink-0">PW</div>
+      <div><h1 class="text-base font-bold leading-none">PromptWeaver</h1><p class="hint mt-1">Multi-Engine AI Music Prompt Studio</p></div>
+    </div>
+    <div class="flex gap-2">
+      <button id="resetBtn" class="btn" style="background:none;border:1px solid #1e2633;color:#8494ab">Reset</button>
+      <button id="copyMainBtn" class="btn" style="background:#f59e0b;color:#0a0d12">Copy Prompt</button>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-5xl mx-auto px-4 py-6 space-y-6">
+  <section class="card flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+      <h2 class="hint font-bold uppercase tracking-wider">Target Generation Model</h2>
+      <p id="engineSub" class="text-xs mt-1" style="color:#d4dce7"></p>
+    </div>
+    <div id="engineTabs" class="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1 rounded-xl" style="background:#0a0d12;border:1px solid #1e2633"></div>
+  </section>
+
+  <div class="flex flex-wrap items-center gap-2">
+    <select id="presetSel" class="inp" style="width:auto;min-width:130px"></select>
+    <input id="presetName" class="inp" style="width:140px" placeholder="Preset name">
+    <button id="presetSave" class="btn">Save</button>
+    <button id="presetDel" class="btn hidden">Delete</button>
+    <button id="rndBtn" class="btn ml-auto" style="color:#f59e0b">🎲 Randomize</button>
+  </div>
+
+  <div class="grid lg:grid-cols-12 gap-6">
+    <div class="lg:col-span-7 space-y-5">
+
+      <!-- 1 -->
+      <section class="card">
+        <div class="flex justify-between mb-3"><h3 class="h">1 · Sound, Style &amp; Era</h3><span class="hint">Each menu narrows the next</span></div>
+        <div class="grid sm:grid-cols-2 gap-3.5">
+          <div><label class="lbl">Genre</label><select id="genre" class="inp"></select></div>
+          <div><label class="lbl">Subgenre</label><select id="sub" class="inp"></select></div>
+          <div><label class="lbl">Aesthetic Era / Style</label><select id="era" class="inp"></select></div>
+          <div><label class="lbl">Key Instrumentation</label><select id="instrSel" class="inp"></select></div>
+        </div>
+        <div id="instrChips" class="flex flex-wrap gap-1.5 mt-3"></div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 pt-4" style="border-top:1px solid #1e2633">
+          <div><label class="lbl">Tempo (BPM)</label><input id="bpm" type="number" min="40" max="220" class="inp" style="font-family:ui-monospace,monospace"></div>
+          <div><label class="lbl">Key Center</label><select id="key" class="inp"></select></div>
+          <div class="col-span-2"><label class="lbl">Vocals</label><select id="vocal" class="inp"></select></div>
+        </div>
+        <div class="grid sm:grid-cols-3 gap-3.5 mt-3.5">
+          <div><label class="lbl">Vocal Delivery</label><select id="deliv" class="inp"></select></div>
+          <div><label class="lbl">Vocal Mix Level</label><select id="vmix" class="inp"></select></div>
+          <div><label class="lbl">Extra tags (optional)</label><input id="extra" class="inp" placeholder="e.g. layered harmonies"></div>
+        </div>
+      </section>
+
+      <!-- 2 -->
+      <section class="card">
+        <div class="flex justify-between mb-1"><h3 class="h">2 · Mood &amp; Atmosphere</h3><span class="hint">Tap to toggle</span></div>
+        <p class="hint mb-2.5">Adds emotional descriptors to the prompt. Options change with your genre.</p>
+        <div id="moodChips" class="flex flex-wrap gap-1.5"></div>
+      </section>
+
+      <!-- 3 -->
+      <section class="card">
+        <div class="flex justify-between mb-1"><h3 class="h">3 · Production &amp; Mix</h3><span class="hint">Tap to toggle</span></div>
+        <p class="hint mb-2.5">Adds sound-quality descriptors (tape warmth, stereo width, etc.).</p>
+        <div id="prodChips" class="flex flex-wrap gap-1.5"></div>
+      </section>
+
+      <!-- 4 -->
+      <section id="structSec" class="card">
+        <div class="flex justify-between mb-1"><h3 class="h">4 · Song Structure (Lyrics Box)</h3><span class="hint" style="color:#06b6d4">All engines</span></div>
+        <p class="hint mb-3">Section cues belong in the Lyrics field, not the style prompt.</p>
+        <div class="grid sm:grid-cols-2 gap-3 mb-3">
+          <div><label class="lbl">Arrangement Template</label>
+            <select id="struct" class="inp">
+              <option value="rock">Rock/Prog: Intro · Build · Solo · Climax · Outro</option>
+              <option value="edm">Electronic: Intro · Build · Drop · Outro</option>
+              <option value="pop">Pop: Intro · Verse · Chorus · Outro</option>
+              <option value="ambient">Ambient: Intro · Evolution · Peak · Outro</option>
+            </select></div>
+          <div><label class="lbl">Dynamic Arc</label>
+            <select id="arc" class="inp">
+              <option value="">None</option>
+              <option>dramatic dynamic build</option><option>intricate melodic phrasing</option>
+              <option>slow unhurried build</option><option>sparse held vocal phrases</option><option>slow build to massive climax</option><option>steady hypnotic groove</option>
+            </select></div>
+        </div>
+        <div id="secChips" class="flex flex-wrap gap-1.5"></div>
+      </section>
+    </div>
+
+    <!-- OUTPUT -->
+    <div class="lg:col-span-5 space-y-5 lg:sticky lg:top-20 self-start">
+      <div class="card" style="background:#11151c">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-2"><span id="dot" class="w-2.5 h-2.5 rounded-full"></span><h3 id="pTitle" class="text-sm font-bold"></h3></div>
+          <button id="copyPromptBtn" class="btn" style="color:#f59e0b">Copy</button>
+        </div>
+        <p id="pHelp" class="hint mb-2.5"></p>
+        <div id="detail" class="flex gap-1 p-1 rounded-lg mb-2.5" style="background:#0a0d12;border:1px solid #1e2633"></div>
+        <textarea id="mainOut" rows="7" readonly class="out"></textarea>
+        <div class="mt-3">
+          <div class="flex justify-between items-center text-[11px] mb-1" style="font-family:ui-monospace,monospace">
+            <span id="cnt" class="hint"></span><span id="stat" class="font-bold"></span>
+          </div>
+          <div class="w-full h-1.5 rounded-full overflow-hidden" style="background:#0a0d12;border:1px solid #1e2633"><div id="bar" class="h-full" style="transition:width .15s"></div></div>
+          <button id="trimBtn" class="btn mt-3 hidden" style="color:#f59e0b">Auto-trim to limit</button>
+        </div>
+      </div>
+
+      <div id="lyrCard" class="card" style="background:#11151c">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full" style="background:#06b6d4"></span><h3 class="text-sm font-bold">Lyrics &amp; Section Cues</h3></div>
+          <button id="copyLyricsBtn" class="btn" style="color:#06b6d4">Copy Structure</button>
+        </div>
+        <div id="drafter" class="mb-2.5">
+          <div class="flex gap-2"><input id="theme" class="inp" placeholder="Theme or story (optional)"><button id="draftBtn" class="btn shrink-0" style="background:#06b6d4;color:#0a0d12">Draft lyrics</button></div>
+          <p class="hint mt-1.5">Written by Claude to fit your genre, mood, tempo and sections. Press again for a fresh take.</p>
+          <button id="stripBtn" type="button" class="hint mt-1.5 underline">Strip delivery cues (if an engine sings them aloud)</button>
+          <details class="mt-2"><summary class="hint cursor-pointer" style="color:#06b6d4">Out of credits? Use another AI</summary>
+            <div id="extAI" class="flex flex-wrap gap-1.5 mt-2"></div>
+            <p class="hint mt-1.5">Copies the lyric prompt and opens the site. If it doesn't fill in, paste it; then paste the reply into the box below. "Copy only" is for browser AI sidebars (Edge Copilot, Chrome Gemini, Brave Leo).</p>
+          </details>
+        </div>
+        <p class="hint mb-2.5">Paste into the Lyrics box. Editable.</p>
+        <textarea id="lyrOut" rows="7" class="out"></textarea>
+      </div>
+
+      <div id="negCard" class="card" style="background:#11151c">
+        <div class="flex items-center justify-between mb-2">
+          <h4 class="hint font-bold uppercase tracking-wider">Negative Prompt</h4>
+          <button id="copyNegBtn" class="btn" style="min-height:28px;font-size:11px">Copy</button>
+        </div>
+        <div id="negChips" class="flex flex-wrap gap-1.5 mb-2.5"></div>
+        <input id="negOut" readonly class="inp" style="font-family:ui-monospace,monospace;color:#8494ab">
+      </div>
+    </div>
+  </div>
+</main>
+
+<div id="toast" class="fixed bottom-6 left-1/2 px-5 py-2.5 rounded-xl text-xs font-bold pointer-events-none z-50" style="background:#f59e0b;color:#0a0d12;opacity:0;transform:translate(-50%,0);transition:.2s"></div>
+
+<script>
+(function(){
+const $=id=>document.getElementById(id);
+
+const MOODS={
+  rock:['dramatic','epic','melancholic','nostalgic','driving','triumphant','introspective','bittersweet'],
+  elec:['neon-lit','dark','hypnotic','euphoric','driving','nostalgic','futuristic','tense'],
+  roots:['heartfelt','wistful','sun-baked','rowdy','homespun','defiant','bittersweet','nostalgic'],
+  soft:['warm','dreamy','intimate','atmospheric','cinematic','melancholic','hazy','serene','brooding','vast']
+};
+const PRODS={
+  analog:['vintage warm production','analog tape warmth','wide stereo mix','punchy mix','reverberant space','lo-fi texture','dynamic arrangement'],
+  modern:['modern master','wide stereo mix','tight sidechain','punchy mix','crisp highs','deep sub bass','polished mix']
+};
+// era: [label, [extra instruments that era brings]]
+const G={
+ 'Symphonic Rock':{sub:['Art Rock','Neo-Prog','Orchestral Rock','Cinematic Rock'],era:[['70s analog warmth',['mellotron strings','moog solo synth']],['80s arena polish',['gated reverb drums','polysynth']],['modern widescreen',['hybrid orchestra','string section']]],
+   instr:['overdriven lead guitar','analog polysynth pads','heavy acoustic drums','grand piano','pipe organ','bass guitar'],bpm:130,vocal:'Male melodic vocal',st:'rock',m:'rock',p:'analog'},
+ 'Progressive Rock':{sub:['Canterbury','Symphonic Prog','Prog Metal','Math Rock'],era:[['70s studio classic',['hammond organ','mellotron']],['90s revival',['seven-string guitar','odd-meter drums']],['modern prog',['djent guitar','synth arpeggios']]],
+   instr:['electric lead guitar','bass guitar','drum kit','flute','analog synth','acoustic guitar'],bpm:120,vocal:'Instrumental, no vocals',st:'rock',m:'rock',p:'analog'},
+ 'Hard Rock':{sub:['Arena Rock','Glam Metal','Blues Rock','Southern Rock'],era:[['70s raw',['fuzz guitar','hammond organ']],['80s hair-metal gloss',['gated snare','chorus guitar']],['modern heavy',['downtuned guitars','tight kick']]],
+   instr:['crunchy rhythm guitar','screaming lead guitar','pounding drums','driving bass','power chords','talkbox'],bpm:140,vocal:'Male melodic vocal',st:'pop',m:'rock',p:'analog'},
+ 'Post-Rock':{sub:['Cinematic Post-Rock','Ambient Post-Rock','Post-Metal'],era:[['90s lo-fi',['tremolo guitar','tape hiss']],['2000s crescendo',['glockenspiel','swelling strings']],['modern',['reverse reverb guitar','granular textures']]],
+   instr:['delay-drenched guitar','tremolo guitar','swelling strings','sparse piano','slow drums','warm bass'],bpm:90,vocal:'Instrumental, no vocals',st:'rock',m:'soft',p:'analog'},
+ 'Shoegaze':{sub:['Dream Pop','Noisegaze','Blackgaze'],era:[['early 90s',['fuzz pedals','tape flutter']],['2010s revival',['shimmer reverb','lush pads']]],
+   instr:['wall of guitars','fuzz guitar','shimmer reverb','soft drums','pulsing bass','ethereal synth'],bpm:105,vocal:'Female airy vocals',st:'pop',m:'soft',p:'analog'},
+ 'Synthwave':{sub:['Outrun','Dreamwave','Retrowave','Dark Synthwave'],era:[['80s analog',['juno pads','linn drum']],['neon nostalgia',['gated reverb snare','arpeggiated bass']],['modern retro',['sidechained pads','vocoder']]],
+   instr:['analog polysynth','arpeggiated bass','gated reverb drums','lead synth','pulsing bassline','electric guitar'],bpm:110,vocal:'Instrumental, no vocals',st:'edm',m:'elec',p:'modern'},
+ 'Darksynth':{sub:['Cyberpunk','Horror Synth','Industrial Synth'],era:[['80s horror score',['analog drones','oberheim brass']],['modern cyberpunk',['distorted bass','glitch percussion']]],
+   instr:['distorted bass synth','aggressive lead','industrial drums','dark pads','sub bass','arpeggiator'],bpm:120,vocal:'Instrumental, no vocals',st:'edm',m:'elec',p:'modern'},
+ 'Melodic Techno':{sub:['Progressive House','Organic House','Peak-Time Techno'],era:[['2010s Berlin',['analog bassline','rolling percussion']],['modern club',['plucked lead','atmospheric pads']]],
+   instr:['rolling bassline','plucked lead synth','atmospheric pads','four-on-the-floor kick','hi-hat groove','vocal chops'],bpm:124,vocal:'Instrumental, no vocals',st:'edm',m:'elec',p:'modern'},
+ 'Synth-Pop':{sub:['New Wave','Electropop','Futurepop'],era:[['early 80s',['fairlight stabs','drum machine']],['mid 80s',['dx7 keys','gated drums']],['modern',['clean synth bass','vocal harmonies']]],
+   instr:['synth bass','drum machine','analog lead','bright pads','electric guitar','vocal harmonies'],bpm:118,vocal:'Female airy vocals',st:'pop',m:'elec',p:'modern'},
+ 'Chillwave':{sub:['Lo-Fi Chillwave','Hypnagogic Pop','Vaporwave'],era:[['2010s bedroom',['tape wobble','washed-out synths']],['modern nostalgia',['vinyl crackle','soft keys']]],
+   instr:['washed-out synths','tape-saturated drums','soft bass','vinyl crackle','warm keys','dreamy guitar'],bpm:95,vocal:'Female airy vocals',st:'pop',m:'soft',p:'analog'},
+ 'Cinematic Ambient':{sub:['Dark Ambient','Drone','Neo-Classical Ambient'],era:[['timeless',['string swells','felt piano']],['modern film score',['hybrid textures','sub boom']]],
+   instr:['evolving pads','felt piano','string swells','deep drones','soft choir','granular textures'],bpm:70,vocal:'Solo breathy vocal, sparse phrases',st:'ambient',m:'soft',p:'modern'},
+ 'Neo-Soul':{sub:['Alt R&B','Jazz-Soul','Quiet Storm'],era:[['90s Soulquarian',['rhodes piano','loose drums']],['modern',['warm sub bass','lush chords']]],
+   instr:['rhodes piano','warm bass','laid-back drums','muted guitar','lush chords','horn stabs'],bpm:88,vocal:'Male melodic vocal',st:'pop',m:'soft',p:'analog'},
+ 'Electro-Swing':{sub:['Swing House','Gypsy Jazz Electro','Big Band Electro'],era:[['1930s sample style',['vintage brass','crackling shellac']],['modern club',['sidechained bass','punchy 4/4 kick']]],
+   instr:['swing horns','upright bass','clarinet','four-on-the-floor kick','piano','scat vocal chops'],bpm:125,vocal:'Female airy vocals',st:'pop',m:'elec',p:'analog'}
+,'Indie':{sub:['Indie Rock','Indie Folk','Indie Pop','Bedroom Pop','Lo-Fi Indie'],era:[['2000s garage revival',['jangly guitar','tape saturation']],['2010s folk-pop',['stomp-clap percussion','banjo pluck']],['bedroom lo-fi',['four-track hiss','drum machine']]],
+   instr:['jangly electric guitar','acoustic guitar','melodic bass','live drums','warm organ','handclaps'],bpm:118,vocal:'Male melodic vocal',st:'pop',m:'soft',p:'analog'},
+ 'Country':{sub:['Modern Country','Outlaw Country','Country Pop','Americana','Bluegrass'],era:[['50s honky-tonk',['pedal steel','upright bass']],['70s outlaw',['telecaster twang','harmonica']],['modern radio country',['layered harmonies','polished acoustic guitars']]],
+   instr:['acoustic guitar','pedal steel','fiddle','banjo','telecaster twang','upright bass'],bpm:105,vocal:'Male melodic vocal',st:'pop',m:'roots',p:'analog'}
+};
+const T={rock:['Intro','Build','Instrumental Solo','Climax','Outro'],edm:['Intro','Build','Drop','Breakdown','Drop','Outro'],pop:['Intro','Verse 1','Chorus','Verse 2','Chorus','Outro'],ambient:['Intro','Evolution','Peak','Outro']};
+const SECTIONS=['[Intro]','[Build]','[Verse]','[Chorus]','[Bridge]','[Solo]','[Drop]','[Climax]','[Outro]'];
+const NEG=['auto-tune','clipping','distortion','muddy low end','tinny highs','harsh sibilance'];
+const VOCALS=['Instrumental, no vocals','Female airy vocals','Male melodic vocal','Ethereal choir backing','Gritty male vocal','Soulful female vocal','Solo breathy vocal, sparse phrases',''];
+const NOTES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+// Character limits are per-engine settings: edit here if a platform changes them.
+const ENG={
+ stepaudio:{tab:'StepAudio-3',n:'StepAudio-3-Music Prompt',lim:500,dot:'#8b5cf6',lyr:false,neg:false,help:'Comma-separated tags, ordered by priority for the 500-character cap.',sub:'Targeting stepfun-ai/StepAudio-3-Music. Positive tags only.'},
+ flow:{tab:'Flow Music',n:'Flow Music Sound Prompt',lim:1000,dot:'#f59e0b',lyr:true,neg:false,help:'Descriptive acoustic and instrument tags. Put cues in the Lyrics box.',sub:'Dual-box model: sound prompt + lyrics/section cues.'},
+ suno:{tab:'Suno v3/v4',n:'Suno Style Prompt',lim:200,dot:'#f59e0b',lyr:true,neg:true,help:'Style field. Short and dense works best.',sub:'Style prompt is short, so priority tokens come first.'},
+ udio:{tab:'Udio',n:'Udio Prompt',lim:300,dot:'#f59e0b',lyr:true,neg:true,help:'Genre and descriptor tags.',sub:'Full style and tag control.'}
+};
+
+let eng='stepaudio', trimOn=false;
+const S={instr:[],moods:new Set(),prods:new Set(),negs:new Set(NEG)};
+
+const fill=(el,items,ph)=>{el.innerHTML='';if(ph!==undefined)el.add(new Option(ph,''));items.forEach(i=>el.add(new Option(i,i)));};
+const gd=()=>G[$('genre').value];
+
+fill($('genre'),Object.keys(G));
+NOTES.forEach(n=>['minor','major'].forEach(s=>$('key').add(new Option(`${n} ${s}`,`${n} ${s}`))));
+$('key').insertBefore(new Option('Any Key',''),$('key').firstChild);$('key').value='';
+VOCALS.forEach(v=>$('vocal').add(new Option(v||'Unspecified',v)));
+const DELIV=[['None',''],['Expressive & clear','emotionally expressive delivery, clear diction, dynamic vocal performance'],['Fragile & aching','fragile, aching, breathy vocal with subtle vibrato, close-mic intimacy'],['Tender & warm','tender, warm, intimate close-mic vocal, articulate consonants'],['Soaring & dramatic','powerful, soaring, emotive vocal with dramatic dynamics'],['Hushed & haunting','hushed, haunting, whispered intensity, then swelling']];
+DELIV.forEach(([n,v])=>$('deliv').add(new Option(n,v)));$('deliv').selectedIndex=1;
+[['None',''],['Upfront lead','lead vocal upfront in the mix, prominent and clear, sparse arrangement leaving space for the vocal'],['Balanced','vocal balanced with the instruments'],['Blended','vocal blended into the instrumental texture']].forEach(([n,v])=>$('vmix').add(new Option(n,v)));$('vmix').selectedIndex=1;
+
+function chips(el,items,set,after){
+  el.innerHTML='';
+  items.forEach(i=>{const b=document.createElement('button');b.type='button';b.textContent=i;
+    b.className='chip'+(set.has(i)?' on':'');
+    b.onclick=()=>{set.has(i)?set.delete(i):set.add(i);after();};el.appendChild(b);});
+}
+function renderChips(){
+  const g=gd();
+  chips($('moodChips'),MOODS[g.m],S.moods,()=>{renderChips();go();});
+  chips($('prodChips'),PRODS[g.p],S.prods,()=>{renderChips();go();});
+  chips($('negChips'),NEG,S.negs,()=>{renderChips();go();});
+}
+function renderInstr(){
+  const g=gd(), era=g.era.find(e=>e[0]===$('era').value), pool=[...new Set([...(era?era[1]:[]),...g.instr])];
+  fill($('instrSel'),pool.filter(i=>!S.instr.includes(i)),'+ Add instrument…');
+  const box=$('instrChips');box.innerHTML='';
+  S.instr.forEach(i=>{const b=document.createElement('button');b.type='button';b.className='chip on';b.textContent=i+' ×';
+    b.onclick=()=>{S.instr=S.instr.filter(x=>x!==i);renderInstr();go();};box.appendChild(b);});
+}
+function setStruct(k){$('struct').value=k;$('lyrOut').value=T[k].map(s=>`[${s}]`).join('\n\n');}
+
+function onGenre(){
+  const g=gd();
+  fill($('sub'),g.sub,'Any subgenre');
+  fill($('era'),g.era.map(e=>e[0]),'Any era');
+  S.instr=g.instr.slice(0,3);
+  S.moods=new Set(MOODS[g.m].slice(0,2));S.prods=new Set(PRODS[g.p].slice(0,2));
+  $('bpm').value=g.bpm;$('vocal').value=g.vocal;$('arc').value=g.bpm<=90?'slow unhurried build':'';
+  setStruct(g.st);renderInstr();renderChips();go();
+}
+$('genre').onchange=onGenre;
+$('era').onchange=()=>{renderInstr();go();};
+$('instrSel').onchange=e=>{if(e.target.value){S.instr.push(e.target.value);renderInstr();go();}};
+$('struct').onchange=e=>setStruct(e.target.value);
+
+// Section cue buttons
+SECTIONS.forEach(t=>{const b=document.createElement('button');b.type='button';b.textContent=t;
+  b.className='btn';b.style.cssText='min-height:30px;padding:0 10px;font-family:ui-monospace,monospace;color:#06b6d4;background:#0a0d12;border:1px solid #1e2633';
+  b.onclick=()=>{const c=$('lyrOut').value.trimEnd();$('lyrOut').value=(c?c+'\n\n':'')+t+'\n';};
+  $('secChips').appendChild(b);});
+
+// Engine tabs
+Object.entries(ENG).forEach(([k,e])=>{const b=document.createElement('button');b.dataset.k=k;b.textContent=e.tab;
+  b.onclick=()=>setEngine(k);$('engineTabs').appendChild(b);});
+function setEngine(k){
+  eng=k;const e=ENG[k];
+  [...$('engineTabs').children].forEach(b=>{const on=b.dataset.k===k;
+    b.className='px-3 py-2 rounded-lg text-xs '+(on?'font-bold':'font-semibold hover:text-white');
+    b.style.cssText=on?'background:#f59e0b;color:#0a0d12':'color:#8494ab';});
+  $('lyrCard').style.display='block';
+  $('negCard').style.display=e.neg?'block':'none';
+  
+  $('dot').style.background=e.dot;$('bar').style.background=e.dot;
+  $('pTitle').textContent=e.n;$('pHelp').textContent=e.help;$('engineSub').textContent=e.sub;
+  go();
+}
+
+function tokens(){
+  const g=$('genre').value,sub=$('sub').value,era=$('era').value,bpm=$('bpm').value,key=$('key').value,
+        vocal=$('vocal').value,arc=$('arc').value,
+        extra=$('extra').value.split(',').map(s=>s.trim()),
+        L=detail==='Lean',M=[...S.moods].slice(0,L?2:99),P=L?[]:[...S.prods],I=L?S.instr.slice(0,2):detail==='Vivid'?[...S.instr,...((gd().era.find(x=>x[0]===era)||[0,[]])[1])]:S.instr,b=bpm?bpm+' BPM':'',
+        sl=(+bpm||100)<=85&&vocal&&!/^Instrumental/.test(vocal)?'slow unhurried vocal phrasing':'',
+        dl=vocal&&!/^Instrumental/.test(vocal)?$('deliv').value:'',
+        vm=vocal&&!/^Instrumental/.test(vocal)?$('vmix').value:'',
+        k=key?(eng==='stepaudio'?key:'key of '+key):'';
+  const order=eng==='stepaudio'
+    ?[g,sub,...I,arc,...M,b,k,vocal,sl,vm,dl,era,...P,...extra]
+    :[g,sub,era,...M,b,k,vocal,sl,vm,dl,...I,...P,arc,...extra];
+  const seen=new Set();
+  return order.filter(t=>{const l=t&&t.toLowerCase();if(!t||seen.has(l))return false;seen.add(l);return true;});
+}
+function compile(){
+  const e=ENG[eng];let t=tokens();
+  const join=a=>a.join(', ');
+  if(trimOn)while(t.length>1&&join(t).length>e.lim)t.pop();
+  const txt=join(t),len=txt.length,over=len>e.lim;
+  $('mainOut').value=txt;
+  $('cnt').textContent=`${len} / ${e.lim} characters`;
+  $('bar').style.width=Math.min(100,len/e.lim*100)+'%';
+  const st=$('stat');
+  if(over){st.textContent=`EXCEEDED BY ${len-e.lim}`;st.style.color='#f87171';$('bar').style.background='#ef4444';}
+  else if(len>e.lim*.88){st.textContent='NEAR LIMIT';st.style.color='#f59e0b';$('bar').style.background='#f59e0b';}
+  else{st.textContent='OK';st.style.color='#2dd4bf';$('bar').style.background=e.dot;}
+  $('trimBtn').classList.toggle('hidden',!over);
+  $('negOut').value=[...S.negs].join(', ');
+}
+function go(){trimOn=false;compile();}
+$('trimBtn').onclick=()=>{trimOn=true;compile();};
+['sub','bpm','key','vocal','deliv','vmix','arc','extra'].forEach(id=>{$(id).addEventListener('input',go);$(id).addEventListener('change',go);});
+
+function toast(m){const t=$('toast');t.textContent=m;t.style.opacity=1;t.style.transform='translate(-50%,-6px)';
+  setTimeout(()=>{t.style.opacity=0;t.style.transform='translate(-50%,0)';},1600);}
+function copy(text,label){if(!text)return;
+  const ok=()=>toast(label);
+  (navigator.clipboard?navigator.clipboard.writeText(text):Promise.reject()).then(ok).catch(()=>{
+    const a=document.createElement('textarea');a.value=text;document.body.appendChild(a);a.select();
+    try{document.execCommand('copy');ok();}catch(_){toast('Copy failed');}a.remove();});}
+$('copyPromptBtn').onclick=$('copyMainBtn').onclick=()=>copy($('mainOut').value,'Prompt copied');
+$('copyLyricsBtn').onclick=()=>copy($('lyrOut').value,'Structure copied');
+$('copyNegBtn').onclick=()=>copy($('negOut').value,'Negative prompt copied');
+
+function reset(){
+  $('genre').value='Symphonic Rock';onGenre();
+  $('sub').value='Art Rock';$('era').value='70s analog warmth';
+  $('key').value='E minor';$('extra').value='';$('deliv').selectedIndex=1;$('vmix').selectedIndex=1;applySub();
+  S.negs=new Set(NEG);renderInstr();renderChips();go();
+}
+$('resetBtn').onclick=()=>{reset();$('presetSel').value='';$('presetDel').classList.add('hidden');toast('Reset to default template');};
+
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const shuffle=a=>a.map(v=>[Math.random(),v]).sort((x,y)=>x[0]-y[0]).map(x=>x[1]);
+
+// Subgenre → typical [BPM, key]
+const SB={'Art Rock':[124,'E minor'],'Neo-Prog':[116,'A minor'],'Orchestral Rock':[132,'D minor'],'Cinematic Rock':[110,'C minor'],
+'Canterbury':[108,'D major'],'Symphonic Prog':[118,'E minor'],'Prog Metal':[140,'F# minor'],'Math Rock':[132,'A minor'],
+'Arena Rock':[122,'A major'],'Glam Metal':[136,'E major'],'Blues Rock':[98,'A minor'],'Southern Rock':[112,'G major'],
+'Cinematic Post-Rock':[84,'B minor'],'Ambient Post-Rock':[72,'D major'],'Post-Metal':[78,'C# minor'],
+'Dream Pop':[98,'F# major'],'Noisegaze':[118,'E minor'],'Blackgaze':[128,'B minor'],
+'Outrun':[118,'A minor'],'Dreamwave':[96,'D major'],'Retrowave':[108,'F# minor'],'Dark Synthwave':[112,'C minor'],
+'Cyberpunk':[116,'D minor'],'Horror Synth':[92,'C# minor'],'Industrial Synth':[128,'F minor'],
+'Progressive House':[122,'A minor'],'Organic House':[118,'D minor'],'Peak-Time Techno':[132,'F minor'],
+'New Wave':[124,'E minor'],'Electropop':[116,'C major'],'Futurepop':[126,'A minor'],
+'Lo-Fi Chillwave':[82,'F major'],'Hypnagogic Pop':[92,'A major'],'Vaporwave':[70,'D# major'],
+'Dark Ambient':[60,'C minor'],'Drone':[50,'D minor'],'Neo-Classical Ambient':[68,'F major'],
+'Alt R&B':[76,'A minor'],'Jazz-Soul':[92,'D# major'],'Quiet Storm':[68,'G major'],
+'Swing House':[124,'G minor'],'Gypsy Jazz Electro':[132,'D minor'],'Big Band Electro':[120,'F major'],
+'Indie Rock':[128,'E major'],'Indie Folk':[100,'G major'],'Indie Pop':[112,'C major'],'Bedroom Pop':[92,'A major'],'Lo-Fi Indie':[85,'D major'],
+'Modern Country':[104,'G major'],'Outlaw Country':[108,'E major'],'Country Pop':[110,'C major'],'Americana':[88,'D major'],'Bluegrass':[140,'G major']};
+function applySub(){const v=SB[$('sub').value];if(v){$('bpm').value=v[0];$('key').value=v[1];}}
+$('sub').addEventListener('change',()=>{applySub();go();});
+
+// Detail level
+let detail='Full';
+function paintDetail(){[...$('detail').children].forEach(b=>{const on=b.textContent===detail;
+  b.className='flex-1 py-1.5 rounded-md text-xs '+(on?'font-bold':'');b.style.cssText=on?'background:#2b3648;color:#fff':'color:#8494ab';});}
+['Lean','Full','Vivid'].forEach(d=>{const b=document.createElement('button');b.textContent=d;b.onclick=()=>{detail=d;paintDetail();go();};$('detail').appendChild(b);});
+paintDetail();
+
+// Presets (browser storage, guarded)
+const PK='pw_presets';
+let mem={},persist=true;
+const STARTERS={'★ Symphonic Rock epic':{genre:'Symphonic Rock',sub:'Orchestral Rock',era:'modern widescreen'},
+'★ Midnight Outrun':{genre:'Synthwave',sub:'Outrun',era:'80s analog'},
+'★ Lo-fi evening':{genre:'Chillwave',sub:'Lo-Fi Chillwave',era:'modern nostalgia'},
+'★ Dark cinematic':{genre:'Cinematic Ambient',sub:'Dark Ambient',era:'modern film score'}};
+const loadP=()=>{let o={};try{o=JSON.parse(localStorage.getItem(PK)||'{}');}catch(_){o=mem;persist=false;}return o;};
+const saveP=o=>{mem=o;try{localStorage.setItem(PK,JSON.stringify(o));return true;}catch(_){persist=false;return false;}};
+const snap=()=>({eng,genre:$('genre').value,sub:$('sub').value,era:$('era').value,instr:S.instr,moods:[...S.moods],prods:[...S.prods],
+  bpm:$('bpm').value,key:$('key').value,vocal:$('vocal').value,deliv:$('deliv').value,vmix:$('vmix').value,arc:$('arc').value,extra:$('extra').value,st:$('struct').value,lyr:$('lyrOut').value});
+function applyP(p){
+  $('genre').value=p.genre;onGenre();$('sub').value=p.sub||'';$('era').value=p.era||'';
+  if(!p.instr){applySub();}else{
+    S.instr=p.instr;S.moods=new Set(p.moods);S.prods=new Set(p.prods);
+    ['bpm','key','vocal','deliv','vmix','arc','extra'].forEach(k=>{if(p[k]!==undefined)$(k).value=p[k];});
+    $('struct').value=p.st;$('lyrOut').value=p.lyr;}
+  renderInstr();renderChips();setEngine(p.eng||eng);
+}
+function paintP(sel){const u=Object.keys(loadP());fill($('presetSel'),[...Object.keys(STARTERS),...u],'Presets…');
+  $('presetSel').value=sel||'';$('presetDel').classList.toggle('hidden',!(sel&&u.includes(sel)));}
+$('presetSave').onclick=()=>{
+  const n=$('presetName').value.trim()||($('genre').value+($('sub').value?' · '+$('sub').value:''));
+  const o=loadP();o[n]=snap();
+  const ok=saveP(o);paintP(n);$('presetName').value='';toast(ok?'Preset saved':'Saved for this session only');
+};
+$('presetSel').onchange=e=>{const n=e.target.value,p=STARTERS[n]||loadP()[n];paintP(n);if(p)applyP(p);};
+$('presetDel').onclick=()=>{const o=loadP();delete o[$('presetSel').value];saveP(o);paintP('');toast('Preset deleted');};
+paintP('');
+
+// Randomize
+$('rndBtn').onclick=()=>{
+  const g=pick(Object.keys(G)),d=G[g];$('genre').value=g;onGenre();
+  $('sub').value=pick(d.sub);applySub();
+  const er=pick(d.era);$('era').value=er[0];
+  S.instr=shuffle([...new Set([...er[1],...d.instr])]).slice(0,4);
+  S.moods=new Set(shuffle(MOODS[d.m]).slice(0,3));S.prods=new Set(shuffle(PRODS[d.p]).slice(0,2));
+  $('arc').value=pick([...$('arc').options].map(o=>o.value));$('vocal').value=pick([d.vocal,d.vocal,...VOCALS.slice(0,6)]);$('deliv').selectedIndex=1+Math.floor(Math.random()*(DELIV.length-1));
+  renderInstr();renderChips();go();
+};
+
+// Lyric drafter (uses Claude via the page's sample capability)
+const ANGLES=['a single scene in present tense, built around one recurring physical object','a letter to one specific person that is never sent','a story with a turn: the final chorus changes meaning from the first','an object or place as the narrator','one memory taken apart into small physical details','an escalating litany with a plain-spoken chorus','two voices in a quiet argument that never quite resolves','a night shift, a road, a kitchen: ordinary work as the setting'];
+const RHYMES=['ABAB verses with AABB chorus','loose slant rhymes, with exact rhyme only on the chorus hook','ABCB, only lines 2 and 4 rhyme','unrhymed verses with strong rhythm, rhymed chorus couplets'];
+let smp=null;
+(async()=>{try{smp=await (window.claude&&window.claude.use('sample'));if(smp)$('drafter').classList.remove('hidden');}catch(_){}})();
+function lyricPrompt(){
+  if(/^Instrumental/.test($('vocal').value)){$('vocal').value='Male melodic vocal';go();}
+  const vocal=$('vocal').value;
+  const tags=($('lyrOut').value.match(/\[[^\]]+\]/g)||[]).map(t=>t.replace(/\s*[-–].*\]/,']'));
+  const secs=(tags.length?tags:['[Verse 1]','[Chorus]','[Verse 2]','[Chorus]','[Outro]']).join(' ');
+  const bpm=$('bpm').value||'mid-tempo', sub=$('sub').value, era=$('era').value;
+  const slow=(+$('bpm').value||100)<=85||/Ambient|Drone|Post-Rock|Chillwave|Dream|Shoegaze/.test($('genre').value+' '+sub);
+  const pace=slow?'Very slow, unhurried delivery at '+bpm+' BPM: 3-6 syllables per line, 2-4 lines per section, about 40 words in total. Keep most words concrete and consonant-clear so each can be articulated; use open vowels (oh, ah, low, home) only on the last held word of a line. Let single images breathe, repeat key phrases, leave silence between lines. Nothing may feel rushed or crammed.':'Singable at '+bpm+' BPM: mostly 6-10 syllables a line, varied length, natural stress. The chorus hook is one short memorable line, repeated.';
+  return `Write original song lyrics.
+Style: ${$('genre').value}${sub?' / '+sub:''}${era?', '+era:''}. Mood: ${[...S.moods].join(', ')||'open'}. Tempo: ${bpm} BPM. Vocal: ${vocal||'any'}. Delivery: ${$('deliv').value||'natural'}.
+Theme: ${$('theme').value.trim()||'your choice: something specific and unexpected, not love or heartbreak in general'}.
+Angle to take: ${pick(ANGLES)}.
+Rhyme approach: ${pick(RHYMES)}.
+Sections, in this order: ${secs}
+
+Rules:
+- Concrete, specific imagery: named objects, places, times of day, textures. No abstract filler.
+- Avoid clichés: neon, echoes, shadows, whispers, fading light, fire in the heart, chasing dreams, dancing in the dark, endless night.
+- ${pace}
+- Verses move the story forward; the chorus states the central idea; a bridge changes perspective. Never force a rhyme that bends the sense.
+- Instrumental sections (solo, drop, build, intro) get only a bracket cue, no words.
+- Emotion: give the song one specific human detail and a turn (something admitted, lost or released). Show feeling through images and actions; never name it ("sad", "lonely").
+- Every vocal section tag carries a short delivery cue tracing an emotional arc, e.g. [Verse 1 - hushed, close, trembling, piano only], [Chorus - opens up, aching, full voice], [Bridge - almost spoken, fragile], [Final Chorus - raw, then softly resolved]. Instrumental sections get a plain instrumental cue. Keep the band thin under the voice: name what drops out or sits back in the cue ("strings drop out", "pads hold low") so the vocal stays clear.
+- Output only lyrics. Section tags in square brackets on their own line. No title, no commentary.`;
+}
+
+const EXT=[['ChatGPT','https://chatgpt.com/?q='],['Gemini','https://gemini.google.com/app'],['Copilot','https://copilot.microsoft.com/?q='],['Claude (free)','https://claude.ai/new?q='],['Copy only','']];
+EXT.forEach(([n,u])=>{
+  const a=document.createElement(u?'a':'button');a.textContent=n;a.className='btn';a.style.cssText='display:inline-flex;align-items:center;color:#06b6d4';
+  if(u){a.href=u;a.target='_blank';a.rel='noopener';}
+  a.addEventListener('click',()=>{const t=lyricPrompt();copy(t,'Prompt copied. Paste it into the AI if needed');if(u.includes('?q='))a.href=u+encodeURIComponent(t);});
+  $('extAI').appendChild(a);});
+$('stripBtn').onclick=()=>{$('lyrOut').value=$('lyrOut').value.replace(/\[([^\]\-–]+?)\s*[-–][^\]]*\]/g,'[$1]');toast('Cues removed');};
+$('draftBtn').onclick=async()=>{
+  if(!smp){try{smp=await (window.claude&&window.claude.use('sample'));}catch(_){}}
+  if(!smp){toast('Not available here. Use the other-AI options');return;}
+  const prompt=lyricPrompt();
+  const btn=$('draftBtn');btn.disabled=true;btn.textContent='Writing…';
+  try{await smp(prompt,{cache:false,onText:({text})=>{$('lyrOut').value=text;}});toast('Lyrics drafted');}
+  catch(e){toast(e&&e.code==='not_granted'?'Permission needed to draft':e&&e.code==='rate_limited'?'Rate limited, try again soon':'Draft failed');}
+  btn.disabled=false;btn.textContent='Draft lyrics';
+};
+
+setEngine('stepaudio');reset();
+})();
+</script>
+</body>
+</html>

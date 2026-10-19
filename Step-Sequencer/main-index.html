@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="GATE-32">
+<title>32-Step Gate Harmony Sequencer</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none; }
+  input, select, textarea { -webkit-user-select: text; user-select: text; }
+  html, body { margin:0; padding:0; font-family: 'SF Mono', 'JetBrains Mono', monospace; touch-action: manipulation; overscroll-behavior: none; width:100%; height:100%; }
+  body { height:100vh; height:100dvh; display:flex; flex-direction:column; overflow:hidden; background:#0d0d17; color:#ccc; }
+  input[type=range] { -webkit-appearance:none; appearance:none; background:transparent; cursor:pointer; height:28px; touch-action:manipulation; width:100%; }
+  input[type=range]::-webkit-slider-runnable-track { height:4px; background:#2a2a3e; border-radius:2px; }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; margin-top:-6px; height:16px; width:16px; border-radius:50%; background:#00e3ff; box-shadow:0 0 6px #00e3ff80; }
+  input[type=range]::-moz-range-track { height:4px; background:#2a2a3e; border-radius:2px; }
+  input[type=range]::-moz-range-thumb { height:16px; width:16px; border:none; border-radius:50%; background:#00e3ff; box-shadow:0 0 6px #00e3ff80; }
+  select, input[type=number], input[type=text] { background:#1a1a2e; border:1px solid #2a2a3e; color:#ccc; border-radius:6px; padding:4px 8px; font-size:12px; min-height:36px; }
+  select:focus, input:focus { outline:none; border-color:#00e3ff; }
+  .step-cell { transition: background .1s, border-color .1s, box-shadow .1s; }
+  .step-cell.active { background:#00e3ff22; border-color:#00e3ff88; box-shadow:0 0 8px #00e3ff40 inset; }
+  .step-cell.playing { background:#00e3ff44; border-color:#00e3ff; box-shadow:0 0 16px #00e3ff60 inset; }
+  .step-cell.gate-off { opacity:.35; }
+  .step-cell.beat-mark { border-top:2px solid #3a3a5e; }
+  .scroll-thin::-webkit-scrollbar { width:5px; height:5px; }
+  .scroll-thin::-webkit-scrollbar-track { background:#0d0d17; }
+  .scroll-thin::-webkit-scrollbar-thumb { background:#2a2a3e; border-radius:3px; }
+  .glow-cyan { text-shadow:0 0 8px #00e3ff80; }
+  .btn-press:active { transform:scale(.95); }
+  .tab-btn.active { border-color:#00e3ff; color:#00e3ff; }
+  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.8); z-index:50; display:flex; align-items:center; justify-content:center; }
+  canvas { display:block; touch-action:none; }
+  .rec-pulse { animation:rec-pulse 1s ease-in-out infinite; }
+  @keyframes rec-pulse { 0%,100% { opacity:1; transform:scale(1); } 50% { opacity:.5; transform:scale(.85); } }
+  .drop-zone { border:2px dashed #2a2a3e; transition:border-color .2s, background .2s; }
+  .drop-zone.dragover { border-color:#00e3ff; background:#00e3ff11; }
+  .no-select { -webkit-user-select:none; user-select:none; }
+  .sidebar-panel { transition: width .2s ease, opacity .15s ease; }
+  .sidebar-panel.collapsed { width:0 !important; opacity:0; overflow:hidden; border:none !important; padding:0 !important; }
+</style>
+</head>
+<body class="no-select">
+
+<div class="flex-shrink-0 flex items-center gap-2 px-3 border-b border-[#1e1e2e] bg-[#11111c] py-1.5 overflow-x-auto scroll-thin" style="min-height:56px;">
+  <button id="toggleLeftPanel" class="btn-press w-8 h-8 flex-shrink-0 rounded-lg border border-[#2a2a3e] flex items-center justify-center text-gray-400 hover:border-[#00e3ff] hover:text-[#00e3ff]">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+  </button>
+  <div class="flex items-center gap-2">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00e3ff" stroke-width="2">
+      <rect x="2" y="6" width="3" height="12" rx="1"/><rect x="7" y="3" width="3" height="18" rx="1"/>
+      <rect x="12" y="8" width="3" height="8" rx="1"/><rect x="17" y="5" width="3" height="14" rx="1"/>
+    </svg>
+    <span class="text-sm font-bold text-[#00e3ff] glow-cyan tracking-wider">GATE-32</span>
+  </div>
+  <div class="h-7 w-px bg-[#2a2a3e] mx-1"></div>
+  
+  <div id="dropZone" class="drop-zone rounded-lg px-3 py-1 cursor-pointer flex items-center gap-2">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6a6a8e" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+    <span class="text-[11px] text-gray-400">Import File (.wav / .mid)</span>
+    <input type="file" id="fileInput" accept=".wav,.mid,.midi,audio/wav,audio/midi" multiple style="display:none;">
+  </div>
+
+  <div class="h-7 w-px bg-[#2a2a3e] mx-1"></div>
+  
+  <div class="flex items-center gap-1">
+    <label class="text-[10px] text-gray-500 uppercase">BPM</label>
+    <input type="number" id="bpmInput" value="125" min="40" max="300" class="w-16 text-center text-[#00e3ff] font-bold text-sm">
+  </div>
+  
+  <div class="flex items-center gap-1">
+    <label class="text-[10px] text-gray-500 uppercase">Swing</label>
+    <input type="range" id="swingSlider" min="0" max="60" value="0" class="w-16">
+    <span id="swingVal" class="text-[10px] text-gray-400 w-7 text-right">0%</span>
+  </div>
+
+  <div class="flex items-center gap-1">
+    <select id="keySelect" class="text-xs">
+      <option value="C">C</option><option value="C#">C#</option><option value="D">D</option><option value="D#">D#</option>
+      <option value="E">E</option><option value="F">F</option><option value="F#">F#</option><option value="G">G</option>
+      <option value="G#">G#</option><option value="A">A</option><option value="A#">A#</option><option value="B">B</option>
+    </select>
+    <select id="scaleSelect" class="text-xs">
+      <option value="major">Major</option><option value="minor">Minor</option><option value="pentatonic">Pentatonic</option>
+      <option value="blues">Blues</option><option value="dorian">Dorian</option><option value="phrygian">Phrygian</option><option value="chromatic">Chromatic</option>
+    </select>
+  </div>
+
+  <div class="flex-1"></div>
+  <button id="clearBtn" class="btn-press text-[11px] px-3 py-1.5 border border-[#2a2a3e] rounded-lg hover:border-[#ff4247] hover:text-[#ff4247]">Clear</button>
+  <button id="exportMidiBtn" class="btn-press text-[11px] px-3 py-1.5 border border-[#2a2a3e] rounded-lg text-[#7fff7f] border-[#7fff7f55] hover:border-[#7fff7f]">Export MIDI</button>
+  <button id="toggleRightPanel" class="btn-press w-8 h-8 flex-shrink-0 rounded-lg border border-[#2a2a3e] flex items-center justify-center text-gray-400 hover:border-[#00e3ff] hover:text-[#00e3ff]">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+  </button>
+</div>
+
+<div class="flex-1 min-h-0 flex relative overflow-hidden">
+
+  <div id="leftPanel" class="sidebar-panel w-56 flex-shrink-0 border-r border-[#1e1e2e] bg-[#0f0f1a] overflow-y-auto scroll-thin p-3 space-y-3">
+    <div>
+      <h3 class="text-[10px] uppercase text-gray-500 mb-2 font-bold tracking-wider">Harmony & Chords</h3>
+      <div class="space-y-1.5">
+        <label class="flex items-center justify-between text-xs cursor-pointer min-h-[28px]"><span>+3rd</span><input type="checkbox" id="h3rd" class="harmony-check accent-[#00e3ff] w-4 h-4"></label>
+        <label class="flex items-center justify-between text-xs cursor-pointer min-h-[28px]"><span>+5th</span><input type="checkbox" id="h5th" class="harmony-check accent-[#00e3ff] w-4 h-4"></label>
+        <label class="flex items-center justify-between text-xs cursor-pointer min-h-[28px]"><span>-8ve</span><input type="checkbox" id="hMinusOct" class="harmony-check accent-[#00e3ff] w-4 h-4"></label>
+        <label class="flex items-center justify-between text-xs cursor-pointer min-h-[28px]"><span>+Oct</span><input type="checkbox" id="hPlusOct" class="harmony-check accent-[#00e3ff] w-4 h-4"></label>
+        <label class="flex items-center justify-between text-xs cursor-pointer min-h-[28px]"><span>+7th</span><input type="checkbox" id="h7th" class="harmony-check accent-[#00e3ff] w-4 h-4"></label>
+      </div>
+    </div>
+
+    <div>
+      <label class="text-[10px] text-gray-500 flex justify-between">Harmony Mix</label>
+      <input type="range" id="mixSlider" min="0" max="100" value="50" class="w-full">
+      <div class="flex justify-between text-[9px] text-gray-600"><span>Dry</span><span id="mixVal">50%</span><span>Harm</span></div>
+    </div>
+
+    <div class="border-t border-[#1e1e2e] pt-3">
+      <h3 class="text-[10px] uppercase text-gray-500 mb-2 font-bold tracking-wider">Oscillator Synthesizer</h3>
+      <select id="waveSelect" class="w-full text-xs mb-2 min-h-[32px]">
+        <option value="sawtooth">Sawtooth</option><option value="square">Square</option>
+        <option value="triangle">Triangle</option><option value="sine">Sine</option>
+      </select>
+      <label class="text-[10px] text-gray-500">Detune (cents)</label>
+      <input type="range" id="detuneSlider" min="-50" max="50" value="0" class="w-full">
+      <div class="text-[9px] text-gray-600 text-center"><span id="detuneVal">0c</span></div>
+    </div>
+
+    <div class="border-t border-[#1e1e2e] pt-3">
+      <h3 class="text-[10px] uppercase text-gray-500 mb-2 font-bold tracking-wider">Envelope</h3>
+      <label class="text-[10px] text-gray-500">Attack</label>
+      <input type="range" id="attackSlider" min="0" max="200" value="2" class="w-full">
+      <label class="text-[10px] text-gray-500 mt-1">Decay</label>
+      <input type="range" id="decaySlider" min="0" max="500" value="120" class="w-full">
+      <label class="text-[10px] text-gray-500 mt-1">Sustain</label>
+      <input type="range" id="sustainSlider" min="0" max="100" value="50" class="w-full">
+      <label class="text-[10px] text-gray-500 mt-1">Release</label>
+      <input type="range" id="releaseSlider" min="0" max="1000" value="200" class="w-full">
+    </div>
+  </div>
+
+  <div class="flex-1 min-w-0 flex flex-col overflow-hidden">
+    <div class="flex-shrink-0 flex gap-1 px-3 pt-2 border-b border-[#1e1e2e] overflow-x-auto scroll-thin">
+      <button data-tab="pitch" class="tab-btn active text-[12px] px-4 py-2 border-b-2 border-transparent text-gray-400 hover:text-gray-200">Pitch</button>
+      <button data-tab="velocity" class="tab-btn text-[12px] px-4 py-2 border-b-2 border-transparent text-gray-400 hover:text-gray-200">Velocity</button>
+      <button data-tab="delay" class="tab-btn text-[12px] px-4 py-2 border-b-2 border-transparent text-gray-400 hover:text-gray-200">Delay</button>
+      <button data-tab="prob" class="tab-btn text-[12px] px-4 py-2 border-b-2 border-transparent text-gray-400 hover:text-gray-200">Probability</button>
+    </div>
+
+    <div class="flex-1 min-h-0 overflow-auto scroll-thin p-3" id="gridContainer">
+      <div id="stepGrid" class="inline-block min-w-full">
+        <div class="flex gap-1 mb-1" id="stepHeaders"></div>
+        <div class="flex items-center gap-1 mb-2">
+          <span class="text-[9px] text-gray-500 w-12 text-right flex-shrink-0 font-bold">Gate</span>
+          <div class="flex gap-1" id="gateRow"></div>
+        </div>
+        <div class="flex items-center gap-1 mb-2">
+          <span class="text-[9px] text-gray-500 w-12 text-right flex-shrink-0 font-bold" id="paramLabel">Pitch</span>
+          <div class="flex gap-1" id="paramCells"></div>
+        </div>
+        
+        <div class="mt-3 border border-[#1e1e2e] rounded-lg bg-[#0a0a12] overflow-hidden">
+          <canvas id="vizCanvas" width="900" height="90" class="w-full"></canvas>
+        </div>
+
+        <div class="flex items-center gap-4 mt-2 text-[11px] text-gray-500">
+          <span>Step: <span id="curStep" class="text-[#00e3ff] font-bold">--</span></span>
+          <span>Beat: <span id="curBeat" class="text-[#00e3ff] font-bold">--</span></span>
+          <span>Note: <span id="curNote" class="text-[#00e3ff] font-bold">--</span></span>
+          <span>Active Voices: <span id="voiceCount" class="text-[#00e3ff] font-bold">0</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="rightPanel" class="sidebar-panel w-52 flex-shrink-0 border-l border-[#1e1e2e] bg-[#0f0f1a] overflow-y-auto scroll-thin p-3 space-y-3">
+    <div>
+      <h3 class="text-[10px] uppercase text-gray-500 mb-2 font-bold tracking-wider">Filter</h3>
+      <label class="text-[10px] text-gray-500 flex justify-between"><span>Cutoff</span><span id="cutoffVal" class="text-[#00e3ff]">8000Hz</span></label>
+      <input type="range" id="cutoffSlider" min="100" max="16000" value="8000" class="w-full">
+      <label class="text-[10px] text-gray-500 mt-1">Resonance</label>
+      <input type="range" id="resoSlider" min="0" max="20" value="2" class="w-full">
+    </div>
+
+    <div class="border-t border-[#1e1e2e] pt-3">
+      <h3 class="text-[10px] uppercase text-gray-500 mb-2 font-bold tracking-wider">Audio Output</h3>
+      <label class="text-[10px] text-gray-500 flex justify-between"><span>Master Volume</span><span id="masterVal" class="text-[#00e3ff]">80%</span></label>
+      <input type="range" id="masterSlider" min="0" max="100" value="80" class="w-full">
+    </div>
+  </div>
+
+</div>
+
+<div class="flex-shrink-0 flex items-center gap-2 px-3 border-t border-[#1e1e2e] bg-[#11111c] py-1.5 overflow-x-auto scroll-thin" style="min-height:56px;">
+  <button id="playBtn" class="btn-press w-11 h-11 rounded-full bg-[#00e3ff] text-[#0d0d17] flex items-center justify-center font-bold hover:bg-[#00c0d9]">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+  </button>
+  <button id="stopBtn" class="btn-press w-10 h-10 rounded-full border border-[#2a2a3e] text-gray-400 flex items-center justify-center hover:border-[#ff4247] hover:text-[#ff4247]">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16"/></svg>
+  </button>
+  <button id="panicBtn" class="btn-press w-10 h-10 rounded-full border border-[#ff4247] text-[#ff4247] flex items-center justify-center hover:bg-[#ff424722]" title="Stop All Audio Instantly">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+  </button>
+  <div class="h-7 w-px bg-[#2a2a3e] mx-1"></div>
+  <button id="randomizeBtn" class="btn-press text-[11px] px-3 py-2 border border-[#2a2a3e] rounded-lg hover:border-[#00e3ff] hover:text-[#00e3ff]">Randomize</button>
+</div>
+
+<script>
+// --- AUDIO CONTEXT SETUP ---
+let actx = null;
+let masterGain = null, filterNode = null;
+let activeVoices = [];
+
+function initAudio() {
+  if (actx) return;
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  actx = new AudioCtx();
+  
+  masterGain = actx.createGain();
+  masterGain.gain.value = 0.8;
+  
+  filterNode = actx.createBiquadFilter();
+  filterNode.type = 'lowpass';
+  filterNode.frequency.value = 8000;
+  filterNode.Q.value = 2;
+  
+  filterNode.connect(masterGain);
+  masterGain.connect(actx.destination);
+}
+
+// --- SEQUENCER STATE ---
+const NUM_STEPS = 32;
+const SCALES = {
+  major: [0, 2, 4, 5, 7, 9, 11],
+  minor: [0, 2, 3, 5, 7, 8, 10],
+  pentatonic: [0, 2, 4, 7, 9],
+  blues: [0, 3, 5, 6, 7, 10],
+  dorian: [0, 2, 3, 5, 7, 9, 10],
+  phrygian: [0, 1, 3, 5, 7, 8, 10],
+  chromatic: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+};
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+let steps = Array.from({ length: NUM_STEPS }, (_, i) => ({
+  gate: i % 2 === 0,
+  pitch: 0, // Scale degree index offset
+  velocity: 90,
+  delay: 0,
+  prob: 100
+}));
+
+let activeTab = 'pitch';
+let isPlaying = false;
+let currentStep = 0;
+let nextNoteTime = 0;
+let timerId = null;
+
+// --- SCALE & FREQUENCY CALCULATION ---
+function getBaseMidiNote(scaleDegree) {
+  const keyName = document.getElementById('keySelect').value;
+  const scaleName = document.getElementById('scaleSelect').value;
+  const scalePattern = SCALES[scaleName] || SCALES.major;
+  const rootIndex = NOTE_NAMES.indexOf(keyName);
+  
+  const octave = 4 + Math.floor(scaleDegree / scalePattern.length);
+  const degreeIndex = ((scaleDegree % scalePattern.length) + scalePattern.length) % scalePattern.length;
+  const semitoneOffset = scalePattern[degreeIndex];
+  
+  return (octave + 1) * 12 + rootIndex + semitoneOffset;
+}
+
+function midiToNoteName(midi) {
+  const note = NOTE_NAMES[midi % 12];
+  const oct = Math.floor(midi / 12) - 1;
+  return `${note}${oct}`;
+}
+
+function midiToFreq(midi) {
+  return 440 * Math.pow(2, (midi - 69) / 12);
+}
+
+function getHarmonyNotes(baseMidi) {
+  const notes = [baseMidi];
+  if (document.getElementById('h3rd').checked) notes.push(baseMidi + 4);
+  if (document.getElementById('h5th').checked) notes.push(baseMidi + 7);
+  if (document.getElementById('hMinusOct').checked) notes.push(baseMidi - 12);
+  if (document.getElementById('hPlusOct').checked) notes.push(baseMidi + 12);
+  if (document.getElementById('h7th').checked) notes.push(baseMidi + 10);
+  return notes;
+}
+
+// --- SYNTH ENGINE ---
+function playNote(midiNote, time, duration, vel) {
+  if (!actx) return;
+  const freq = midiToFreq(midiNote);
+  
+  const osc = actx.createOscillator();
+  const gain = actx.createGain();
+  
+  osc.type = document.getElementById('waveSelect').value;
+  osc.frequency.setValueAtTime(freq, time);
+  
+  const detune = parseFloat(document.getElementById('detuneSlider').value);
+  if (detune) osc.detune.setValueAtTime(detune, time);
+  
+  const att = parseInt(document.getElementById('attackSlider').value) / 1000;
+  const dec = parseInt(document.getElementById('decaySlider').value) / 1000;
+  const sus = parseInt(document.getElementById('sustainSlider').value) / 100;
+  const rel = parseInt(document.getElementById('releaseSlider').value) / 1000;
+  const vol = (vel / 127) * 0.3;
+
+  gain.gain.setValueAtTime(0, time);
+  gain.gain.linearRampToValueAtTime(vol, time + att);
+  gain.gain.linearRampToValueAtTime(vol * sus, time + att + dec);
+  gain.gain.exponentialRampToValueAtTime(0.0001, time + duration + rel);
+
+  osc.connect(gain);
+  gain.connect(filterNode);
+
+  osc.start(time);
+  osc.stop(time + duration + rel + 0.1);
+  
+  const voiceObj = { osc, gain };
+  activeVoices.push(voiceObj);
+  
+  osc.onended = () => {
+    osc.disconnect();
+    gain.disconnect();
+    activeVoices = activeVoices.filter(v => v.osc !== osc);
+    updateVoiceCount();
+  };
+  updateVoiceCount();
+}
+
+function updateVoiceCount() {
+  const el = document.getElementById('voiceCount');
+  if (el) el.textContent = activeVoices.length;
+}
+
+function stopAllSound() {
+  activeVoices.forEach(v => {
+    try { v.osc.stop(); v.osc.disconnect(); v.gain.disconnect(); } catch(e){}
+  });
+  activeVoices = [];
+  updateVoiceCount();
+}
+
+// --- UI GRID BUILDER & RENDER ---
+function renderGrid() {
+  const headers = document.getElementById('stepHeaders');
+  const gateRow = document.getElementById('gateRow');
+  const paramCells = document.getElementById('paramCells');
+  const paramLabel = document.getElementById('paramLabel');
+
+  headers.innerHTML = '';
+  gateRow.innerHTML = '';
+  paramCells.innerHTML = '';
+
+  paramLabel.textContent = activeTab.toUpperCase();
+
+  for (let i = 0; i < NUM_STEPS; i++) {
+    const step = steps[i];
+
+    // Header
+    const hdr = document.createElement('div');
+    hdr.className = `w-9 h-5 flex items-center justify-center text-[9px] rounded border border-[#1a1a2e] ${i % 4 === 0 ? 'beat-mark' : ''}`;
+    hdr.textContent = i + 1;
+    headers.appendChild(hdr);
+
+    // Gate LED Button
+    const gateBtn = document.createElement('button');
+    gateBtn.className = `step-cell w-9 h-9 rounded-lg border border-[#1a1a2e] flex items-center justify-center ${step.gate ? 'active' : 'gate-off'}`;
+    gateBtn.innerHTML = `<div class="w-2.5 h-2.5 rounded-full ${step.gate ? 'bg-[#00e3ff]' : 'bg-[#2a2a3e]'}"></div>`;
+    gateBtn.onclick = () => {
+      step.gate = !step.gate;
+      renderGrid();
+    };
+    gateRow.appendChild(gateBtn);
+
+    // Param Cell
+    const cell = document.createElement('div');
+    cell.className = `step-cell w-9 h-12 rounded-lg border border-[#1a1a2e] flex flex-col items-center justify-center text-[10px] cursor-pointer hover:border-[#00e3ff] ${step.gate ? '' : 'opacity-40'}`;
+
+    if (activeTab === 'pitch') {
+      const midi = getBaseMidiNote(step.pitch);
+      const noteStr = midiToNoteName(midi);
+      cell.innerHTML = `
+        <span class="text-[#00e3ff] font-bold text-[9px]">${noteStr}</span>
+        <div class="flex gap-0.5 mt-1">
+          <button class="px-1 text-[8px] bg-[#1a1a2e] rounded hover:bg-[#00e3ff] hover:text-[#0d0d17]" title="-1 Step">-</button>
+          <button class="px-1 text-[8px] bg-[#1a1a2e] rounded hover:bg-[#00e3ff] hover:text-[#0d0d17]" title="+1 Step">+</button>
+        </div>
+      `;
+      const [minusBtn, plusBtn] = cell.querySelectorAll('button');
+      minusBtn.onclick = (e) => { e.stopPropagation(); step.pitch--; renderGrid(); };
+      plusBtn.onclick = (e) => { e.stopPropagation(); step.pitch++; renderGrid(); };
+      cell.onwheel = (e) => {
+        e.preventDefault();
+        step.pitch += e.deltaY < 0 ? 1 : -1;
+        renderGrid();
+      };
+    } else if (activeTab === 'velocity') {
+      cell.innerHTML = `<span class="text-gray-300 font-bold">${step.velocity}</span>`;
+      cell.onwheel = (e) => {
+        e.preventDefault();
+        step.velocity = Math.max(0, Math.min(127, step.velocity + (e.deltaY < 0 ? 5 : -5)));
+        renderGrid();
+      };
+    } else if (activeTab === 'delay') {
+      cell.innerHTML = `<span class="text-gray-300 font-bold">${step.delay}ms</span>`;
+    } else if (activeTab === 'prob') {
+      cell.innerHTML = `<span class="text-gray-300 font-bold">${step.prob}%</span>`;
+    }
+    paramCells.appendChild(cell);
+  }
+}
+
+// --- CLOCK & SEQUENCER SCHEDULER ---
+function scheduler() {
+  while (nextNoteTime < actx.currentTime + 0.1) {
+    scheduleStep(currentStep, nextNoteTime);
+    advanceStep();
+  }
+  if (isPlaying) timerId = setTimeout(scheduler, 25);
+}
+
+function scheduleStep(stepIdx, time) {
+  const step = steps[stepIdx];
+  if (step.gate && Math.random() * 100 <= step.prob) {
+    const baseMidi = getBaseMidiNote(step.pitch);
+    const notes = getHarmonyNotes(baseMidi);
+    const bpm = parseInt(document.getElementById('bpmInput').value);
+    const stepDuration = (60 / bpm) / 4;
+    
+    notes.forEach((midi, idx) => {
+      const vel = idx === 0 ? step.velocity : Math.floor(step.velocity * 0.7);
+      playNote(midi, time + (step.delay / 1000), stepDuration * 0.8, vel);
+    });
+
+    requestAnimationFrame(() => highlightStep(stepIdx, midiToNoteName(baseMidi)));
+  }
+}
+
+function advanceStep() {
+  const bpm = parseInt(document.getElementById('bpmInput').value);
+  let stepDur = (60 / bpm) / 4;
+  const swing = parseInt(document.getElementById('swingSlider').value) / 100;
+  
+  if (currentStep % 2 === 1) stepDur *= (1 + swing * 0.5);
+  else stepDur *= (1 - swing * 0.5);
+
+  nextNoteTime += stepDur;
+  currentStep = (currentStep + 1) % NUM_STEPS;
+}
+
+function highlightStep(stepIdx, noteStr) {
+  document.getElementById('curStep').textContent = stepIdx + 1;
+  document.getElementById('curBeat').textContent = Math.floor(stepIdx / 4) + 1;
+  document.getElementById('curNote').textContent = noteStr || '--';
+}
+
+// --- STANDARD MIDI FILE EXPORT ---
+function exportMIDI() {
+  const bpm = parseInt(document.getElementById('bpmInput').value) || 120;
+  const ppq = 480;
+  const stepTicks = ppq / 4;
+  const events = [];
+
+  for (let i = 0; i < NUM_STEPS; i++) {
+    const step = steps[i];
+    if (!step.gate) continue;
+
+    const stepTick = i * stepTicks;
+    const durTicks = Math.round(stepTicks * 0.85);
+    const baseMidi = getBaseMidiNote(step.pitch);
+    const notes = getHarmonyNotes(baseMidi);
+
+    notes.forEach(note => {
+      events.push({ tick: stepTick, type: 0x90, note, vel: step.velocity });
+      events.push({ tick: stepTick + durTicks, type: 0x80, note, vel: 0 });
+    });
+  }
+
+  events.sort((a, b) => a.tick - b.tick);
+
+  const trackBytes = [];
+  const mpq = Math.round(60000000 / bpm);
+  trackBytes.push(0x00, 0xFF, 0x51, 0x03, (mpq >> 16) & 0xFF, (mpq >> 8) & 0xFF, mpq & 0xFF);
+
+  let currentTick = 0;
+  function writeVarLen(val) {
+    let buf = val & 0x7F;
+    while ((val >>= 7)) {
+      buf <<= 8;
+      buf |= (val & 0x7F) | 0x80;
+    }
+    while (true) {
+      trackBytes.push(buf & 0xFF);
+      if (buf & 0x80) buf >>= 8;
+      else break;
+    }
+  }
+
+  events.forEach(e => {
+    writeVarLen(e.tick - currentTick);
+    currentTick = e.tick;
+    trackBytes.push(e.type, Math.max(0, Math.min(127, e.note)), Math.max(0, Math.min(127, e.vel)));
+  });
+
+  trackBytes.push(0x00, 0xFF, 0x2F, 0x00);
+
+  const header = [
+    0x4D, 0x54, 0x68, 0x64, 0x00, 0x00, 0x00, 0x06,
+    0x00, 0x00, 0x00, 0x01, (ppq >> 8) & 0xFF, ppq & 0xFF
+  ];
+  const trackHeader = [
+    0x4D, 0x54, 0x72, 0x6B,
+    (trackBytes.length >> 24) & 0xFF, (trackBytes.length >> 16) & 0xFF,
+    (trackBytes.length >> 8) & 0xFF, trackBytes.length & 0xFF
+  ];
+
+  const blob = new Blob([new Uint8Array([...header, ...trackHeader, ...trackBytes])], { type: 'audio/midi' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'gate32_sequence.mid';
+  a.click();
+}
+
+// --- INITIALIZATION & LISTENERS ---
+window.addEventListener('DOMContentLoaded', () => {
+  renderGrid();
+
+  document.getElementById('keySelect').addEventListener('change', renderGrid);
+  document.getElementById('scaleSelect').addEventListener('change', renderGrid);
+  document.querySelectorAll('.harmony-check').forEach(el => el.addEventListener('change', renderGrid));
+
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeTab = btn.dataset.tab;
+      renderGrid();
+    };
+  });
+
+  document.getElementById('playBtn').onclick = () => {
+    initAudio();
+    if (actx.state === 'suspended') actx.resume();
+    isPlaying = true;
+    currentStep = 0;
+    nextNoteTime = actx.currentTime;
+    scheduler();
+  };
+
+  document.getElementById('stopBtn').onclick = () => {
+    isPlaying = false;
+    clearTimeout(timerId);
+    stopAllSound();
+  };
+
+  document.getElementById('panicBtn').onclick = stopAllSound;
+
+  document.getElementById('exportMidiBtn').onclick = exportMIDI;
+
+  document.getElementById('toggleLeftPanel').onclick = () => {
+    document.getElementById('leftPanel').classList.toggle('collapsed');
+  };
+  document.getElementById('toggleRightPanel').onclick = () => {
+    document.getElementById('rightPanel').classList.toggle('collapsed');
+  };
+
+  document.getElementById('masterSlider').oninput = (e) => {
+    if (masterGain) masterGain.gain.value = e.target.value / 100;
+    document.getElementById('masterVal').textContent = `${e.target.value}%`;
+  };
+
+  document.getElementById('cutoffSlider').oninput = (e) => {
+    if (filterNode) filterNode.frequency.value = e.target.value;
+    document.getElementById('cutoffVal').textContent = `${e.target.value}Hz`;
+  };
+
+  document.getElementById('swingSlider').oninput = (e) => {
+    document.getElementById('swingVal').textContent = `${e.target.value}%`;
+  };
+});
+</script>
+</body>
+</html>

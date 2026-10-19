@@ -1,0 +1,1478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=yes">
+  <title>Incredibox Mod Builder v1.2</title>
+  <style>
+    :root {
+      --bg: #f2f4f8;
+      --panel: #ffffff;
+      --ink: #1a1e2c;
+      --muted: #6b7280;
+      --accent: #4f46e5;
+      --accent2: #eef2ff;
+      --border: #d1d5db;
+      --ok: #0b7e4b;
+      --warn: #b45309;
+      --err: #b91c1c;
+      --radius: 12px;
+      --shadow: 0 2px 12px rgba(0,0,0,.06);
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:0;margin:0;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+    .app{max-width:1100px;margin:0 auto;padding:12px}
+    header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;padding:8px 0 12px;border-bottom:1px solid var(--border)}
+    header h1{font-size:clamp(22px,4vw,32px);font-weight:700;display:flex;align-items:center;gap:8px}
+    header h1 small{font-size:14px;font-weight:400;color:var(--muted)}
+    .top-actions{display:flex;flex-wrap:wrap;gap:6px}
+    .top-actions button{padding:8px 14px;font-size:13px;border-radius:8px;border:none;background:var(--accent2);color:var(--accent);font-weight:600;cursor:pointer;touch-action:manipulation}
+    .top-actions button:active{transform:scale(.96)}
+    .top-actions button.primary{background:var(--accent);color:#fff}
+    .top-actions button.danger{background:#fecaca;color:#991b1b}
+    .nav{display:flex;flex-wrap:wrap;gap:4px;margin:12px 0;background:#e5e7eb;border-radius:10px;padding:4px;overflow-x:auto}
+    .nav button{padding:8px 14px;border:none;border-radius:8px;background:transparent;font-weight:600;font-size:13px;color:var(--muted);cursor:pointer;white-space:nowrap;touch-action:manipulation}
+    .nav button.active{background:#fff;color:var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.08)}
+    .nav button:active{transform:scale(.96)}
+    .panel{display:none;background:var(--panel);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);margin-top:8px}
+    .panel.active{display:block}
+    .row{display:flex;flex-wrap:wrap;gap:12px;margin:6px 0}
+    .row>*{flex:1;min-width:140px}
+    label{display:block;font-weight:600;font-size:13px;color:var(--muted);margin:6px 0 3px}
+    input,select,textarea{width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;font:inherit;background:#fff;color:var(--ink);touch-action:manipulation}
+    textarea{min-height:80px;resize:vertical;font-family:monospace}
+    input[type="color"]{padding:4px;height:44px;cursor:pointer}
+    input[type="file"]{padding:8px;border:2px dashed var(--border);background:#fafbfc;cursor:pointer}
+    button{font:inherit;padding:10px 14px;border:none;border-radius:8px;font-weight:600;cursor:pointer;touch-action:manipulation;background:var(--accent2);color:var(--accent)}
+    button:active{transform:scale(.96)}
+    button.primary{background:var(--accent);color:#fff}
+    button.danger{background:#fecaca;color:#991b1b}
+    button.ok{background:#d1fae5;color:#0b7e4b}
+    button:disabled{opacity:.5;pointer-events:none}
+    .status{display:flex;flex-wrap:wrap;gap:6px;padding:8px 12px;border-radius:8px;font-size:13px;margin:6px 0}
+    .status.ok{background:#d1fae5;color:#0b7e4b}
+    .status.warn{background:#fef3c7;color:#92400e}
+    .status.err{background:#fecaca;color:#991b1b}
+    .card{background:#f9fafb;border-radius:var(--radius);padding:12px;border:1px solid var(--border);margin:6px 0}
+    .card-header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+    .badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:11px;font-weight:700}
+    .badge.ok{background:#d1fae5;color:#0b7e4b}
+    .badge.warn{background:#fef3c7;color:#92400e}
+    .badge.err{background:#fecaca;color:#991b1b}
+    .badge.muted{background:#e5e7eb;color:#6b7280}
+    .flex{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+    .flex>*{flex-shrink:0}
+    .mt-8{margin-top:8px}
+    .mb-8{margin-bottom:8px}
+    .hidden{display:none!important}
+    .w-full{width:100%}
+    .text-muted{color:var(--muted);font-size:13px}
+    .performer-card{padding:10px;border:1px solid var(--border);border-radius:var(--radius);background:#fff;position:relative}
+    .performer-card .actions{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+    .performer-card .actions button{padding:4px 10px;font-size:12px}
+    .performer-card .color-dot{display:inline-block;width:20px;height:20px;border-radius:50%;border:1px solid var(--border);vertical-align:middle}
+    .performer-card .name{font-weight:600;font-size:15px}
+    .performer-card .id{color:var(--muted);font-size:12px}
+    .bonus-card{padding:10px;border:1px solid var(--border);border-radius:var(--radius);background:#fff}
+    .code-picker{display:flex;flex-wrap:wrap;gap:4px;margin:4px 0}
+    .code-picker button{padding:6px 10px;font-size:13px;border-radius:6px;border:1px solid var(--border);background:#fff;min-width:36px;text-align:center}
+    .code-picker button.selected{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .code-picker button:active{transform:scale(.92)}
+    .drag-handle{cursor:grab;color:var(--muted);font-size:18px;padding:0 4px;touch-action:none}
+    .drag-handle:active{cursor:grabbing}
+    .performer-card.drop-target{outline:2px dashed var(--accent);outline-offset:2px}
+    @media(max-width:600px){.app{padding:8px}.row>*{min-width:100%}.nav button{padding:6px 10px;font-size:12px}.performer-card .actions button{font-size:11px;padding:3px 8px}.grid{grid-template-columns:1fr}}
+    @media(orientation:landscape){.grid{grid-template-columns:repeat(auto-fill,minmax(180px,1fr))}}
+    ::-webkit-scrollbar{width:6px;height:6px}
+    ::-webkit-scrollbar-track{background:#f1f1f1;border-radius:4px}
+    ::-webkit-scrollbar-thumb{background:#c1c7cd;border-radius:4px}
+  </style>
+</head>
+<body>
+<div class="app" id="app">
+  <header>
+    <h1>🎵 Incredibox Mod Builder <small>v1.2</small></h1>
+    <div class="top-actions">
+      <button id="btnNew" class="primary">✨ New</button>
+      <button id="btnOpen">📂 Open</button>
+      <button id="btnSave">💾 Save</button>
+      <button id="btnExportProject">⬇️ Export Project</button>
+      <button id="btnExport" class="primary">📦 Export ZIP</button>
+    </div>
+  </header>
+  <div class="text-muted" style="padding:2px 0 8px">💾 Save keeps your work in this browser only — it can be cleared by the browser (especially on iPad/Safari after inactivity). Use ⬇️ Export Project regularly to download a full backup file (including all audio/images) that you can reopen later or move to another device.</div>
+
+  <nav class="nav" id="mainNav">
+    <button class="active" data-panel="project">📋 Project</button>
+    <button data-panel="performers">🎤 Performers</button>
+    <button data-panel="audio">🔊 Audio</button>
+    <button data-panel="images">🖼️ Images</button>
+    <button data-panel="animations">🎬 Animations</button>
+    <button data-panel="bonuses">⭐ Bonuses</button>
+    <button data-panel="validate">✅ Validate</button>
+    <button data-panel="export">📦 Export</button>
+  </nav>
+
+  <div id="statusBar" class="status ok">Ready. Create a new project or open an existing one.</div>
+
+  <!-- ==================== PROJECT ==================== -->
+  <div id="panel-project" class="panel active">
+    <h2>Project Details</h2>
+    <div class="row">
+      <div><label>Mod Name</label><input id="projName" placeholder="My Incredible Mod" value="My Mod"></div>
+      <div><label>Mod Slug (folder name)</label><input id="projSlug" placeholder="my-mod"></div>
+    </div>
+    <div class="row">
+      <div><label>Creation Date</label><input id="projDate" type="date"></div>
+      <div><label>Loop Duration (ms)</label><input id="projLooptime" type="number" value="8000" min="2000" max="30000"></div>
+      <div><label>BPM</label><input id="projBpm" type="number" value="120" min="60" max="200"></div>
+    </div>
+    <div class="row">
+      <div><label>Total Frames</label><input id="projTotalframe" type="number" value="384" min="48" max="1200"></div>
+      <div><label>Bonus starts loop A</label>
+        <select id="projBonusLoopA"><option value="true">Yes</option><option value="false">No</option></select>
+      </div>
+      <div><label>Metronome restart after bonus</label>
+        <select id="projBonusEndLoopA"><option value="true">Yes</option><option value="false">No</option></select>
+      </div>
+    </div>
+    <div class="row">
+      <div><label>Crew Name</label><input id="projCrew" placeholder="Your crew name"></div>
+    </div>
+    <div class="row">
+      <div><label>Process Credits</label><input id="projProcess" placeholder="Names, separated by comma"></div>
+      <div><label>Music Credits</label><input id="projMusic" placeholder="Names, comma separated"></div>
+    </div>
+    <div class="row">
+      <div><label>Design Credits</label><input id="projDesign" placeholder="Names, comma separated"></div>
+      <div><label>Animation Credits</label><input id="projAnimation" placeholder="Names, comma separated"></div>
+    </div>
+    <div class="row">
+      <div><label>Thanks Text</label><input id="projThanks" placeholder="Special thanks..."></div>
+    </div>
+    <div class="row">
+      <div><label>Internal Notes (not exported)</label><textarea id="projNotes" rows="2" placeholder="Notes for yourself..."></textarea></div>
+    </div>
+    <div class="row">
+      <div><label>6 Interface Colors (hex)</label>
+        <div class="flex" style="gap:6px;flex-wrap:wrap">
+          <input type="color" id="col0" value="#4f46e5" style="width:44px;height:44px;padding:2px">
+          <input type="color" id="col1" value="#7c3aed" style="width:44px;height:44px;padding:2px">
+          <input type="color" id="col2" value="#2563eb" style="width:44px;height:44px;padding:2px">
+          <input type="color" id="col3" value="#0d9488" style="width:44px;height:44px;padding:2px">
+          <input type="color" id="col4" value="#d97706" style="width:44px;height:44px;padding:2px">
+          <input type="color" id="col5" value="#dc2626" style="width:44px;height:44px;padding:2px">
+        </div>
+      </div>
+    </div>
+    <div class="flex mt-8">
+      <button id="btnSuggestFrames" class="secondary">🔮 Suggest frames from looptime</button>
+      <button id="btnSlugFromName">📝 Generate slug from name</button>
+    </div>
+  </div>
+
+  <!-- ==================== PERFORMERS ==================== -->
+  <div id="panel-performers" class="panel">
+    <div class="flex" style="justify-content:space-between">
+      <h2>Performers <span class="text-muted" id="perfCount">0 / 20</span></h2>
+      <button id="btnAddPerformer" class="primary">➕ Add Performer</button>
+    </div>
+    <div class="text-muted mb-8">Drag cards to reorder. Max 20 performers.</div>
+    <div id="performerList" class="grid"></div>
+  </div>
+
+  <!-- ==================== AUDIO ==================== -->
+  <div id="panel-audio" class="panel">
+    <h2>Audio Manager</h2>
+    <p class="text-muted">Assign sound files to performers. MP3 and WAV are fully supported for import and preview. Other common audio formats may work depending on your browser. MP3 is recommended for final export.</p>
+    <div id="audioPerformerList"></div>
+  </div>
+
+  <!-- ==================== IMAGES ==================== -->
+  <div id="panel-images" class="panel">
+    <h2>Image Manager</h2>
+    <p class="text-muted">Required and optional images for the mod. Dimensions are validated.</p>
+    <div id="imageList" class="grid"></div>
+  </div>
+
+  <!-- ==================== ANIMATIONS ==================== -->
+  <div id="panel-animations" class="panel">
+    <h2>Animation Manager</h2>
+    <p class="text-muted">Assign HD PNG, LD PNG, and JSON sprite data to each performer.</p>
+    <div id="animationList"></div>
+  </div>
+
+  <!-- ==================== BONUSES ==================== -->
+  <div id="panel-bonuses" class="panel">
+    <div class="flex" style="justify-content:space-between">
+      <h2>Bonuses <span class="text-muted" id="bonusCount">0 / 3</span></h2>
+      <button id="btnAddBonus" class="primary">➕ Add Bonus</button>
+    </div>
+    <div id="bonusList"></div>
+  </div>
+
+  <!-- ==================== VALIDATE ==================== -->
+  <div id="panel-validate" class="panel">
+    <h2>Validation Dashboard</h2>
+    <div class="flex">
+      <button id="btnRunValidation" class="primary">🔍 Run All Checks</button>
+      <button id="btnExportReport">📄 Export Report</button>
+    </div>
+    <div id="validationResults" class="mt-8"></div>
+  </div>
+
+  <!-- ==================== EXPORT ==================== -->
+  <div id="panel-export" class="panel">
+    <h2>Export</h2>
+    <p class="text-muted">Export a complete mod ZIP ready for testing in the official Incredibox app.</p>
+    <div class="row">
+      <div><label>Export Mode</label>
+        <select id="exportMode">
+          <option value="dev">Development (allow missing LD)</option>
+          <option value="final">Final (strict validation)</option>
+        </select>
+      </div>
+    </div>
+    <div class="flex mt-8">
+      <button id="btnExportZIP" class="primary">📦 Export Mod ZIP</button>
+      <button id="btnExportAppJson">📄 Export app.json</button>
+      <button id="btnPreviewJson">👁️ Preview app.json</button>
+    </div>
+    <div id="exportStatus" class="status mt-8">Ready to export.</div>
+    <div id="jsonPreview" class="hidden" style="background:#1e1e2e;color:#c9d1d9;padding:12px;border-radius:8px;overflow:auto;max-height:400px;font-family:monospace;font-size:12px;white-space:pre-wrap"></div>
+  </div>
+
+  <!-- hidden file inputs -->
+  <input type="file" id="fileOpen" accept=".imbproject,.json" style="display:none">
+  <input type="file" id="fileImportAudio" accept=".mp3,.wav,.m4a,.aac,.ogg,audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/wave,audio/mp4,audio/aac,audio/ogg" style="display:none" multiple>
+  <input type="file" id="fileImportImage" accept="image/*" style="display:none">
+  <input type="file" id="fileImportAnimPNG" accept="image/png" style="display:none">
+  <input type="file" id="fileImportAnimJSON" accept=".json" style="display:none">
+</div>
+
+<script>
+"use strict";
+// ============================================================
+//  INCREDIBOX MOD BUILDER v1.2 – Main Application
+//  Single-file HTML, iPad-friendly, offline-capable.
+//  Uses IndexedDB for project storage, JSZip for ZIP export.
+// ============================================================
+
+// ---- JSZip CDN (loaded dynamically) ----
+function loadJSZip() {
+  return new Promise((resolve, reject) => {
+    if (typeof JSZip !== 'undefined') { resolve(JSZip); return; }
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+    script.onload = () => resolve(window.JSZip);
+    script.onerror = () => reject(new Error('Failed to load JSZip. Check internet connection.'));
+    document.head.appendChild(script);
+  });
+}
+
+// ---- State ----
+let project = null;
+let projectId = null;
+let db = null;
+let zipLib = null;
+
+const defaultProject = () => ({
+  name: 'My Incredible Mod',
+  slug: 'my-mod',
+  date: new Date().toISOString().slice(0,10),
+  looptime: 8000,
+  bpm: 120,
+  totalframe: 384,
+  bonusLoopA: true,
+  bonusEndLoopA: false,
+  colors: ['#4f46e5','#7c3aed','#2563eb','#0d9488','#d97706','#dc2626'],
+  crew: '',
+  process: '',
+  music: '',
+  design: '',
+  animation: '',
+  thanks: '',
+  notes: '',
+  performers: [], // { id, name, color, uniqsnd, soundA, soundB, animHD, animLD, animJSON, category, notes }
+  images: {}, // key -> { file, name, width, height, type, size }
+  bonuses: [], // { title, code: [5 numbers], name, sound, predrop, loop }
+  version: 1
+});
+
+// ---- IndexedDB ----
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('IncrediboxModBuilder', 1);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains('projects')) {
+        db.createObjectStore('projects', { keyPath: 'id' });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function dbSave(proj) {
+  return new Promise((resolve, reject) => {
+    if (!db) { resolve(); return; }
+    const tx = db.transaction('projects', 'readwrite');
+    const store = tx.objectStore('projects');
+    store.put(proj);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+function dbLoad(id) {
+  return new Promise((resolve, reject) => {
+    if (!db) { reject(new Error('DB not open')); return; }
+    const tx = db.transaction('projects', 'readonly');
+    const store = tx.objectStore('projects');
+    const req = store.get(id);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function dbList() {
+  return new Promise((resolve, reject) => {
+    if (!db) { resolve([]); return; }
+    const tx = db.transaction('projects', 'readonly');
+    const store = tx.objectStore('projects');
+    const req = store.getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function dbDelete(id) {
+  return new Promise((resolve, reject) => {
+    if (!db) { resolve(); return; }
+    const tx = db.transaction('projects', 'readwrite');
+    const store = tx.objectStore('projects');
+    store.delete(id);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+// ---- Helpers ----
+function uid() { return Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,6); }
+function slugify(s) {
+  return s.toLowerCase().trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+function parseComma(s) { return s.split(',').map(x => x.trim()).filter(Boolean); }
+function formatComma(a) { return a.join(', '); }
+
+// ---- File <-> base64 (for embedding real file content in an exportable project file) ----
+async function fileToBase64(file) {
+  const buf = await file.arrayBuffer();
+  const bytes = new Uint8Array(buf);
+  let binary = '';
+  const chunkSize = 0x8000; // avoid call-stack overflow from String.fromCharCode.apply on large files
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+function base64ToFile(base64, name, type) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new File([bytes], name, { type: type || '' });
+}
+
+// ---- UI Helpers ----
+function $(id) { return document.getElementById(id); }
+function qs(sel, ctx) { return (ctx||document).querySelector(sel); }
+function qsa(sel, ctx) { return (ctx||document).querySelectorAll(sel); }
+function el(tag, cls, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html !== undefined) e.innerHTML = html; return e; }
+
+function setStatus(msg, type='ok') {
+  const el = $('statusBar');
+  el.textContent = msg;
+  el.className = 'status ' + type;
+}
+
+function showPanel(id) {
+  qsa('.panel').forEach(p => p.classList.remove('active'));
+  const p = $('panel-'+id);
+  if (p) p.classList.add('active');
+  qsa('.nav button').forEach(b => {
+    b.classList.toggle('active', b.dataset.panel === id);
+  });
+}
+
+// ---- Navigation ----
+qsa('.nav button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    showPanel(btn.dataset.panel);
+    if (btn.dataset.panel === 'performers') renderPerformers();
+    if (btn.dataset.panel === 'audio') renderAudio();
+    if (btn.dataset.panel === 'images') renderImages();
+    if (btn.dataset.panel === 'animations') renderAnimations();
+    if (btn.dataset.panel === 'bonuses') renderBonuses();
+    if (btn.dataset.panel === 'validate') runValidation();
+  });
+});
+
+// ---- Project CRUD ----
+function newProject() {
+  project = defaultProject();
+  project.id = uid();
+  projectId = project.id;
+  loadProjectIntoUI(project);
+  saveProject();
+  setStatus('New project created.', 'ok');
+  renderAll();
+}
+
+function loadProjectIntoUI(p) {
+  $('projName').value = p.name || '';
+  $('projSlug').value = p.slug || '';
+  $('projDate').value = p.date || new Date().toISOString().slice(0,10);
+  $('projLooptime').value = p.looptime || 8000;
+  $('projBpm').value = p.bpm || 120;
+  $('projTotalframe').value = p.totalframe || 384;
+  $('projBonusLoopA').value = p.bonusLoopA !== undefined ? String(p.bonusLoopA) : 'true';
+  $('projBonusEndLoopA').value = p.bonusEndLoopA !== undefined ? String(p.bonusEndLoopA) : 'false';
+  $('projCrew').value = p.crew || '';
+  $('projProcess').value = p.process || '';
+  $('projMusic').value = p.music || '';
+  $('projDesign').value = p.design || '';
+  $('projAnimation').value = p.animation || '';
+  $('projThanks').value = p.thanks || '';
+  $('projNotes').value = p.notes || '';
+  const cols = p.colors || defaultProject().colors;
+  for (let i=0; i<6; i++) {
+    const el = $('col'+i);
+    if (el) el.value = cols[i] || '#000000';
+  }
+  $('perfCount').textContent = (p.performers||[]).length + ' / 20';
+  $('bonusCount').textContent = (p.bonuses||[]).length + ' / 3';
+}
+
+function uiToProject() {
+  if (!project) return;
+  project.name = $('projName').value.trim() || 'Unnamed';
+  project.slug = $('projSlug').value.trim() || slugify(project.name);
+  project.date = $('projDate').value || new Date().toISOString().slice(0,10);
+  project.looptime = parseInt($('projLooptime').value) || 8000;
+  project.bpm = parseInt($('projBpm').value) || 120;
+  project.totalframe = parseInt($('projTotalframe').value) || 384;
+  project.bonusLoopA = $('projBonusLoopA').value === 'true';
+  project.bonusEndLoopA = $('projBonusEndLoopA').value === 'true';
+  project.crew = $('projCrew').value.trim();
+  project.process = $('projProcess').value.trim();
+  project.music = $('projMusic').value.trim();
+  project.design = $('projDesign').value.trim();
+  project.animation = $('projAnimation').value.trim();
+  project.thanks = $('projThanks').value.trim();
+  project.notes = $('projNotes').value.trim();
+  project.colors = [];
+  for (let i=0; i<6; i++) {
+    const el = $('col'+i);
+    project.colors.push(el ? el.value : '#000000');
+  }
+  // ensure performers have ids
+  (project.performers || []).forEach(p => { if (!p.id) p.id = uid(); });
+  if (!project.bonuses) project.bonuses = [];
+  if (!project.images) project.images = {};
+}
+
+function saveProject() {
+  uiToProject();
+  if (!project.id) project.id = uid();
+  projectId = project.id;
+  dbSave(project).catch(e => console.warn('Save failed:', e));
+  setStatus('Project saved.', 'ok');
+}
+
+function loadProject(data) {
+  project = data;
+  projectId = data.id;
+  loadProjectIntoUI(data);
+  renderAll();
+  setStatus('Project loaded: ' + data.name, 'ok');
+}
+
+async function openProjectFile() {
+  const input = $('fileOpen');
+  input.click();
+  input.onchange = async () => {
+    const file = input.files[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if (!data.id) data.id = uid();
+      if (!data.performers) data.performers = [];
+      if (!data.bonuses) data.bonuses = [];
+      if (!data.images) data.images = {};
+      let restoredFiles = 0;
+      for (const p of data.performers) {
+        for (const key of ['soundA', 'soundB', 'animHD', 'animLD', 'animJSON']) {
+          if (p[key] && p[key].data) {
+            p[key] = { name: p[key].name, size: p[key].size, type: p[key].type, file: base64ToFile(p[key].data, p[key].name, p[key].type) };
+            restoredFiles++;
+          }
+        }
+      }
+      for (const key of Object.keys(data.images)) {
+        const img = data.images[key];
+        if (img && img.data) {
+          data.images[key] = { name: img.name, width: img.width, height: img.height, type: img.type, size: img.size, file: base64ToFile(img.data, img.name, img.type) };
+          restoredFiles++;
+        }
+      }
+      loadProject(data);
+      setStatus(data.formatVersion >= 2
+        ? `Project opened: ${data.name} (${restoredFiles} file(s) restored)`
+        : `Project opened: ${data.name} (metadata only — this file has no embedded audio/images; re-upload them, or re-export with the current app version)`, 'ok');
+    } catch(e) {
+      setStatus('Failed to open project: ' + e.message, 'err');
+    }
+    input.value = '';
+  };
+}
+
+// Downloads a full, self-contained project backup — including real audio/image/animation
+// file content (base64-encoded) — so it can be reopened later or moved to another device.
+// This is the counterpart "Open" was always missing: without it, the only persistence was
+// browser-local IndexedDB, which iPad/Safari can evict after a period of inactivity.
+async function exportProjectFile() {
+  if (!project) { setStatus('Create or open a project first.', 'err'); return; }
+  uiToProject();
+  setStatus('Encoding files for export…', 'ok');
+  try {
+    const data = JSON.parse(JSON.stringify(project, (k, v) => (k === 'file' ? undefined : v)));
+    for (const p of data.performers || []) {
+      const orig = (project.performers || []).find(op => op.id === p.id);
+      if (!orig) continue;
+      for (const key of ['soundA', 'soundB', 'animHD', 'animLD', 'animJSON']) {
+        if (orig[key] && orig[key].file) {
+          p[key] = { name: orig[key].name, size: orig[key].size, type: orig[key].type, data: await fileToBase64(orig[key].file) };
+        }
+      }
+    }
+    for (const key of Object.keys(data.images || {})) {
+      const orig = (project.images || {})[key];
+      if (orig && orig.file) {
+        data.images[key] = { name: orig.name, width: orig.width, height: orig.height, type: orig.type, size: orig.size, data: await fileToBase64(orig.file) };
+      }
+    }
+    data.formatVersion = 2;
+    const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = (project.slug || slugify(project.name) || 'project') + '.imbproject';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    setStatus('Project exported: ' + a.download, 'ok');
+  } catch(e) {
+    setStatus('Project export failed: ' + e.message, 'err');
+  }
+}
+
+// ---- Performers ----
+function renderPerformers() {
+  const container = $('performerList');
+  if (!project) { container.innerHTML = '<p class="text-muted">Create or open a project first.</p>'; return; }
+  const list = project.performers || [];
+  $('perfCount').textContent = list.length + ' / 20';
+  if (!list.length) {
+    container.innerHTML = '<p class="text-muted">No performers yet. Add one above.</p>';
+    return;
+  }
+  container.innerHTML = '';
+  list.forEach((p, idx) => {
+    const card = el('div', 'performer-card');
+    card.dataset.idx = idx;
+    const colorDot = `<span class="color-dot" style="background:${p.color||'#888'}"></span>`;
+    const nameDisplay = `<span class="name">${p.name||'Unnamed'}</span> <span class="id">#${idx+1}</span>`;
+    const uniq = p.uniqsnd !== undefined ? p.uniqsnd : true;
+    const soundStatus = uniq ? '🔊 A only' : '🔊 A+B';
+    const hasFiles = (p.soundA || p.soundB || p.animHD || p.animJSON) ? '📎' : '';
+    card.innerHTML = `
+      <div class="card-header">
+        <div>${colorDot} ${nameDisplay} <span class="badge muted">${soundStatus}</span> ${hasFiles}</div>
+        <div class="flex" style="gap:3px">
+          <span class="drag-handle">⠿</span>
+          <button data-action="editPerf" data-idx="${idx}" class="secondary" style="padding:2px 8px;font-size:12px">✏️</button>
+          <button data-action="dupPerf" data-idx="${idx}" class="secondary" style="padding:2px 8px;font-size:12px">📋</button>
+          <button data-action="delPerf" data-idx="${idx}" class="danger" style="padding:2px 8px;font-size:12px">✕</button>
+        </div>
+      </div>
+      <div class="text-muted" style="font-size:12px">
+        ${p.soundA ? '🎵 A: ' + p.soundA.name : ''} ${p.soundB ? '🎵 B: ' + p.soundB.name : ''}
+        ${p.animHD ? '🖼️ HD' : ''} ${p.animLD ? 'LD' : ''} ${p.animJSON ? '📄 JSON' : ''}
+      </div>
+    `;
+    container.appendChild(card);
+  });
+
+  // Event listeners
+  container.querySelectorAll('[data-action="editPerf"]').forEach(btn => {
+    btn.addEventListener('click', () => editPerformer(parseInt(btn.dataset.idx)));
+  });
+  container.querySelectorAll('[data-action="dupPerf"]').forEach(btn => {
+    btn.addEventListener('click', () => duplicatePerformer(parseInt(btn.dataset.idx)));
+  });
+  container.querySelectorAll('[data-action="delPerf"]').forEach(btn => {
+    btn.addEventListener('click', () => deletePerformer(parseInt(btn.dataset.idx)));
+  });
+
+  // Drag-to-reorder via Pointer Events — native HTML5 drag-and-drop (draggable/dragstart/
+  // dragover/drop) never worked on iOS Safari for custom elements, only certain built-ins,
+  // so it was silently non-functional on the app's own stated target device. Pointer Events
+  // unify mouse, touch, and pencil, so this works everywhere.
+  container.querySelectorAll('.performer-card').forEach(card => {
+    const handle = card.querySelector('.drag-handle');
+    handle.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      const startIdx = parseInt(card.dataset.idx);
+      const startY = e.clientY;
+      const cards = Array.from(container.querySelectorAll('.performer-card'));
+      // Other cards' positions are fixed for the duration of the drag; only the dragged
+      // card's element is visually translated, so we don't touch the DOM (and lose pointer
+      // capture) until the drag actually ends.
+      const others = cards.filter(c => c !== card).map(c => ({ idx: parseInt(c.dataset.idx), rect: c.getBoundingClientRect(), el: c }));
+      let targetIdx = startIdx;
+      card.style.position = 'relative';
+      card.style.zIndex = '50';
+      card.style.transition = 'none';
+      card.style.boxShadow = '0 6px 18px rgba(0,0,0,.25)';
+      card.setPointerCapture(e.pointerId);
+
+      const onMove = (ev) => {
+        if (ev.pointerId !== e.pointerId) return;
+        const dy = ev.clientY - startY;
+        card.style.transform = `translateY(${dy}px)`;
+        const centerY = ev.clientY, centerX = ev.clientX;
+        let best = null, bestDist = Infinity;
+        for (const o of others) {
+          const cx = o.rect.left + o.rect.width / 2, cy = o.rect.top + o.rect.height / 2;
+          const dist = Math.hypot(centerX - cx, centerY - cy);
+          if (dist < bestDist) { bestDist = dist; best = o; }
+        }
+        others.forEach(o => o.el.classList.remove('drop-target'));
+        if (best && bestDist < 200) {
+          targetIdx = best.idx;
+          best.el.classList.add('drop-target');
+        } else {
+          targetIdx = startIdx;
+        }
+      };
+      const onUp = (ev) => {
+        if (ev.pointerId !== e.pointerId) return;
+        card.style.position = '';
+        card.style.zIndex = '';
+        card.style.transform = '';
+        card.style.boxShadow = '';
+        others.forEach(o => o.el.classList.remove('drop-target'));
+        handle.removeEventListener('pointermove', onMove);
+        handle.removeEventListener('pointerup', onUp);
+        handle.removeEventListener('pointercancel', onUp);
+        if (targetIdx !== startIdx) {
+          const listArr = project.performers;
+          const [removed] = listArr.splice(startIdx, 1);
+          listArr.splice(targetIdx, 0, removed);
+          saveProject();
+          renderPerformers();
+        }
+      };
+      handle.addEventListener('pointermove', onMove);
+      handle.addEventListener('pointerup', onUp);
+      handle.addEventListener('pointercancel', onUp);
+    });
+  });
+}
+
+function addPerformer() {
+  if (!project) { setStatus('Create a project first.', 'err'); return; }
+  if ((project.performers||[]).length >= 20) {
+    setStatus('Maximum 20 performers reached.', 'err');
+    return;
+  }
+  const p = {
+    id: uid(),
+    name: 'Performer ' + ((project.performers||[]).length + 1),
+    color: '#888888',
+    uniqsnd: true,
+    soundA: null,
+    soundB: null,
+    animHD: null,
+    animLD: null,
+    animJSON: null,
+    category: 'Other',
+    notes: ''
+  };
+  project.performers.push(p);
+  saveProject();
+  renderPerformers();
+  editPerformer(project.performers.length - 1);
+}
+
+function editPerformer(idx) {
+  const list = project.performers;
+  if (idx < 0 || idx >= list.length) return;
+  const p = list[idx];
+  // Simple inline edit using prompt
+  const newName = prompt('Performer name:', p.name);
+  if (newName !== null && newName.trim()) p.name = newName.trim();
+  const newColor = prompt('Color (hex):', p.color || '#888888');
+  if (newColor !== null) p.color = newColor.trim();
+  const uniq = confirm('One repeated sound? (OK = A only, Cancel = A+B)');
+  p.uniqsnd = uniq;
+  const cat = prompt('Category (Beat, Effect, Melody, Voice, Other):', p.category || 'Other');
+  if (cat !== null) p.category = cat.trim();
+  saveProject();
+  renderPerformers();
+}
+
+function duplicatePerformer(idx) {
+  const list = project.performers;
+  if (idx < 0 || idx >= list.length) return;
+  const orig = list[idx];
+  const copy = JSON.parse(JSON.stringify(orig));
+  copy.id = uid();
+  copy.name = orig.name + ' (copy)';
+  // clear file refs
+  copy.soundA = null;
+  copy.soundB = null;
+  copy.animHD = null;
+  copy.animLD = null;
+  copy.animJSON = null;
+  list.splice(idx+1, 0, copy);
+  saveProject();
+  renderPerformers();
+}
+
+function deletePerformer(idx) {
+  const list = project.performers;
+  if (idx < 0 || idx >= list.length) return;
+  if (!confirm(`Delete performer "${list[idx].name}"?`)) return;
+  list.splice(idx, 1);
+  saveProject();
+  renderPerformers();
+}
+
+// ---- Audio ----
+function renderAudio() {
+  const container = $('audioPerformerList');
+  if (!project) { container.innerHTML = '<p class="text-muted">Create or open a project first.</p>'; return; }
+  const list = project.performers || [];
+  if (!list.length) {
+    container.innerHTML = '<p class="text-muted">No performers. Add performers first.</p>';
+    return;
+  }
+  container.innerHTML = '';
+  list.forEach((p, idx) => {
+    const card = el('div', 'card');
+    const uniq = p.uniqsnd !== undefined ? p.uniqsnd : true;
+    const hasA = p.soundA && p.soundA.name;
+    const hasB = !uniq && p.soundB && p.soundB.name;
+    card.innerHTML = `
+      <div class="flex" style="justify-content:space-between">
+        <div><strong>${p.name}</strong> <span class="badge muted">${uniq ? 'A only' : 'A+B'}</span></div>
+        <div class="flex" style="gap:4px">
+          <button data-action="uploadA" data-idx="${idx}" class="secondary" style="padding:2px 10px;font-size:12px">🎵 A</button>
+          ${!uniq ? `<button data-action="uploadB" data-idx="${idx}" class="secondary" style="padding:2px 10px;font-size:12px">🎵 B</button>` : ''}
+          <button data-action="playA" data-idx="${idx}" class="secondary" style="padding:2px 10px;font-size:12px">▶️</button>
+          <button data-action="clearA" data-idx="${idx}" style="padding:2px 10px;font-size:12px;background:#fecaca;color:#991b1b">✕</button>
+        </div>
+      </div>
+      <div class="text-muted" style="font-size:12px">
+        ${hasA ? 'A: ' + p.soundA.name + (p.soundA.duration ? ' · ' + p.soundA.duration.toFixed(2) + 's' : '') + (p.soundA.sampleRate ? ' · ' + Math.round(p.soundA.sampleRate/1000) + 'kHz' : '') + (p.soundA.channels ? ' · ' + (p.soundA.channels === 1 ? 'mono' : 'stereo') : '') : 'No A file'} ${hasB ? '| B: ' + p.soundB.name + (p.soundB.duration ? ' · ' + p.soundB.duration.toFixed(2) + 's' : '') : ''}
+      </div>
+    `;
+    container.appendChild(card);
+  });
+
+  container.querySelectorAll('[data-action="uploadA"]').forEach(btn => {
+    btn.addEventListener('click', () => uploadAudio(parseInt(btn.dataset.idx), 'A'));
+  });
+  container.querySelectorAll('[data-action="uploadB"]').forEach(btn => {
+    btn.addEventListener('click', () => uploadAudio(parseInt(btn.dataset.idx), 'B'));
+  });
+  container.querySelectorAll('[data-action="playA"]').forEach(btn => {
+    btn.addEventListener('click', () => playAudio(parseInt(btn.dataset.idx), 'A'));
+  });
+  container.querySelectorAll('[data-action="clearA"]').forEach(btn => {
+    const idx = parseInt(btn.dataset.idx);
+    btn.addEventListener('click', () => {
+      const p = project.performers[idx];
+      if (p) { p.soundA = null; p.soundB = null; saveProject(); renderAudio(); }
+    });
+  });
+}
+
+const SUPPORTED_AUDIO_EXTENSIONS = ['mp3','wav','m4a','aac','ogg'];
+let sharedAudioContext = null;
+let activeAudioSource = null;
+
+function getFileExtension(name) {
+  const parts = String(name || '').toLowerCase().split('.');
+  return parts.length > 1 ? parts.pop() : '';
+}
+
+function isSupportedAudioFile(file) {
+  const ext = getFileExtension(file && file.name);
+  return SUPPORTED_AUDIO_EXTENSIONS.includes(ext);
+}
+
+async function inspectAudioFile(file) {
+  const info = { duration: null, sampleRate: null, channels: null };
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return info;
+    const ctx = new Ctx();
+    const arrayBuffer = await file.arrayBuffer();
+    const decoded = await ctx.decodeAudioData(arrayBuffer.slice(0));
+    info.duration = decoded.duration;
+    info.sampleRate = decoded.sampleRate;
+    info.channels = decoded.numberOfChannels;
+    try { await ctx.close(); } catch(e) {}
+  } catch(e) {
+    // File can still be stored even if this browser cannot decode it for preview.
+  }
+  return info;
+}
+
+function uploadAudio(idx, which) {
+  const input = $('fileImportAudio');
+  input.value = '';
+  input.onchange = async () => {
+    const file = input.files && input.files[0];
+    input.value = '';
+    if (!file) return;
+    if (!isSupportedAudioFile(file)) {
+      setStatus('Unsupported audio file. Choose MP3, WAV, M4A, AAC or OGG.', 'err');
+      return;
+    }
+    const p = project.performers[idx];
+    if (!p) return;
+    setStatus('Loading audio: ' + file.name + '…', 'ok');
+    const meta = await inspectAudioFile(file);
+    const entry = {
+      name: file.name,
+      file: file,
+      size: file.size,
+      type: file.type || '',
+      duration: meta.duration,
+      sampleRate: meta.sampleRate,
+      channels: meta.channels
+    };
+    if (which === 'A') p.soundA = entry;
+    else p.soundB = entry;
+    saveProject();
+    renderAudio();
+    setStatus('Loaded: ' + file.name, 'ok');
+  };
+  input.click();
+}
+
+async function playAudio(idx, which) {
+  const p = project.performers[idx];
+  if (!p) return;
+  const entry = which === 'A' ? p.soundA : p.soundB;
+  if (!entry || !entry.file) { setStatus('No audio file loaded.', 'err'); return; }
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) throw new Error('Web Audio is not supported in this browser.');
+    if (!sharedAudioContext || sharedAudioContext.state === 'closed') sharedAudioContext = new Ctx();
+    if (sharedAudioContext.state === 'suspended') await sharedAudioContext.resume();
+    if (activeAudioSource) { try { activeAudioSource.stop(); } catch(e) {} activeAudioSource = null; }
+    const arrayBuffer = await entry.file.arrayBuffer();
+    const buf = await sharedAudioContext.decodeAudioData(arrayBuffer.slice(0));
+    const src = sharedAudioContext.createBufferSource();
+    src.buffer = buf;
+    const gain = sharedAudioContext.createGain();
+    gain.gain.value = 0.7;
+    src.connect(gain);
+    gain.connect(sharedAudioContext.destination);
+    src.onended = () => { if (activeAudioSource === src) activeAudioSource = null; };
+    activeAudioSource = src;
+    src.start();
+    setStatus('Playing: ' + entry.name, 'ok');
+  } catch(err) {
+    const ext = getFileExtension(entry.name).toUpperCase() || 'audio';
+    setStatus(`${ext} playback failed in this browser. Try a standard MP3 or 16-bit/24-bit PCM WAV. ${err.message}`, 'err');
+  }
+}
+
+// ---- Images ----
+function renderImages() {
+  const container = $('imageList');
+  if (!project) { container.innerHTML = '<p class="text-muted">Create or open a project first.</p>'; return; }
+  const required = [
+    { key: 'game-bck', label: 'game-bck.jpg', w: 2048, h: 800 },
+    { key: 'game-picto', label: 'game-picto.png', w: 'auto', h: 272 },
+    { key: 'home-screen', label: 'home-screen.jpg', w: 2976, h: 1420 },
+    { key: 'icon', label: 'icon.jpg', w: 500, h: 500 }
+  ];
+  const optional = [
+    { key: 'crew', label: 'crew.jpg', w: 1120, h: 800 },
+    { key: 'game-bck-gif', label: 'game-bck.gif', w: 2048, h: 800 },
+    { key: 'game-front-bot', label: 'game-front-bot.png', w: 2048, h: 800 },
+    { key: 'game-front-top', label: 'game-front-top.png', w: 2048, h: 800 }
+  ];
+  const all = [...required, ...optional];
+  container.innerHTML = '';
+  all.forEach(img => {
+    const existing = project.images[img.key];
+    const has = existing && existing.file;
+    const status = has ? '✅' : '⬜';
+    const dims = has ? `${existing.width||'?'}×${existing.height||'?'}` : '—';
+    const card = el('div', 'card');
+    card.innerHTML = `
+      <div class="flex" style="justify-content:space-between">
+        <div>
+          <strong>${img.label}</strong>
+          <span class="badge ${has ? 'ok' : 'muted'}">${has ? 'Loaded' : 'Missing'}</span>
+          <div class="text-muted" style="font-size:12px">Expected: ${img.w}×${img.h} ${has ? '| Actual: '+dims : ''}</div>
+        </div>
+        <div class="flex" style="gap:4px">
+          <button data-action="uploadImg" data-key="${img.key}" class="secondary" style="padding:2px 10px;font-size:12px">${has ? 'Replace' : 'Upload'}</button>
+          ${has ? `<button data-action="clearImg" data-key="${img.key}" style="padding:2px 10px;font-size:12px;background:#fecaca;color:#991b1b">✕</button>` : ''}
+        </div>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+
+  container.querySelectorAll('[data-action="uploadImg"]').forEach(btn => {
+    btn.addEventListener('click', () => uploadImage(btn.dataset.key));
+  });
+  container.querySelectorAll('[data-action="clearImg"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      delete project.images[btn.dataset.key];
+      saveProject();
+      renderImages();
+    });
+  });
+}
+
+function uploadImage(key) {
+  const input = $('fileImportImage');
+  input.click();
+  input.onchange = () => {
+    const file = input.files[0];
+    if (!file) return;
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const entry = { name: file.name, file: file, width: img.width, height: img.height, type: file.type, size: file.size };
+      project.images[key] = entry;
+      saveProject();
+      renderImages();
+      URL.revokeObjectURL(url);
+    };
+    img.onerror = () => {
+      // Still save even if can't read dimensions
+      const entry = { name: file.name, file: file, width: 0, height: 0, type: file.type, size: file.size };
+      project.images[key] = entry;
+      saveProject();
+      renderImages();
+      URL.revokeObjectURL(url);
+    };
+    img.src = url;
+    input.value = '';
+  };
+}
+
+// ---- Animations ----
+function renderAnimations() {
+  const container = $('animationList');
+  if (!project) { container.innerHTML = '<p class="text-muted">Create or open a project first.</p>'; return; }
+  const list = project.performers || [];
+  if (!list.length) {
+    container.innerHTML = '<p class="text-muted">No performers. Add performers first.</p>';
+    return;
+  }
+  container.innerHTML = '';
+  list.forEach((p, idx) => {
+    const card = el('div', 'card');
+    const hasHD = p.animHD && p.animHD.name;
+    const hasLD = p.animLD && p.animLD.name;
+    const hasJSON = p.animJSON && p.animJSON.name;
+    card.innerHTML = `
+      <div class="flex" style="justify-content:space-between">
+        <div><strong>${p.name}</strong>
+          <span class="badge ${hasHD ? 'ok' : 'muted'}">HD ${hasHD ? '✅' : '⬜'}</span>
+          <span class="badge ${hasLD ? 'ok' : 'muted'}">LD ${hasLD ? '✅' : '⬜'}</span>
+          <span class="badge ${hasJSON ? 'ok' : 'muted'}">JSON ${hasJSON ? '✅' : '⬜'}</span>
+        </div>
+        <div class="flex" style="gap:4px">
+          <button data-action="animHD" data-idx="${idx}" class="secondary" style="padding:2px 10px;font-size:12px">📸 HD</button>
+          <button data-action="animLD" data-idx="${idx}" class="secondary" style="padding:2px 10px;font-size:12px">📸 LD</button>
+          <button data-action="animJSON" data-idx="${idx}" class="secondary" style="padding:2px 10px;font-size:12px">📄 JSON</button>
+          <button data-action="clearAnim" data-idx="${idx}" style="padding:2px 10px;font-size:12px;background:#fecaca;color:#991b1b">✕</button>
+        </div>
+      </div>
+      <div class="text-muted" style="font-size:12px">
+        ${hasHD ? 'HD: '+p.animHD.name : ''} ${hasLD ? '| LD: '+p.animLD.name : ''} ${hasJSON ? '| JSON: '+p.animJSON.name : ''}
+      </div>
+    `;
+    container.appendChild(card);
+  });
+
+  container.querySelectorAll('[data-action="animHD"]').forEach(btn => {
+    btn.addEventListener('click', () => uploadAnimFile(parseInt(btn.dataset.idx), 'HD'));
+  });
+  container.querySelectorAll('[data-action="animLD"]').forEach(btn => {
+    btn.addEventListener('click', () => uploadAnimFile(parseInt(btn.dataset.idx), 'LD'));
+  });
+  container.querySelectorAll('[data-action="animJSON"]').forEach(btn => {
+    btn.addEventListener('click', () => uploadAnimFile(parseInt(btn.dataset.idx), 'JSON'));
+  });
+  container.querySelectorAll('[data-action="clearAnim"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const p = project.performers[parseInt(btn.dataset.idx)];
+      if (p) { p.animHD = null; p.animLD = null; p.animJSON = null; saveProject(); renderAnimations(); }
+    });
+  });
+}
+
+function uploadAnimFile(idx, type) {
+  const isJSON = type === 'JSON';
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = isJSON ? '.json' : 'image/png';
+  input.click();
+  input.onchange = () => {
+    const file = input.files[0];
+    if (!file) return;
+    const p = project.performers[idx];
+    if (!p) return;
+    const entry = { name: file.name, file: file, size: file.size, type: file.type };
+    if (type === 'HD') p.animHD = entry;
+    else if (type === 'LD') p.animLD = entry;
+    else p.animJSON = entry;
+    saveProject();
+    renderAnimations();
+    input.remove();
+  };
+}
+
+// ---- Bonuses ----
+function renderBonuses() {
+  const container = $('bonusList');
+  if (!project) { container.innerHTML = '<p class="text-muted">Create or open a project first.</p>'; return; }
+  const list = project.bonuses || [];
+  $('bonusCount').textContent = list.length + ' / 3';
+  if (!list.length) {
+    container.innerHTML = '<p class="text-muted">No bonuses. Add one above.</p>';
+    return;
+  }
+  container.innerHTML = '';
+  list.forEach((bonus, idx) => {
+    const card = el('div', 'bonus-card');
+    const codeStr = (bonus.code||[]).join(' · ');
+    card.innerHTML = `
+      <div class="flex" style="justify-content:space-between">
+        <div><strong>${bonus.title || 'Untitled'}</strong> <span class="badge muted">Code: ${codeStr}</span></div>
+        <div class="flex" style="gap:4px">
+          <button data-action="editBonus" data-idx="${idx}" class="secondary" style="padding:2px 10px;font-size:12px">✏️</button>
+          <button data-action="delBonus" data-idx="${idx}" class="danger" style="padding:2px 10px;font-size:12px">✕</button>
+        </div>
+      </div>
+      <div class="text-muted" style="font-size:12px">
+        Sound: ${bonus.sound || '—'} | Predrop: ${bonus.predrop || '—'} | Loop: ${bonus.loop || 1}
+      </div>
+    `;
+    container.appendChild(card);
+  });
+
+  container.querySelectorAll('[data-action="editBonus"]').forEach(btn => {
+    btn.addEventListener('click', () => editBonus(parseInt(btn.dataset.idx)));
+  });
+  container.querySelectorAll('[data-action="delBonus"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (!confirm('Delete this bonus?')) return;
+      project.bonuses.splice(parseInt(btn.dataset.idx), 1);
+      saveProject();
+      renderBonuses();
+    });
+  });
+}
+
+function addBonus() {
+  if (!project) { setStatus('Create a project first.', 'err'); return; }
+  if ((project.bonuses||[]).length >= 3) {
+    setStatus('Maximum 3 bonuses reached.', 'err');
+    return;
+  }
+  // pick first 5 performers
+  const performerIds = (project.performers||[]).map((p, i) => i+1);
+  const code = performerIds.slice(0, Math.min(5, performerIds.length));
+  while (code.length < 5) code.push(0);
+  project.bonuses.push({
+    title: 'Bonus ' + ((project.bonuses||[]).length + 1),
+    code: code.slice(0,5),
+    name: 'bonus_' + ((project.bonuses||[]).length + 1),
+    sound: '',
+    predrop: '',
+    loop: 1
+  });
+  saveProject();
+  renderBonuses();
+  editBonus(project.bonuses.length - 1);
+}
+
+function editBonus(idx) {
+  const list = project.bonuses;
+  if (idx < 0 || idx >= list.length) return;
+  const b = list[idx];
+  const title = prompt('Bonus title:', b.title || '');
+  if (title !== null) b.title = title.trim() || 'Untitled';
+  const name = prompt('Internal bonus name:', b.name || '');
+  if (name !== null) b.name = name.trim() || 'bonus_'+(idx+1);
+  const sound = prompt('Bonus sound filename:', b.sound || '');
+  if (sound !== null) b.sound = sound.trim();
+  const predrop = prompt('Predrop sound filename (optional):', b.predrop || '');
+  if (predrop !== null) b.predrop = predrop.trim();
+  const loop = parseInt(prompt('Loop count:', String(b.loop || 1)) || '1');
+  b.loop = Math.max(1, loop);
+  // code editing: simple picker
+  const performerCount = (project.performers||[]).length;
+  let codeStr = prompt(`Enter 5 performer numbers (1-${performerCount}), comma separated:`, (b.code||[]).join(','));
+  if (codeStr !== null) {
+    const nums = codeStr.split(',').map(s => parseInt(s.trim())).filter(n => n > 0 && n <= performerCount);
+    while (nums.length < 5) nums.push(0);
+    b.code = nums.slice(0,5);
+  }
+  saveProject();
+  renderBonuses();
+}
+
+// ---- Validation ----
+function runValidation() {
+  const container = $('validationResults');
+  if (!project) { container.innerHTML = '<p class="text-muted">Create or open a project first.</p>'; return; }
+  const results = { ok: [], warn: [], err: [] };
+
+  // 1. Performer count
+  const pCount = (project.performers||[]).length;
+  if (pCount === 0) results.err.push('No performers defined.');
+  else if (pCount < 20) results.warn.push(`Only ${pCount} performers (traditional mods use 20).`);
+  else if (pCount > 20) results.err.push(`Too many performers: ${pCount} (max 20).`);
+  else results.ok.push(`${pCount} performers.`);
+
+  // 2. Performer names unique
+  const names = (project.performers||[]).map(p => p.name);
+  const dupes = names.filter((n, i) => names.indexOf(n) !== i);
+  if (dupes.length) results.err.push(`Duplicate performer names: ${dupes.join(', ')}`);
+
+  // 3. Performer colors
+  (project.performers||[]).forEach((p, i) => {
+    if (!p.color || !/^#[0-9a-f]{6}$/i.test(p.color)) {
+      results.warn.push(`Performer ${i+1} "${p.name}" has invalid color: ${p.color}`);
+    }
+  });
+
+  // 4. Audio
+  (project.performers||[]).forEach((p, i) => {
+    if (!p.soundA) results.err.push(`Performer ${i+1} "${p.name}" missing sound A.`);
+    else if (!p.soundA.name.toLowerCase().endsWith('.mp3')) results.warn.push(`Performer ${i+1} "${p.name}" sound A is not MP3 (${p.soundA.name}).`);
+    if (!p.uniqsnd && !p.soundB) results.err.push(`Performer ${i+1} "${p.name}" has uniqsnd=false but missing sound B.`);
+    if (!p.uniqsnd && p.soundB && !p.soundB.name.toLowerCase().endsWith('.mp3')) {
+      results.warn.push(`Performer ${i+1} "${p.name}" sound B is not MP3 (${p.soundB.name}).`);
+    }
+  });
+
+  // 5. Animations
+  (project.performers||[]).forEach((p, i) => {
+    if (!p.animHD) results.err.push(`Performer ${i+1} "${p.name}" missing HD animation sprite.`);
+    if (!p.animLD) results.warn.push(`Performer ${i+1} "${p.name}" missing LD animation sprite.`);
+    if (!p.animJSON) results.err.push(`Performer ${i+1} "${p.name}" missing animation JSON.`);
+  });
+
+  // 6. Required images
+  const requiredImages = ['game-bck', 'game-picto', 'home-screen', 'icon'];
+  requiredImages.forEach(key => {
+    if (!project.images[key]) results.err.push(`Missing required image: ${key}.`);
+    else {
+      const img = project.images[key];
+      if (key === 'game-picto') {
+        const expectedW = (project.performers||[]).length * 136;
+        if (img.width && Math.abs(img.width - expectedW) > 10) {
+          results.warn.push(`game-picto.png width: expected ~${expectedW}px, got ${img.width}px.`);
+        }
+      }
+    }
+  });
+
+  // 7. Bonuses
+  (project.bonuses||[]).forEach((b, i) => {
+    if (!b.title) results.warn.push(`Bonus ${i+1} has no title.`);
+    if (!b.code || b.code.length !== 5) results.err.push(`Bonus ${i+1} has invalid code (need 5 numbers).`);
+    else {
+      const valid = b.code.every(n => n >= 0 && n <= (project.performers||[]).length);
+      if (!valid) results.err.push(`Bonus ${i+1} code contains invalid performer IDs.`);
+    }
+    if (b.code && new Set(b.code).size !== b.code.length) {
+      results.warn.push(`Bonus ${i+1} code contains duplicate performer IDs.`);
+    }
+  });
+
+  // 8. Colors
+  const cols = project.colors || [];
+  if (cols.length !== 6) results.err.push('Need exactly 6 interface colors.');
+  else {
+    cols.forEach((c, i) => {
+      if (!/^#[0-9a-f]{6}$/i.test(c)) results.err.push(`Color ${i+1} invalid: ${c}`);
+    });
+  }
+
+  // 9. Slug
+  if (!project.slug) results.err.push('Missing mod slug.');
+  else if (!/^[a-z0-9-]+$/.test(project.slug)) results.warn.push('Slug should only contain lowercase letters, numbers, and hyphens.');
+
+  // render
+  let html = '';
+  if (results.err.length) {
+    html += `<div class="status err">❌ ${results.err.length} error(s) - export blocking</div>`;
+    results.err.forEach(msg => html += `<div class="status err" style="margin:2px 0">• ${msg}</div>`);
+  }
+  if (results.warn.length) {
+    html += `<div class="status warn">⚠️ ${results.warn.length} warning(s)</div>`;
+    results.warn.forEach(msg => html += `<div class="status warn" style="margin:2px 0">• ${msg}</div>`);
+  }
+  if (results.ok.length) {
+    html += `<div class="status ok">✅ ${results.ok.length} check(s) passed</div>`;
+    results.ok.forEach(msg => html += `<div class="status ok" style="margin:2px 0">• ${msg}</div>`);
+  }
+  if (!results.err.length && !results.warn.length) {
+    html += `<div class="status ok">🎉 All checks passed! Your mod looks good.</div>`;
+  }
+  container.innerHTML = html || '<p class="text-muted">No validation results yet.</p>';
+  return results;
+}
+
+// ---- Export ----
+async function exportZIP() {
+  if (!project) { setStatus('Create or open a project first.', 'err'); return; }
+  if (!zipLib) {
+    try { zipLib = await loadJSZip(); } catch(e) {
+      setStatus('Failed to load JSZip: ' + e.message, 'err');
+      return;
+    }
+  }
+  setStatus('Building ZIP...', 'ok');
+  const zip = new zipLib();
+  const slug = project.slug || slugify(project.name) || 'mod';
+
+  // app.json
+  const appJson = buildAppJson();
+  zip.file(slug + '/app.json', JSON.stringify(appJson, null, 2));
+
+  // images
+  for (const [key, data] of Object.entries(project.images || {})) {
+    if (!data || !data.file) continue;
+    const ext = data.name.split('.').pop() || 'jpg';
+    const filename = key + '.' + ext;
+    zip.file(slug + '/image/' + filename, data.file);
+  }
+
+  // sounds
+  (project.performers || []).forEach((p, i) => {
+    const baseName = p.name.toLowerCase().replace(/[^a-z0-9]/g, '-') || 'performer-' + (i+1);
+    if (p.soundA && p.soundA.file) {
+      const ext = p.soundA.name.split('.').pop() || 'mp3';
+      zip.file(slug + '/sound/mp3/' + baseName + '-a.' + ext, p.soundA.file);
+    }
+    if (p.soundB && p.soundB.file) {
+      const ext = p.soundB.name.split('.').pop() || 'mp3';
+      zip.file(slug + '/sound/mp3/' + baseName + '-b.' + ext, p.soundB.file);
+    }
+    if (p.animHD && p.animHD.file) {
+      zip.file(slug + '/anime/' + baseName + '.png', p.animHD.file);
+    }
+    if (p.animLD && p.animLD.file) {
+      zip.file(slug + '/anime/' + baseName + '-ld.png', p.animLD.file);
+    }
+    if (p.animJSON && p.animJSON.file) {
+      zip.file(slug + '/anime/' + baseName + '.json', p.animJSON.file);
+    }
+  });
+
+  // bonuses
+  (project.bonuses || []).forEach((b, i) => {
+    const name = b.name || 'bonus_' + (i+1);
+    // We don't have actual bonus files in this MVP; just placeholders
+    // In a full version, we'd copy uploaded video/audio files.
+    // For now, we create a placeholder note.
+    zip.file(slug + '/bonus/' + name + '.mp4', '');
+    zip.file(slug + '/bonus/' + name + '-ld.mp4', '');
+    zip.file(slug + '/bonus/' + name + '.svg', '<svg xmlns="http://www.w3.org/2000/svg" width="70" height="70"><rect width="70" height="70" fill="#888"/></svg>');
+    zip.file(slug + '/bonus/' + name + '.mp3', '');
+    if (b.predrop) zip.file(slug + '/bonus/' + b.predrop + '.mp3', '');
+  });
+
+  // Generate
+  try {
+    const blob = await zip.generateAsync({ type: 'blob' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = slug + '.zip';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    setStatus('ZIP exported successfully: ' + slug + '.zip', 'ok');
+  } catch(e) {
+    setStatus('ZIP export error: ' + e.message, 'err');
+  }
+}
+
+function buildAppJson() {
+  uiToProject();
+  const animearray = (project.performers || []).map(p => ({
+    name: p.name.toLowerCase().replace(/[^a-z0-9]/g, '-') || 'unknown',
+    color: p.color || '#888888',
+    uniqsnd: p.uniqsnd !== undefined ? p.uniqsnd : true
+  }));
+  const bonusarray = (project.bonuses || []).map(b => ({
+    title: b.title || 'Bonus',
+    code: (b.code || []).slice(0,5),
+    name: b.name || 'bonus',
+    sound: b.sound || '',
+    predrop: b.predrop || undefined,
+    loop: b.loop || 1
+  }));
+  const json = {
+    name: project.name || 'Unnamed',
+    date: project.date || new Date().toISOString().slice(0,10),
+    looptime: project.looptime || 8000,
+    bpm: project.bpm || 120,
+    totalframe: project.totalframe || 384,
+    bonusloopA: project.bonusLoopA !== undefined ? project.bonusLoopA : true,
+    bonusendloopA: project.bonusEndLoopA !== undefined ? project.bonusEndLoopA : false,
+    colors: (project.colors || defaultProject().colors).slice(0,6),
+    animearray: animearray,
+    credit: {
+      crewname: project.crew || '',
+      process: parseComma(project.process || ''),
+      music: parseComma(project.music || ''),
+      design: parseComma(project.design || ''),
+      animation: parseComma(project.animation || ''),
+      thanks: project.thanks || ''
+    }
+  };
+  if (bonusarray.length) json.bonusarray = bonusarray;
+  // clean empty credit fields
+  if (!json.credit.crewname) delete json.credit.crewname;
+  if (!json.credit.process.length) delete json.credit.process;
+  if (!json.credit.music.length) delete json.credit.music;
+  if (!json.credit.design.length) delete json.credit.design;
+  if (!json.credit.animation.length) delete json.credit.animation;
+  if (!json.credit.thanks) delete json.credit.thanks;
+  return json;
+}
+
+function previewAppJson() {
+  const json = buildAppJson();
+  const preview = $('jsonPreview');
+  preview.textContent = JSON.stringify(json, null, 2);
+  preview.classList.remove('hidden');
+  $('btnPreviewJson').textContent = '👁️ Hide JSON';
+  $('btnPreviewJson').onclick = () => {
+    preview.classList.add('hidden');
+    $('btnPreviewJson').textContent = '👁️ Preview app.json';
+    $('btnPreviewJson').onclick = previewAppJson;
+  };
+}
+
+function exportAppJson() {
+  const json = buildAppJson();
+  const blob = new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'app.json';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// ---- Render all ----
+function renderAll() {
+  renderPerformers();
+  renderAudio();
+  renderImages();
+  renderAnimations();
+  renderBonuses();
+  if (project) $('perfCount').textContent = (project.performers||[]).length + ' / 20';
+}
+
+// ---- Event bindings ----
+$('btnNew').addEventListener('click', () => { if (confirm('Discard current project?')) newProject(); });
+$('btnOpen').addEventListener('click', openProjectFile);
+$('btnSave').addEventListener('click', saveProject);
+$('btnExportProject').addEventListener('click', exportProjectFile);
+$('btnExport').addEventListener('click', exportZIP);
+$('btnAddPerformer').addEventListener('click', addPerformer);
+$('btnAddBonus').addEventListener('click', addBonus);
+$('btnRunValidation').addEventListener('click', runValidation);
+$('btnExportReport').addEventListener('click', () => {
+  const results = runValidation();
+  const lines = ['Validation Report', '================', ''];
+  const flatten = (arr, label) => { if (arr.length) { lines.push(label + ':'); arr.forEach(m => lines.push('  ' + m)); lines.push(''); } };
+  flatten(results.ok, 'Passed');
+  flatten(results.warn, 'Warnings');
+  flatten(results.err, 'Errors');
+  const blob = new Blob([lines.join('\n')], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'validation-report.txt';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+$('btnExportZIP').addEventListener('click', exportZIP);
+$('btnExportAppJson').addEventListener('click', exportAppJson);
+$('btnPreviewJson').addEventListener('click', previewAppJson);
+$('btnSlugFromName').addEventListener('click', () => {
+  const name = $('projName').value.trim();
+  if (name) $('projSlug').value = slugify(name);
+});
+$('btnSuggestFrames').addEventListener('click', () => {
+  const looptime = parseInt($('projLooptime').value) || 8000;
+  const frames = Math.round(looptime / 1000 * 2 * 24);
+  $('projTotalframe').value = clamp(frames, 48, 1200);
+});
+
+// ---- Init ----
+async function init() {
+  try {
+    db = await openDB();
+    const list = await dbList();
+    if (list.length) {
+      // Load the most recent project
+      const latest = list.reduce((a, b) => a.timestamp > b.timestamp ? a : b, list[0]);
+      loadProject(latest);
+    } else {
+      newProject();
+    }
+  } catch(e) {
+    console.warn('DB init failed, using memory only:', e);
+    newProject();
+  }
+  // Preload JSZip in background
+  loadJSZip().then(z => { zipLib = z; }).catch(() => {});
+}
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,3196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MIDI Restoration Studio v5.0 — Ultimate Edition</title>
+    <style>
+        /* ===== CSS VARIABLES & RESET ===== */
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #1c2333;
+            --bg-card: #21262d;
+            --bg-hover: #2d3748;
+            --border-color: #30363d;
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --text-muted: #484f58;
+            --accent-blue: #58a6ff;
+            --accent-green: #3fb950;
+            --accent-red: #f85149;
+            --accent-orange: #d29922;
+            --accent-purple: #bc8cff;
+            --accent-pink: #f778ba;
+            --confidence-high: #3fb950;
+            --confidence-medium: #d29922;
+            --confidence-low: #f85149;
+            --shadow: 0 8px 32px rgba(0,0,0,0.6);
+            --radius: 8px;
+            --radius-sm: 4px;
+            --transition: 0.2s ease;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-secondary); }
+        ::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+        /* ===== LAYOUT ===== */
+        .app-container {
+            display: grid;
+            grid-template-columns: 240px 1fr 280px;
+            grid-template-rows: 44px 1fr 100px;
+            height: 100vh;
+            gap: 1px;
+            background: var(--border-color);
+        }
+
+        /* ===== HEADER ===== */
+        .header {
+            grid-column: 1 / -1;
+            background: var(--bg-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .header-left { display: flex; align-items: center; gap: 12px; }
+        .logo {
+            font-size: 16px;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .logo span {
+            font-weight: 400;
+            font-size: 11px;
+            -webkit-text-fill-color: var(--text-secondary);
+            margin-left: 8px;
+        }
+        .logo .version {
+            -webkit-text-fill-color: var(--text-muted);
+            font-weight: 300;
+        }
+
+        .header-actions { display: flex; gap: 4px; }
+        .btn-icon {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 3px 8px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 12px;
+            transition: all var(--transition);
+        }
+        .btn-icon:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+
+        .validation-badge {
+            font-size: 10px;
+            padding: 2px 10px;
+            border-radius: 12px;
+            background: var(--bg-tertiary);
+            color: var(--text-muted);
+            display: none;
+        }
+        .validation-badge.pass { background: rgba(63,185,80,0.15); color: var(--accent-green); display: inline-block; }
+        .validation-badge.fail { background: rgba(248,81,73,0.15); color: var(--accent-red); display: inline-block; }
+
+        /* ===== LEFT PANEL ===== */
+        .left-panel {
+            background: var(--bg-secondary);
+            padding: 12px;
+            overflow-y: auto;
+            grid-row: 2 / -1;
+        }
+
+        .panel-section { margin-bottom: 14px; }
+        .panel-section-title {
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            font-weight: 600;
+        }
+
+        .drop-zone {
+            border: 2px dashed var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all var(--transition);
+            background: var(--bg-tertiary);
+            margin-bottom: 4px;
+        }
+        .drop-zone:hover { border-color: var(--accent-blue); background: var(--bg-card); }
+        .drop-zone.dragover { border-color: var(--accent-green); background: rgba(63,185,80,0.08); }
+        .drop-zone-icon { font-size: 20px; margin-bottom: 2px; }
+        .drop-zone-text { font-size: 11px; color: var(--text-secondary); }
+        .drop-zone-text strong { color: var(--text-primary); }
+
+        .file-status {
+            font-size: 10px;
+            padding: 3px 8px;
+            border-radius: var(--radius-sm);
+            margin-top: 4px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            min-height: 24px;
+        }
+        .file-status.loaded { background: rgba(63,185,80,0.12); color: var(--accent-green); }
+        .file-status.missing { background: rgba(248,81,73,0.12); color: var(--accent-red); }
+        .file-status.info { background: rgba(88,166,255,0.12); color: var(--accent-blue); }
+
+        .instrument-select {
+            width: 100%;
+            padding: 4px 8px;
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            font-size: 12px;
+        }
+        .instrument-select:focus { outline: none; border-color: var(--accent-blue); }
+
+        .preset-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 3px;
+        }
+        .preset-btn {
+            padding: 3px 4px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            color: var(--text-secondary);
+            font-size: 10px;
+            cursor: pointer;
+            transition: all var(--transition);
+            text-align: center;
+        }
+        .preset-btn:hover { background: var(--bg-card); border-color: var(--accent-blue); color: var(--text-primary); }
+        .preset-btn.active { background: var(--accent-blue); border-color: var(--accent-blue); color: white; }
+
+        .file-info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2px;
+            font-size: 10px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+        .file-info-grid .label { color: var(--text-muted); }
+        .file-info-grid .value { color: var(--text-primary); text-align: right; }
+
+        /* ===== CENTER PANEL ===== */
+        .center-panel {
+            background: var(--bg-secondary);
+            position: relative;
+            overflow: hidden;
+            grid-row: 2 / -1;
+        }
+
+        .piano-roll-container {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        #pianoRollCanvas {
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+
+        .piano-roll-controls {
+            position: absolute;
+            bottom: 6px;
+            right: 6px;
+            display: flex;
+            gap: 3px;
+            background: rgba(22,27,34,0.92);
+            padding: 3px 8px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-color);
+            backdrop-filter: blur(8px);
+        }
+        .piano-roll-controls button {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 1px 6px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 10px;
+        }
+        .piano-roll-controls button:hover { background: var(--bg-card); color: var(--text-primary); }
+        .piano-roll-controls .sep { color: var(--border-color); padding: 0 2px; }
+        .piano-roll-hint {
+            position: absolute;
+            left: 8px;
+            top: 6px;
+            font-size: 9px;
+            color: var(--text-muted);
+            background: rgba(22,27,34,.75);
+            padding: 3px 8px;
+            border-radius: var(--radius-sm);
+            pointer-events: none;
+            max-width: calc(100% - 16px);
+        }
+
+        /* ===== RIGHT PANEL ===== */
+        .right-panel {
+            background: var(--bg-secondary);
+            padding: 12px;
+            overflow-y: auto;
+            grid-row: 2 / -1;
+        }
+
+        .confidence-ring {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 10px;
+            background: var(--bg-tertiary);
+            border-radius: var(--radius-sm);
+            margin-bottom: 6px;
+        }
+        .ring {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            font-weight: 700;
+            border: 3px solid var(--border-color);
+            flex-shrink: 0;
+        }
+        .ring.high { border-color: var(--confidence-high); color: var(--confidence-high); }
+        .ring.medium { border-color: var(--confidence-medium); color: var(--confidence-medium); }
+        .ring.low { border-color: var(--confidence-low); color: var(--confidence-low); }
+
+        .confidence-details { font-size: 11px; color: var(--text-secondary); line-height: 1.5; }
+        .confidence-details .score { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2px;
+        }
+        .stat-item {
+            background: var(--bg-tertiary);
+            padding: 3px 6px;
+            border-radius: var(--radius-sm);
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+        }
+        .stat-item .label { color: var(--text-secondary); }
+        .stat-item .value { color: var(--text-primary); font-weight: 500; }
+        .stat-item .value.warning { color: var(--accent-orange); }
+        .stat-item .value.danger { color: var(--accent-red); }
+        .stat-item .value.good { color: var(--accent-green); }
+
+        .module-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2px;
+        }
+        .module-option {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 4px;
+            font-size: 10px;
+            cursor: pointer;
+            border-radius: var(--radius-sm);
+            background: var(--bg-tertiary);
+            transition: all var(--transition);
+        }
+        .module-option:hover { background: var(--bg-card); }
+        .module-option input[type="checkbox"] {
+            accent-color: var(--accent-blue);
+            width: 12px;
+            height: 12px;
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+        .module-option .label { color: var(--text-secondary); flex: 1; }
+
+        .action-btn {
+            width: 100%;
+            padding: 6px;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all var(--transition);
+            margin-top: 3px;
+        }
+        .action-btn.primary { background: var(--accent-blue); color: white; }
+        .action-btn.primary:hover { background: #4a8fd8; transform: translateY(-1px); }
+        .action-btn.primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+        .action-btn.success { background: var(--accent-green); color: white; }
+        .action-btn.success:hover { background: #36a040; }
+        .action-btn.success:disabled { opacity: 0.4; cursor: not-allowed; }
+        .action-btn.warning { background: var(--accent-orange); color: white; }
+        .action-btn.warning:hover { background: #c4881e; }
+        .action-btn.warning:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        /* ===== BOTTOM PANEL ===== */
+        .bottom-panel {
+            background: var(--bg-secondary);
+            grid-column: 2 / -1;
+            padding: 6px 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-top: 1px solid var(--border-color);
+        }
+        .bottom-panel .status {
+            font-size: 11px;
+            color: var(--text-secondary);
+            flex: 1;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .bottom-panel .status .highlight { color: var(--accent-blue); }
+        .bottom-panel .status .success { color: var(--accent-green); }
+        .bottom-panel .status .error { color: var(--accent-red); }
+
+        .audition-controls {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .audition-controls button {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            padding: 2px 10px;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 11px;
+            transition: all var(--transition);
+        }
+        .audition-controls button:hover { background: var(--bg-card); color: var(--text-primary); }
+
+        .audition-toggle {
+            display: flex;
+            gap: 0;
+            border-radius: var(--radius-sm);
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+        }
+        .audition-toggle button {
+            border-radius: 0;
+            border: none;
+            background: var(--bg-tertiary);
+            padding: 2px 10px;
+            font-size: 10px;
+        }
+        .audition-toggle button.active { background: var(--accent-blue); color: white; }
+
+        .validation-indicators {
+            display: flex;
+            gap: 6px;
+            font-size: 9px;
+            color: var(--text-muted);
+        }
+        .validation-indicators .pass { color: var(--accent-green); }
+        .validation-indicators .fail { color: var(--accent-red); }
+
+        /* ===== MODAL ===== */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(4px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.active { display: flex; }
+
+        .modal {
+            background: var(--bg-secondary);
+            border-radius: var(--radius);
+            padding: 24px;
+            max-width: 520px;
+            width: 90%;
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow);
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .modal h2 { margin-bottom: 8px; font-size: 17px; }
+        .modal p { color: var(--text-secondary); font-size: 12px; line-height: 1.6; margin-bottom: 10px; white-space: pre-wrap; }
+        .modal .btn-group { display: flex; gap: 6px; justify-content: flex-end; margin-top: 12px; }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 1024px) {
+            .app-container { grid-template-columns: 200px 1fr 220px; }
+        }
+        @media (max-width: 768px) {
+            .app-container {
+                grid-template-columns: 1fr;
+                grid-template-rows: 44px auto 300px 300px 100px;
+                height: auto;
+                overflow-y: auto;
+            }
+            .left-panel, .right-panel, .bottom-panel { grid-column: 1; }
+            .center-panel { grid-row: auto; height: 400px; }
+            .left-panel { grid-row: 2; }
+            .center-panel { grid-row: 3; }
+            .right-panel { grid-row: 4; }
+            .bottom-panel { grid-row: 5; }
+        }
+
+        /* ===== ANIMATIONS ===== */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .processing { animation: pulse 1s ease-in-out infinite; }
+
+        @keyframes slideIn {
+            from { transform: translateY(6px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        .slide-in { animation: slideIn 0.25s ease-out; }
+
+        /* ===== TOOLTIP ===== */
+        .tooltip {
+            position: relative;
+            cursor: help;
+        }
+        .tooltip:hover::after {
+            content: attr(data-tip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--bg-card);
+            color: var(--text-primary);
+            padding: 4px 8px;
+            border-radius: var(--radius-sm);
+            font-size: 10px;
+            white-space: nowrap;
+            border: 1px solid var(--border-color);
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <!-- ===== APP CONTAINER ===== -->
+    <div class="app-container">
+
+        <!-- ===== HEADER ===== -->
+        <header class="header">
+            <div class="header-left">
+                <div class="logo">🎵 MIDI Restoration <span>Studio <span class="version">v5.0 — Ultimate Edition</span></span></div>
+                <span class="validation-badge" id="validationBadge">✓ Validated</span>
+            </div>
+            <div class="header-actions">
+                <button class="btn-icon" onclick="resetApplication()">↻ Reset</button>
+                <button class="btn-icon" onclick="showHelp()">📖</button>
+                <button class="btn-icon" onclick="runValidation()">✓ Validate</button>
+                <button class="btn-icon" onclick="showAbout()">ℹ️</button>
+            </div>
+        </header>
+
+        <!-- ===== LEFT PANEL ===== -->
+        <aside class="left-panel">
+            <!-- Import -->
+            <div class="panel-section">
+                <div class="panel-section-title">📂 Import</div>
+                <div class="drop-zone" id="midiDropZone">
+                    <div class="drop-zone-icon">🎵</div>
+                    <div class="drop-zone-text"><strong>Drop MIDI</strong> or click</div>
+                    <div class="drop-zone-filename" id="midiFileName" style="display:none; font-size:11px; opacity:0.8; margin-top:4px; word-break:break-all;"></div>
+                    <input type="file" id="midiInput" accept=".mid,.midi" style="display:none">
+                </div>
+                <div class="drop-zone" id="audioDropZone">
+                    <div class="drop-zone-icon">🎤</div>
+                    <div class="drop-zone-text"><strong>Drop WAV</strong> or click</div>
+                    <div class="drop-zone-filename" id="audioFileName" style="display:none; font-size:11px; opacity:0.8; margin-top:4px; word-break:break-all;"></div>
+                    <input type="file" id="audioInput" accept=".wav,.mp3,.m4a,.aac,.aiff,.aif" style="display:none">
+                </div>
+                <div id="fileStatus" class="file-status missing">No files loaded</div>
+                <div class="file-info-grid" id="fileInfoGrid">
+                    <span class="label">Tracks</span>
+                    <span class="value" id="trackCount">—</span>
+                    <span class="label">Notes</span>
+                    <span class="value" id="noteCount">—</span>
+                    <span class="label">Tempo</span>
+                    <span class="value" id="tempoDisplay">—</span>
+                    <span class="label">Format</span>
+                    <span class="value" id="formatDisplay">—</span>
+                    <span class="label">MIDI Key</span>
+                    <span class="value" id="midiKeyDisplay">—</span>
+                    <span class="label">WAV Key</span>
+                    <span class="value" id="audioKeyDisplay">—</span>
+                </div>
+            </div>
+
+            <!-- Instrument Profile -->
+            <div class="panel-section">
+                <div class="panel-section-title">🎹 Instrument</div>
+                <select class="instrument-select" id="instrumentSelect">
+                    <option value="piano">Piano</option>
+                    <option value="guitar">Guitar</option>
+                    <option value="bass">Bass</option>
+                    <option value="strings">Strings</option>
+                    <option value="vocals">Vocals</option>
+                    <option value="drums">Drums</option>
+                    <option value="auto">Auto-detect</option>
+                </select>
+            </div>
+
+            <!-- Presets -->
+            <div class="panel-section">
+                <div class="panel-section-title">⚡ Presets</div>
+                <div class="preset-grid">
+                    <button class="preset-btn active" data-preset="conservative">Conservative</button>
+                    <button class="preset-btn" data-preset="standard">Standard</button>
+                    <button class="preset-btn" data-preset="aggressive">Aggressive</button>
+                    <button class="preset-btn" data-preset="piano">Piano</button>
+                    <button class="preset-btn" data-preset="guitar">Guitar</button>
+                    <button class="preset-btn" data-preset="bass">Bass</button>
+                    <button class="preset-btn" data-preset="composed" title="For MIDI that was sequenced/composed directly, not transcribed from audio. Fixes only technical errors (duplicates, overlaps, unterminated notes) and leaves timing, velocity, and pitch untouched.">Composed</button>
+                </div>
+                <div class="preset-hint" id="presetHint" style="font-size:11px; opacity:0.7; margin-top:6px; line-height:1.4; display:none;"></div>
+            </div>
+
+            <!-- Audio Status -->
+            <div class="panel-section">
+                <div class="panel-section-title">🎧 Audio Analysis</div>
+                <div id="audioStatus" style="font-size:10px;color:var(--text-muted);line-height:1.6">
+                    <div>⏳ Waiting for audio...</div>
+                </div>
+                <div style="height:30px;background:var(--bg-tertiary);border-radius:var(--radius-sm);overflow:hidden;margin-top:3px;">
+                    <canvas id="waveformCanvas" style="width:100%;height:100%;"></canvas>
+                </div>
+            </div>
+        </aside>
+
+        <!-- ===== CENTER PANEL ===== -->
+        <main class="center-panel">
+            <div class="piano-roll-container">
+                <canvas id="pianoRollCanvas"></canvas>
+                <div class="piano-roll-controls">
+                    <button onclick="zoomPianoRoll(-1)">−</button>
+                    <span style="font-size:10px;color:var(--text-muted)" id="zoomDisplay">100%</span>
+                    <button onclick="zoomPianoRoll(1)">+</button>
+                    <span class="sep">|</span>
+                    <button onclick="resetView()">⟲</button>
+                    <button onclick="toggleConfidenceView()">📊</button>
+                    <button onclick="toggleWaveformOverlay()">🌊</button>
+                    <button onclick="showChordOverlay()">🎼</button>
+                    <span class="sep">|</span>
+                    <button id="editUndoBtn" onclick="undoEdit()" disabled title="Undo last note edit (Ctrl/Cmd+Z)">↶</button>
+                    <button id="deleteNoteBtn" onclick="deleteSelectedNotes()" disabled title="Delete selected note(s) (Delete)">🗑</button>
+                </div>
+                <div class="piano-roll-hint" id="pianoRollHint">Click a note to select · Shift/Cmd-click to multi-select · drag empty space to marquee-select · drag a note to move it · drag its right edge to resize · Delete to remove · Ctrl/Cmd+Z to undo</div>
+            </div>
+        </main>
+
+        <!-- ===== RIGHT PANEL ===== -->
+        <aside class="right-panel">
+            <!-- Confidence -->
+            <div class="panel-section">
+                <div class="panel-section-title">📊 Confidence</div>
+                <div class="confidence-ring">
+                    <div class="ring low" id="confidenceRing">0%</div>
+                    <div class="confidence-details">
+                        <div class="score" id="confidenceScore">—</div>
+                        <div id="confidenceLabel">No data</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Statistics -->
+            <div class="panel-section">
+                <div class="panel-section-title">📈 Statistics</div>
+                <div id="statsPlaceholder" style="text-align:center;padding:8px;color:var(--text-muted);font-size:10px;">
+                    Load MIDI to see statistics
+                </div>
+                <div id="statsContent" style="display:none">
+                    <div class="stat-grid" id="statGrid"></div>
+                </div>
+            </div>
+
+            <!-- Restoration Modules -->
+            <div class="panel-section">
+                <div class="panel-section-title">🧹 Restoration Modules</div>
+                <div class="module-grid" id="moduleGrid">
+                    <label class="module-option"><input type="checkbox" checked data-module="duplicate"><span class="label">Duplicate Removal</span></label>
+                    <label class="module-option"><input type="checkbox" checked data-module="ghost"><span class="label">Ghost Note Removal</span></label>
+                    <label class="module-option"><input type="checkbox" checked data-module="overlap"><span class="label">Overlap Repair</span></label>
+                    <label class="module-option"><input type="checkbox" checked data-module="hanging"><span class="label">Hanging Note Repair</span></label>
+                    <label class="module-option"><input type="checkbox" checked data-module="merge"><span class="label">Note Merge</span></label>
+                    <label class="module-option"><input type="checkbox" data-module="timing"><span class="label">Timing Repair</span></label>
+                    <label class="module-option"><input type="checkbox" data-module="velocity"><span class="label">Velocity Smoothing</span></label>
+                    <label class="module-option"><input type="checkbox" data-module="pitch"><span class="label">Pitch Flicker Repair</span></label>
+                    <label class="module-option"><input type="checkbox" data-module="voice"><span class="label">Voice Separation</span></label>
+                    <label class="module-option"><input type="checkbox" data-module="phrase"><span class="label">Phrase Continuity</span></label>
+                    <label class="module-option"><input type="checkbox" data-module="chord"><span class="label">Chord Consistency</span></label>
+                    <label class="module-option"><input type="checkbox" data-module="audio"><span class="label">🔊 Audio-Assisted</span></label>
+                </div>
+            </div>
+
+            <!-- Key Correction -->
+            <div class="panel-section">
+                <div class="panel-section-title">🎹 Key Correction</div>
+                <div style="display:flex; gap:6px; margin-bottom:6px;">
+                    <select id="keyRootSelect" style="flex:1; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border-color, #333); border-radius:4px; padding:4px;">
+                        <option value="">— Root —</option>
+                        <option value="0">C</option>
+                        <option value="1">C# / Db</option>
+                        <option value="2">D</option>
+                        <option value="3">D# / Eb</option>
+                        <option value="4">E</option>
+                        <option value="5">F</option>
+                        <option value="6">F# / Gb</option>
+                        <option value="7">G</option>
+                        <option value="8">G# / Ab</option>
+                        <option value="9">A</option>
+                        <option value="10">A# / Bb</option>
+                        <option value="11">B</option>
+                    </select>
+                    <select id="keyScaleSelect" style="flex:1; background:var(--bg-card); color:var(--text-primary); border:1px solid var(--border-color, #333); border-radius:4px; padding:4px;">
+                        <option value="major">Major</option>
+                        <option value="naturalMinor">Natural Minor</option>
+                        <option value="harmonicMinor">Harmonic Minor</option>
+                        <option value="melodicMinor">Melodic Minor</option>
+                    </select>
+                </div>
+                <button class="btn-icon" id="useDetectedKeyBtn" style="display:none; width:100%; margin-bottom:6px; font-size:11px;" onclick="useDetectedKey()">Use detected key</button>
+                <label class="module-option"><input type="checkbox" data-module="key" id="keyModuleCheckbox"><span class="label">Snap notes to key</span></label>
+                <div style="font-size:11px; opacity:0.7; margin-top:4px; line-height:1.4;">
+                    ⚠️ Unlike the modules above, this changes note pitches. Any note outside the selected scale is moved to the nearest scale tone. Off by default — only runs when a root is chosen and this box is checked.
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="panel-section">
+                <button class="action-btn primary" id="analyzeBtn" onclick="runAnalysis()" disabled>🔬 Analyze</button>
+                <button class="action-btn success" id="restoreBtn" onclick="runRestoration()" disabled>🧹 Restore</button>
+                <button class="action-btn primary" id="previewBtn" onclick="previewRestored()" disabled>▶ Preview Restored MIDI</button>
+                <button class="action-btn warning" id="exportBtn" onclick="exportMIDI()" disabled>💾 Export MIDI</button>
+            </div>
+        </aside>
+
+        <!-- ===== BOTTOM PANEL ===== -->
+        <footer class="bottom-panel">
+            <div class="status"><span id="statusText">Ready — Load MIDI and WAV files</span></div>
+            <div class="validation-indicators" id="validationIndicators">
+                <span class="fail" id="valDuration">⏱ —</span>
+                <span class="fail" id="valTempo">🎵 —</span>
+                <span class="fail" id="valNotes">📝 —</span>
+            </div>
+            <div class="audition-controls">
+                <span style="font-size:9px;color:var(--text-muted)">Audition:</span>
+                <div class="audition-toggle">
+                    <button class="active" onclick="setAuditionMode('before')">Before</button>
+                    <button onclick="setAuditionMode('after')">After</button>
+                </div>
+                <button onclick="playAudition()">▶</button>
+                <button onclick="stopAudition()">⏹</button>
+            </div>
+        </footer>
+    </div>
+
+    <!-- ===== MODAL ===== -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal">
+            <h2 id="modalTitle">Modal</h2>
+            <p id="modalBody">Content</p>
+            <div class="btn-group">
+                <button class="action-btn primary" onclick="closeModal()">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- ===== JAVASCRIPT ===== -->
+    <!-- ============================================================ -->
+    <script>
+        // ============================================================
+        // MIDI Restoration Studio v4.4 - Reliable Restoration Build
+        // Core Design: Restoration, not composition
+        // ============================================================
+
+        // ---- State ----
+        const state = {
+            // MIDI data
+            midiFileName: null,
+            audioFileName: null,
+            midiData: null,
+            notes: [],
+            originalNotes: [],
+            cleanedNotes: [],
+            tracks: [],
+            tempoMap: [{ time: 0, tempo: 500000 }],
+            timeSignatures: [],
+            keySignatures: [],
+            ppq: 480,
+            format: 1,
+            duration: 0,
+            originalMaxTime: 0,
+            
+            // Audio data
+            audioData: null,
+            audioBuffer: null,
+            audioContext: null,
+            sampleRate: 44100,
+            
+            // Analysis
+            confidenceMap: new Map(),
+            confidenceExplanations: new Map(),
+            chromagram: [],
+            spectrogram: [],
+            beats: [],
+            onsets: [],
+            detectedTempo: 120,
+            detectedKey: null,
+            midiDetectedKey: null,
+            audioDetectedKey: null,
+            chords: [],
+            voices: [],
+            phrases: [],
+            stats: null,
+            
+            // Restoration
+            isCleaned: false,
+            confidenceScore: 0,
+            zoomLevel: 1,
+            showConfidence: true,
+            showWaveformOverlay: false,
+            showChordOverlay: false,
+            auditionMode: 'before',
+            instrument: 'piano',
+            activePreset: 'conservative',
+            noteIdCounter: 0,
+            
+            // Validation
+            validationPassed: false,
+            validationErrors: [],
+            
+            // UI
+            isProcessing: false,
+        };
+
+        // ---- DOM Refs ----
+        const $ = id => document.getElementById(id);
+        const canvas = $('pianoRollCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // ---- Manual note editing state (select / move / resize / delete / undo on the piano roll) ----
+        let rollLayout = null;          // layout computed by the last renderPianoRoll() call, reused for hit-testing
+        let selectedNoteIds = new Set();
+        let editUndoStack = [];
+        let marqueeRect = null;         // [x0,y0,x1,y1] while a marquee-select drag is in progress
+
+        // ============================================================
+        // 1. MIDI PARSER - Standards Compliant
+        // ============================================================
+
+        class MIDIParser {
+            static parse(arrayBuffer) {
+                const data = new Uint8Array(arrayBuffer);
+                const view = new DataView(arrayBuffer);
+                
+                if (String.fromCharCode(...data.slice(0, 4)) !== 'MThd') {
+                    throw new Error('Not a valid MIDI file');
+                }
+
+                const format = view.getUint16(8);
+                const numTracks = view.getUint16(10);
+                const ppq = view.getUint16(12);
+                
+                let pos = 14;
+                const tracks = [];
+                const tempoMap = [{ time: 0, tempo: 500000 }];
+                const timeSignatures = [];
+                const keySignatures = [];
+                const allNotes = [];
+                let globalTempo = 500000;
+                let maxTime = 0;
+                
+                for (let t = 0; t < numTracks; t++) {
+                    if (String.fromCharCode(...data.slice(pos, pos + 4)) !== 'MTrk') {
+                        throw new Error(`Invalid track header at track ${t}`);
+                    }
+                    const trackLength = view.getUint32(pos + 4);
+                    const trackData = data.slice(pos + 8, pos + 8 + trackLength);
+                    
+                    const result = this.parseTrack(trackData, ppq, t, globalTempo);
+                    tracks.push(result);
+                    allNotes.push(...result.notes);
+                    
+                    for (const ev of result.events) {
+                        if (ev.type === 'tempo') {
+                            globalTempo = ev.tempo;
+                            tempoMap.push({ time: ev.time, tempo: ev.tempo });
+                        }
+                        if (ev.type === 'time_signature') {
+                            timeSignatures.push(ev);
+                        }
+                        if (ev.type === 'key_signature') {
+                            keySignatures.push(ev);
+                        }
+                    }
+                    
+                    if (result.maxTime > maxTime) maxTime = result.maxTime;
+                    pos += 8 + trackLength;
+                }
+                
+                tempoMap.sort((a, b) => a.time - b.time);
+                
+                // Calculate duration in seconds
+                const duration = maxTime / ppq * 0.5; // Rough conversion
+                
+                return {
+                    format,
+                    numTracks,
+                    ppq,
+                    tracks,
+                    notes: allNotes.sort((a, b) => a.start - b.start || a.note - b.note),
+                    tempoMap,
+                    timeSignatures,
+                    keySignatures,
+                    duration,
+                    maxTime,
+                };
+            }
+
+            static parseTrack(data, ppq, trackIndex, defaultTempo) {
+                let pos = 0;
+                let currentTime = 0;
+                let runningStatus = null;
+                const notes = [];
+                const events = [];
+                const activeNotes = new Map();
+                let tempo = defaultTempo;
+                let maxTime = 0;
+
+                while (pos < data.length) {
+                    // Standard MIDI VLQ is big-endian in 7-bit groups.
+                    let delta = 0;
+                    let byte;
+                    do {
+                        if (pos >= data.length) throw new Error('Unexpected end of track while reading delta time');
+                        byte = data[pos++];
+                        delta = (delta << 7) | (byte & 0x7F);
+                    } while (byte & 0x80);
+                    currentTime += delta;
+                    if (currentTime > maxTime) maxTime = currentTime;
+
+                    if (pos >= data.length) break;
+
+                    let status = data[pos++];
+                    
+                    if (status < 0x80) {
+                        if (runningStatus === null) { pos--; continue; }
+                        pos--;
+                        status = runningStatus;
+                    } else {
+                        runningStatus = status;
+                    }
+
+                    const type = status >> 4;
+                    const channel = status & 0x0F;
+
+                    if (status === 0xFF) {
+                        if (pos >= data.length) break;
+                        const metaType = data[pos++];
+                        if (pos >= data.length) break;
+                        let length = 0;
+                        let lengthByte;
+                        do {
+                            if (pos >= data.length) throw new Error('Unexpected end of track while reading meta-event length');
+                            lengthByte = data[pos++];
+                            length = (length << 7) | (lengthByte & 0x7F);
+                        } while (lengthByte & 0x80);
+                        const metaData = data.slice(pos, pos + length);
+                        pos += length;
+                        
+                        if (metaType === 0x51 && metaData.length >= 3) {
+                            tempo = (metaData[0] << 16) | (metaData[1] << 8) | metaData[2];
+                            events.push({ time: currentTime, type: 'tempo', tempo });
+                        } else if (metaType === 0x58 && metaData.length >= 4) {
+                            events.push({ 
+                                time: currentTime, 
+                                type: 'time_signature', 
+                                numerator: metaData[0], 
+                                denominator: Math.pow(2, metaData[1])
+                            });
+                        } else if (metaType === 0x59 && metaData.length >= 2) {
+                            events.push({
+                                time: currentTime,
+                                type: 'key_signature',
+                                key: metaData[0],
+                                scale: metaData[1]
+                            });
+                        }
+                        continue;
+                    }
+
+                    if (status === 0xF0 || status === 0xF7) {
+                        let len = 0;
+                        let b;
+                        try {
+                            do { b = data[pos++]; len++; } while (b !== 0xF7 && pos < data.length);
+                        } catch (e) {}
+                        events.push({ time: currentTime, type: 'sysex', length: len });
+                        continue;
+                    }
+
+                    if (pos + 1 >= data.length) break;
+                    
+                    if (type === 0x8 || type === 0x9) {
+                        const note = data[pos++];
+                        const velocity = data[pos++];
+                        const key = `${trackIndex}|${channel}|${note}`;
+
+                        if (type === 0x9 && velocity > 0) {
+                            activeNotes.set(key, { 
+                                start: currentTime, 
+                                velocity, 
+                                channel, 
+                                track: trackIndex,
+                                noteId: state.noteIdCounter++,
+                            });
+                        } else {
+                            if (activeNotes.has(key)) {
+                                const active = activeNotes.get(key);
+                                notes.push({
+                                    id: active.noteId,
+                                    track: trackIndex,
+                                    channel: channel,
+                                    note: note,
+                                    start: active.start,
+                                    end: currentTime,
+                                    duration: currentTime - active.start,
+                                    velocity: active.velocity,
+                                });
+                                activeNotes.delete(key);
+                            }
+                        }
+                    } else if (type === 0xA || type === 0xB || type === 0xC || type === 0xD || type === 0xE) {
+                        if (type === 0xC || type === 0xD) { if (pos < data.length) data[pos++]; }
+                        else { if (pos + 1 < data.length) { data[pos++]; data[pos++]; } }
+                    }
+                }
+
+                // Handle hanging notes - repair them rather than discard
+                for (const [key, active] of activeNotes) {
+                    notes.push({
+                        id: active.noteId,
+                        track: trackIndex,
+                        channel: active.channel,
+                        note: parseInt(key.split('|')[2]),
+                        start: active.start,
+                        end: currentTime,
+                        duration: currentTime - active.start,
+                        velocity: active.velocity,
+                        hanging: true,
+                    });
+                }
+
+                return { notes, events, maxTime };
+            }
+        }
+
+        // ============================================================
+        // 2. MIDI WRITER - Standards Compliant
+        // ============================================================
+
+        class MIDIWriter {
+            static write(notes, ppq, tempoMap, timeSignatures, keySignatures, format = 0, endTick = null) {
+                const events = this.buildEventTimeline(notes, tempoMap, timeSignatures, keySignatures);
+                const finalTick = endTick == null
+                    ? Math.max(0, ...notes.map(n => Math.round(n.end ?? (n.start + 1))))
+                    : Math.max(0, Math.round(endTick));
+
+                const header = this.writeHeader(0, 1, ppq);
+                const trackData = this.writeTrack(events, finalTick);
+                const result = new Uint8Array(header.length + trackData.length);
+                result.set(header, 0);
+                result.set(trackData, header.length);
+                return result;
+            }
+
+            static buildEventTimeline(notes, tempoMap, timeSignatures, keySignatures) {
+                const events = [];
+
+                for (const t of (tempoMap || [])) {
+                    events.push({ time: Math.max(0, Math.round(t.time || 0)), type: 'tempo', tempo: t.tempo || 500000 });
+                }
+                for (const ts of (timeSignatures || [])) {
+                    events.push({ time: Math.max(0, Math.round(ts.time || 0)), type: 'time_signature', ...ts });
+                }
+                for (const ks of (keySignatures || [])) {
+                    events.push({ time: Math.max(0, Math.round(ks.time || 0)), type: 'key_signature', ...ks });
+                }
+                for (const n of notes) {
+                    const start = Math.max(0, Math.round(n.start));
+                    const end = Math.max(start + 1, Math.round(n.end ?? (n.start + Math.max(1, n.duration || 1))));
+                    events.push({
+                        time: start, type: 'note_on', note: n.note,
+                        velocity: Math.min(127, Math.max(1, n.velocity || 64)),
+                        channel: n.channel || 0, id: n.id ?? 0
+                    });
+                    events.push({
+                        time: end, type: 'note_off', note: n.note, velocity: 0,
+                        channel: n.channel || 0, id: n.id ?? 0
+                    });
+                }
+
+                const priority = { tempo: 0, time_signature: 1, key_signature: 2, note_off: 3, note_on: 4 };
+                return events.sort((a, b) =>
+                    a.time - b.time ||
+                    (priority[a.type] ?? 9) - (priority[b.type] ?? 9) ||
+                    (a.channel || 0) - (b.channel || 0) ||
+                    (a.note || 0) - (b.note || 0) ||
+                    (a.id || 0) - (b.id || 0)
+                );
+            }
+
+            static writeHeader(format, numTracks, ppq) {
+                const data = new Uint8Array(14);
+                const view = new DataView(data.buffer);
+                data.set([0x4D, 0x54, 0x68, 0x64], 0);
+                view.setUint32(4, 6);
+                view.setUint16(8, format);
+                view.setUint16(10, numTracks);
+                view.setUint16(12, ppq);
+                return data;
+            }
+
+            static writeTrack(events, endTick) {
+                const bytes = [];
+                let currentTime = 0;
+
+                for (const ev of events) {
+                    const eventTime = Math.max(currentTime, Math.round(ev.time));
+                    bytes.push(...this.writeVarLen(eventTime - currentTime));
+
+                    if (ev.type === 'tempo') {
+                        const tempo = ev.tempo || 500000;
+                        bytes.push(0xFF, 0x51, 0x03, (tempo >> 16) & 0xFF, (tempo >> 8) & 0xFF, tempo & 0xFF);
+                    } else if (ev.type === 'time_signature') {
+                        const denominator = Math.max(1, ev.denominator || 4);
+                        bytes.push(0xFF, 0x58, 0x04, ev.numerator || 4, Math.round(Math.log2(denominator)), 24, 8);
+                    } else if (ev.type === 'key_signature') {
+                        bytes.push(0xFF, 0x59, 0x02, (ev.key || 0) & 0xFF, (ev.scale || 0) & 0xFF);
+                    } else if (ev.type === 'note_on') {
+                        bytes.push(0x90 | (ev.channel & 0x0F), ev.note & 0x7F, ev.velocity & 0x7F);
+                    } else if (ev.type === 'note_off') {
+                        bytes.push(0x80 | (ev.channel & 0x0F), ev.note & 0x7F, 0);
+                    }
+                    currentTime = eventTime;
+                }
+
+                const finalTime = Math.max(currentTime, endTick || 0);
+                bytes.push(...this.writeVarLen(finalTime - currentTime), 0xFF, 0x2F, 0x00);
+
+                const result = new Uint8Array(8 + bytes.length);
+                result.set([0x4D, 0x54, 0x72, 0x6B], 0);
+                new DataView(result.buffer).setUint32(4, bytes.length);
+                result.set(bytes, 8);
+                return result;
+            }
+
+            static writeVarLen(value) {
+                let v = Math.max(0, Math.floor(value));
+                const bytes = [v & 0x7F];
+                while ((v >>= 7) > 0) bytes.unshift((v & 0x7F) | 0x80);
+                return bytes;
+            }
+        }
+
+        // ============================================================
+        // 3. ANALYSIS ENGINE - Read-Only
+        // ============================================================
+
+        class AnalysisEngine {
+            static analyze(notes, ppq, tempoMap) {
+                const stats = {
+                    noteCount: notes.length,
+                    duplicates: 0,
+                    overlaps: 0,
+                    hanging: 0,
+                    outOfRange: 0,
+                    minNote: 128,
+                    maxNote: 0,
+                    avgVelocity: 0,
+                    avgDuration: 0,
+                    velocityHistogram: new Array(128).fill(0),
+                    pitchHistogram: new Array(128).fill(0),
+                    confidence: 0,
+                    issues: [],
+                };
+
+                if (notes.length === 0) return stats;
+
+                const seen = new Set();
+                let totalVelocity = 0;
+                let totalDuration = 0;
+
+                for (const n of notes) {
+                    // Track ranges
+                    if (n.note < stats.minNote) stats.minNote = n.note;
+                    if (n.note > stats.maxNote) stats.maxNote = n.note;
+                    
+                    // Histograms
+                    stats.pitchHistogram[n.note] = (stats.pitchHistogram[n.note] || 0) + 1;
+                    stats.velocityHistogram[n.velocity] = (stats.velocityHistogram[n.velocity] || 0) + 1;
+                    
+                    totalVelocity += n.velocity;
+                    totalDuration += n.duration || 240;
+
+                    // Duplicate detection
+                    const key = `${n.note}|${Math.round(n.start)}|${Math.round(n.end)}`;
+                    if (seen.has(key)) stats.duplicates++;
+                    else seen.add(key);
+
+                    // Hanging notes
+                    if (n.hanging) stats.hanging++;
+
+                    // Out of range
+                    if (n.note < 21 || n.note > 108) stats.outOfRange++;
+
+                    // Overlaps (same note, overlapping time)
+                    for (const other of notes) {
+                        if (n === other) continue;
+                        if (n.note === other.note &&
+                            n.start < other.end &&
+                            other.start < n.end) {
+                            stats.overlaps++;
+                            break;
+                        }
+                    }
+                }
+
+                stats.avgVelocity = Math.round(totalVelocity / notes.length);
+                stats.avgDuration = Math.round(totalDuration / notes.length);
+
+                // Calculate confidence score
+                let confidence = 100;
+                if (stats.duplicates > 0) {
+                    confidence -= Math.min(20, stats.duplicates * 2);
+                    stats.issues.push(`${stats.duplicates} duplicate notes`);
+                }
+                if (stats.hanging > 0) {
+                    confidence -= Math.min(15, stats.hanging * 3);
+                    stats.issues.push(`${stats.hanging} hanging notes`);
+                }
+                if (stats.overlaps > 0) {
+                    confidence -= Math.min(20, stats.overlaps);
+                    stats.issues.push(`${stats.overlaps} overlapping notes`);
+                }
+                if (stats.outOfRange > 0) {
+                    confidence -= Math.min(15, stats.outOfRange * 2);
+                    stats.issues.push(`${stats.outOfRange} notes outside piano range`);
+                }
+                if (notes.length < 10) {
+                    confidence -= 10;
+                    stats.issues.push('Very few notes detected');
+                }
+
+                stats.confidence = Math.max(0, Math.min(100, confidence));
+
+                return stats;
+            }
+
+            static detectTempo(notes, ppq) {
+                if (notes.length < 4) return 120;
+                
+                // Estimate tempo from note intervals
+                const intervals = [];
+                for (let i = 1; i < Math.min(notes.length, 50); i++) {
+                    const gap = notes[i].start - notes[i-1].start;
+                    if (gap > 0 && gap < 2000) intervals.push(gap);
+                }
+                
+                if (intervals.length < 2) return 120;
+                
+                intervals.sort((a, b) => a - b);
+                const median = intervals[Math.floor(intervals.length / 2)];
+                const bpm = 60 / (median / ppq * 0.5);
+                
+                return Math.round(Math.max(40, Math.min(250, bpm)));
+            }
+        }
+
+        // ============================================================
+        // 4. RESTORATION ENGINE - Non-Destructive, Module-Based
+        // ============================================================
+
+        class RestorationEngine {
+            constructor(notes, ppq, tempoMap, originalMaxTime = null) {
+                this.originalNotes = notes.map(n => ({ ...n }));
+                this.notes = notes.map(n => ({ ...n }));
+                this.ppq = ppq;
+                this.tempoMap = tempoMap;
+                // Source end time (ticks). Used as a hard ceiling so no restoration
+                // module can ever push material beyond what the source contained.
+                this.originalMaxTime = originalMaxTime ?? (notes.length
+                    ? Math.max(...notes.map(n => n.end ?? (n.start + 1))) : 0);
+                this.stats = {
+                    removed: 0,
+                    merged: 0,
+                    repaired: 0,
+                    corrected: 0,
+                };
+                this.modules = {};
+            }
+
+            restore(modules, instrument, confidenceMap, keyRoot = null, keyScale = 'major') {
+                this.modules = modules;
+                let result = this.originalNotes.map(n => ({ ...n }));
+                this.stats = { removed: 0, merged: 0, repaired: 0, corrected: 0, keyCorrected: 0 };
+
+                // Apply modules in order (conservative first, then corrective)
+                if (modules.duplicate) result = this.removeDuplicates(result);
+                if (modules.hanging) result = this.repairHanging(result);
+                if (modules.overlap) result = this.repairOverlaps(result);
+                if (modules.ghost) result = this.removeGhosts(result, instrument);
+                if (modules.merge) result = this.mergeNotes(result);
+                if (modules.voice) result = this.separateVoices(result);
+                if (modules.phrase) result = this.repairPhrases(result);
+                if (modules.pitch) result = this.repairPitchFlicker(result);
+                if (modules.key && keyRoot !== null && keyRoot !== '') result = this.correctToKey(result, parseInt(keyRoot, 10), keyScale);
+                if (modules.timing) result = this.repairTiming(result);
+                if (modules.velocity) result = this.smoothVelocity(result);
+                if (modules.chord) result = this.repairChords(result, confidenceMap);
+                if (modules.audio && confidenceMap) result = this.applyAudioConfidence(result, confidenceMap);
+
+                // Final safety pass: restoration must never create material beyond
+                // the source. Quantisation (timing), merging, and hanging-note repair
+                // can each independently push a note's end past the original last
+                // tick — clamp here regardless of which module caused it, instead of
+                // only handling one case.
+                if (this.originalMaxTime > 0) {
+                    const limit = this.originalMaxTime;
+                    result = result.map(n => {
+                        if (n.end > limit) {
+                            const clampedEnd = Math.max(n.start + 1, limit);
+                            this.stats.corrected++;
+                            return { ...n, end: clampedEnd, duration: clampedEnd - n.start };
+                        }
+                        return n;
+                    });
+                }
+
+                // Sort by start time
+                result.sort((a, b) => a.start - b.start);
+
+                return result;
+            }
+
+            removeDuplicates(notes) {
+                const seen = new Set();
+                const result = [];
+                for (const n of notes) {
+                    const key = `${n.note}|${Math.round(n.start)}|${Math.round(n.end)}`;
+                    if (!seen.has(key)) {
+                        seen.add(key);
+                        result.push(n);
+                    } else {
+                        this.stats.removed++;
+                    }
+                }
+                return result;
+            }
+
+            repairHanging(notes) {
+                return notes.map(n => {
+                    if (n.hanging) {
+                        // Extend to a reasonable duration
+                        n.end = n.start + 240;
+                        n.duration = 240;
+                        n.hanging = false;
+                        this.stats.repaired++;
+                    }
+                    return n;
+                });
+            }
+
+            repairOverlaps(notes) {
+                const sorted = notes.map(n => ({ ...n })).sort((a, b) =>
+                    a.track - b.track || a.channel - b.channel || a.note - b.note || a.start - b.start
+                );
+                const lastByKey = new Map();
+                const result = [];
+
+                for (const n of sorted) {
+                    const key = `${n.track || 0}|${n.channel || 0}|${n.note}`;
+                    const previous = lastByKey.get(key);
+                    if (previous && previous.end > n.start) {
+                        previous.end = Math.max(previous.start + 1, n.start);
+                        previous.duration = previous.end - previous.start;
+                        this.stats.repaired++;
+                    }
+                    n.end = Math.max(n.start + 1, n.end ?? (n.start + Math.max(1, n.duration || 1)));
+                    n.duration = n.end - n.start;
+                    result.push(n);
+                    lastByKey.set(key, n);
+                }
+                return result.sort((a, b) => a.start - b.start || a.note - b.note);
+            }
+
+            removeGhosts(notes, instrument) {
+                const thresholds = {
+                    piano: { minDuration: 60, minVelocity: 8 },
+                    guitar: { minDuration: 50, minVelocity: 10 },
+                    bass: { minDuration: 80, minVelocity: 12 },
+                    strings: { minDuration: 100, minVelocity: 10 },
+                    vocals: { minDuration: 120, minVelocity: 10 },
+                    drums: { minDuration: 30, minVelocity: 15 },
+                    auto: { minDuration: 60, minVelocity: 8 },
+                };
+                
+                const t = thresholds[instrument] || thresholds.piano;
+                
+                return notes.filter(n => {
+                    const duration = n.duration || 240;
+                    if (duration < t.minDuration) {
+                        this.stats.removed++;
+                        return false;
+                    }
+                    if (n.velocity < t.minVelocity) {
+                        this.stats.removed++;
+                        return false;
+                    }
+                    return true;
+                });
+            }
+
+            mergeNotes(notes) {
+                const sorted = [...notes].sort((a, b) => a.start - b.start || a.note - b.note);
+                const result = [];
+                let i = 0;
+                
+                while (i < sorted.length) {
+                    let current = { ...sorted[i] };
+                    let j = i + 1;
+                    
+                    while (j < sorted.length) {
+                        const next = sorted[j];
+                        const gap = next.start - current.end;
+                        
+                        if (next.note === current.note && gap > 0 && gap < 80) {
+                            current.end = next.end;
+                            current.duration = current.end - current.start;
+                            current.velocity = Math.max(current.velocity, next.velocity);
+                            this.stats.merged++;
+                            j++;
+                        } else {
+                            break;
+                        }
+                    }
+                    
+                    result.push(current);
+                    i = j;
+                }
+                
+                return result;
+            }
+
+            separateVoices(notes) {
+                // Group by track and channel
+                const voices = new Map();
+                for (const n of notes) {
+                    const key = `${n.track || 0}|${n.channel || 0}`;
+                    if (!voices.has(key)) voices.set(key, []);
+                    voices.get(key).push(n);
+                }
+                return notes; // Return all notes, voices stored for reference
+            }
+
+            repairPhrases(notes) {
+                // Detect phrase gaps and smooth transitions
+                const sorted = [...notes].sort((a, b) => a.start - b.start);
+                const result = [];
+                let currentPhrase = [];
+                let lastEnd = 0;
+                
+                for (const n of sorted) {
+                    if (currentPhrase.length > 0 && n.start - lastEnd > 300) {
+                        // End of phrase - check if we need to fill
+                        if (currentPhrase.length > 1) {
+                            result.push(...currentPhrase);
+                        }
+                        currentPhrase = [];
+                    }
+                    currentPhrase.push(n);
+                    lastEnd = n.end || n.start + 240;
+                }
+                
+                if (currentPhrase.length > 0) result.push(...currentPhrase);
+                
+                // Ensure no gaps between phrases
+                // (Conservative - only merge if same instrument)
+                return result;
+            }
+
+            repairPitchFlicker(notes) {
+                const result = [];
+                let i = 0;
+                
+                while (i < notes.length) {
+                    const current = notes[i];
+                    const next = notes[i + 1];
+                    const next2 = notes[i + 2];
+                    
+                    if (next && next2) {
+                        const close1 = Math.abs(next.start - current.end) < 60;
+                        const close2 = Math.abs(next2.start - next.end) < 60;
+                        const samePitch = current.note === next2.note;
+                        const diff = Math.abs(next.note - current.note) === 1;
+                        
+                        if (close1 && close2 && samePitch && diff) {
+                            const merged = {
+                                ...current,
+                                end: next2.end,
+                                duration: next2.end - current.start,
+                                velocity: Math.max(current.velocity, next2.velocity),
+                            };
+                            result.push(merged);
+                            this.stats.corrected++;
+                            i += 3;
+                            continue;
+                        }
+                    }
+                    
+                    result.push(current);
+                    i++;
+                }
+                
+                return result;
+            }
+
+            // Moves any note outside the chosen scale to the nearest in-scale pitch.
+            // Unlike the other modules this deliberately changes pitch content, so it
+            // only ever runs when explicitly enabled with a chosen root.
+            correctToKey(notes, keyRoot, scaleType) {
+                const scales = {
+                    major: [0, 2, 4, 5, 7, 9, 11],
+                    naturalMinor: [0, 2, 3, 5, 7, 8, 10],
+                    harmonicMinor: [0, 2, 3, 5, 7, 8, 11],
+                    melodicMinor: [0, 2, 3, 5, 7, 9, 11],
+                };
+                const scale = scales[scaleType] || scales.major;
+                const inScale = new Set(scale.map(iv => (iv + keyRoot) % 12));
+
+                return notes.map(n => {
+                    const pc = ((n.note % 12) + 12) % 12;
+                    if (inScale.has(pc)) return n;
+
+                    // Search outward for the nearest in-scale pitch class. On a tie
+                    // (equally close above and below), prefer moving up.
+                    let shift = 0;
+                    for (let d = 1; d <= 6; d++) {
+                        const up = (pc + d) % 12;
+                        const down = ((pc - d) % 12 + 12) % 12;
+                        if (inScale.has(up)) { shift = d;
+                            break; }
+                        if (inScale.has(down)) { shift = -d;
+                            break; }
+                    }
+
+                    const newNote = Math.min(127, Math.max(0, n.note + shift));
+                    this.stats.corrected++;
+                    this.stats.keyCorrected++;
+                    return { ...n, note: newNote, keyCorrected: true };
+                });
+            }
+
+            repairTiming(notes) {
+                // Quantise to nearest 16th note
+                const grid = 240; // 16th note at 480ppq
+                const strength = 0.5;
+                
+                return notes.map(n => {
+                    const qStart = Math.round(n.start / grid) * grid;
+                    const offset = (qStart - n.start) * strength;
+                    return {
+                        ...n,
+                        start: Math.round(n.start + offset),
+                        end: Math.round((n.end || n.start + 240) + offset),
+                        duration: n.duration,
+                    };
+                });
+            }
+
+            smoothVelocity(notes) {
+                const windowSize = 5;
+                const velocities = notes.map(n => n.velocity);
+                
+                return notes.map((n, i) => {
+                    let sum = 0;
+                    let count = 0;
+                    const start = Math.max(0, i - windowSize);
+                    const end = Math.min(notes.length, i + windowSize + 1);
+                    
+                    for (let j = start; j < end; j++) {
+                        sum += velocities[j];
+                        count++;
+                    }
+                    
+                    const avg = Math.round(sum / count);
+                    const newVel = Math.round(n.velocity * 0.6 + avg * 0.4);
+                    return { ...n, velocity: Math.min(127, Math.max(1, newVel)) };
+                });
+            }
+
+            repairChords(notes, confidenceMap) {
+                // Restoration must never add chord tones that were not present in the source.
+                // Keep this module diagnostic-only until a non-generative repair rule is available.
+                return notes.map(n => ({ ...n }));
+            }
+
+            applyAudioConfidence(notes, confidenceMap) {
+                // Remove notes with very low confidence
+                return notes.filter(n => {
+                    const conf = confidenceMap.get(n.id || n) || 50;
+                    if (conf < 20) {
+                        this.stats.removed++;
+                        return false;
+                    }
+                    return true;
+                });
+            }
+
+            getStats() {
+                return this.stats;
+            }
+        }
+
+        // ============================================================
+        // 5. VALIDATION ENGINE
+        // ============================================================
+
+        class ValidationEngine {
+            static validate(originalNotes, cleanedNotes, tempoMap, ppq, originalMaxTime = null) {
+                const errors = [];
+                const warnings = [];
+                const sourceEnd = originalMaxTime ?? (originalNotes.length
+                    ? Math.max(...originalNotes.map(n => n.end ?? (n.start + 1))) : 0);
+                const cleanedEnd = cleanedNotes.length
+                    ? Math.max(...cleanedNotes.map(n => n.end ?? (n.start + 1))) : 0;
+
+                // A restoration may shorten a damaged final note. It must not create material beyond the source.
+                if (cleanedEnd > sourceEnd + Math.max(10, Math.round(ppq * 0.05))) {
+                    errors.push(`Restoration extends beyond source: ${sourceEnd} → ${cleanedEnd} ticks`);
+                } else if (cleanedEnd !== sourceEnd) {
+                    warnings.push(`Last sounding note changed: ${sourceEnd} → ${cleanedEnd} ticks; export keeps the original end-of-track time`);
+                }
+
+                const hanging = cleanedNotes.filter(n => n.hanging);
+                if (hanging.length) errors.push(`${hanging.length} hanging notes remain`);
+
+                const seen = new Set();
+                let duplicates = 0;
+                for (const n of cleanedNotes) {
+                    const key = `${n.track || 0}|${n.channel || 0}|${n.note}|${Math.round(n.start)}|${Math.round(n.end)}`;
+                    if (seen.has(key)) duplicates++;
+                    else seen.add(key);
+                }
+                if (duplicates) errors.push(`${duplicates} exact duplicate notes found`);
+
+                const invalidDuration = cleanedNotes.filter(n =>
+                    !Number.isFinite(n.start) || !Number.isFinite(n.end) || n.end <= n.start
+                );
+                if (invalidDuration.length) errors.push(`${invalidDuration.length} notes have invalid duration`);
+
+                const outOfRange = cleanedNotes.filter(n => !Number.isInteger(n.note) || n.note < 0 || n.note > 127);
+                if (outOfRange.length) errors.push(`${outOfRange.length} notes outside MIDI range`);
+
+                return { passed: errors.length === 0, errors, warnings, sourceEnd, cleanedEnd };
+            }
+        }
+
+        // ============================================================
+        // 6. UI INTEGRATION
+        // ============================================================
+
+        // ---- File handling ----
+        function initFileHandling() {
+            const midiDrop = $('midiDropZone');
+            const audioDrop = $('audioDropZone');
+            const midiInput = $('midiInput');
+            const audioInput = $('audioInput');
+
+            [midiDrop, audioDrop].forEach((drop, idx) => {
+                const input = idx === 0 ? midiInput : audioInput;
+                drop.addEventListener('click', () => input.click());
+                drop.addEventListener('dragover', e => { e.preventDefault();
+                    drop.classList.add('dragover'); });
+                drop.addEventListener('dragleave', () => drop.classList.remove('dragover'));
+                drop.addEventListener('drop', e => {
+                    e.preventDefault();
+                    drop.classList.remove('dragover');
+                    if (e.dataTransfer.files.length) {
+                        const file = e.dataTransfer.files[0];
+                        idx === 0 ? handleMIDIFile(file) : handleAudioFile(file);
+                    }
+                });
+            });
+
+            midiInput.addEventListener('change', e => {
+                if (e.target.files.length) handleMIDIFile(e.target.files[0]);
+            });
+            audioInput.addEventListener('change', e => {
+                if (e.target.files.length) handleAudioFile(e.target.files[0]);
+            });
+        }
+
+        function handleMIDIFile(file) {
+            if (!file.name.match(/\.(mid|midi)$/i)) {
+                showModal('Invalid File', 'Please select a MIDI file (.mid or .midi)');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const result = MIDIParser.parse(e.target.result);
+                    state.midiFileName = file.name;
+                    const midiNameEl = $('midiFileName');
+                    midiNameEl.textContent = file.name;
+                    midiNameEl.style.display = 'block';
+                    state.midiData = e.target.result;
+                    state.notes = result.notes;
+                    state.originalNotes = result.notes.map(n => ({ ...n }));
+                    state.cleanedNotes = [];
+                    selectedNoteIds.clear(); editUndoStack.length = 0; marqueeRect = null;
+                    updateEditUndoButton(); updateDeleteButton();
+                    state.ppq = result.ppq;
+                    state.format = result.format;
+                    state.tempoMap = result.tempoMap;
+                    state.timeSignatures = result.timeSignatures;
+                    state.keySignatures = result.keySignatures;
+                    state.tracks = result.tracks;
+                    state.duration = result.duration;
+                    state.originalMaxTime = result.maxTime;
+                    
+                    if (result.tempoMap.length > 0) {
+                        state.detectedTempo = 60000000 / result.tempoMap[0].tempo;
+                    }
+                    
+                    // Auto-detect tempo from notes if not available
+                    if (!state.detectedTempo || state.detectedTempo < 30) {
+                        state.detectedTempo = AnalysisEngine.detectTempo(state.notes, state.ppq);
+                    }
+                    
+                    updateFileInfo(file);
+                    $('analyzeBtn').disabled = false;
+                    $('restoreBtn').disabled = false;
+                    $('previewBtn').disabled = true;
+                    $('exportBtn').disabled = true;
+                    
+                    setStatus(`✅ MIDI loaded: ${file.name} (${result.notes.length} notes)`, 'success');
+                    renderPianoRoll();
+                    
+                    // Auto-analyze
+                    runAnalysis();
+                    
+                } catch (err) {
+                    showModal('Error', `Failed to load MIDI: ${err.message}`);
+                    console.error(err);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function handleAudioFile(file) {
+            if (!file.type.startsWith('audio/') && !file.name.match(/\.(wav|mp3|m4a|aac|aiff|aif)$/i)) {
+                showModal('Invalid File', 'Please select an audio file');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    state.audioFileName = file.name;
+                    const audioNameEl = $('audioFileName');
+                    audioNameEl.textContent = file.name;
+                    audioNameEl.style.display = 'block';
+                    const arrayBuffer = e.target.result;
+                    await decodeAudio(arrayBuffer);
+                    updateFileStatus();
+                    setStatus(`✅ Audio loaded: ${file.name}`, 'success');
+                } catch (err) {
+                    showModal('Error', `Failed to load audio: ${err.message}`);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        async function decodeAudio(arrayBuffer) {
+            if (!state.audioContext) {
+                state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+
+            try {
+                const audioBuffer = await state.audioContext.decodeAudioData(arrayBuffer);
+                state.audioBuffer = audioBuffer;
+                state.audioData = audioBuffer.getChannelData(0);
+                state.sampleRate = audioBuffer.sampleRate;
+                
+                // Simple audio analysis
+                await analyzeAudio(state.audioData, state.sampleRate);
+                drawWaveform(state.audioData);
+                
+                updateAudioStatus(`✅ Audio analysed: ${state.sampleRate}Hz`);
+                updateFileStatus();
+                
+                if (state.notes.length > 0) {
+                    buildConfidenceMap();
+                }
+            } catch (err) {
+                updateAudioStatus('❌ Failed to decode audio');
+                throw err;
+            }
+        }
+
+        // In-place iterative radix-2 Cooley-Tukey FFT. re/im are Float64Arrays of
+        // equal power-of-two length. O(n log n) instead of the previous O(n) per
+        // bin per frame DFT, which is what makes analysing a whole recording
+        // (rather than ~1 second of it) fast enough to run in the browser.
+        function fft(re, im) {
+            const n = re.length;
+            for (let i = 1, j = 0; i < n; i++) {
+                let bit = n >> 1;
+                for (; j & bit; bit >>= 1) j ^= bit;
+                j ^= bit;
+                if (i < j) {
+                    [re[i], re[j]] = [re[j], re[i]];
+                    [im[i], im[j]] = [im[j], im[i]];
+                }
+            }
+            for (let len = 2; len <= n; len <<= 1) {
+                const ang = -2 * Math.PI / len;
+                const wr = Math.cos(ang), wi = Math.sin(ang);
+                for (let i = 0; i < n; i += len) {
+                    let curWr = 1, curWi = 0;
+                    for (let j = 0; j < len / 2; j++) {
+                        const ur = re[i + j], ui = im[i + j];
+                        const vr = re[i + j + len / 2] * curWr - im[i + j + len / 2] * curWi;
+                        const vi = re[i + j + len / 2] * curWi + im[i + j + len / 2] * curWr;
+                        re[i + j] = ur + vr; im[i + j] = ui + vi;
+                        re[i + j + len / 2] = ur - vr; im[i + j + len / 2] = ui - vi;
+                        const nWr = curWr * wr - curWi * wi;
+                        const nWi = curWr * wi + curWi * wr;
+                        curWr = nWr; curWi = nWi;
+                    }
+                }
+            }
+        }
+
+        // Converts a MIDI tick position to seconds by integrating the tempo map,
+        // so notes can be aligned against the audio timeline (which is in seconds).
+        function ticksToSeconds(ticks, ppq, tempoMap) {
+            if (!tempoMap || !tempoMap.length) return (ticks / (ppq || 480)) * 0.5;
+            let seconds = 0, lastTick = 0, tempo = tempoMap[0].tempo || 500000;
+            for (const t of tempoMap) {
+                if (t.time >= ticks) break;
+                seconds += ((t.time - lastTick) / (ppq || 480)) * (tempo / 1000000);
+                lastTick = t.time;
+                tempo = t.tempo || tempo;
+            }
+            seconds += ((ticks - lastTick) / (ppq || 480)) * (tempo / 1000000);
+            return seconds;
+        }
+
+        function detectKeyFromPitchClass(values) {
+            if (!values || values.length < 12) return null;
+            const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+            const majorProfile = [6.35,2.23,3.48,2.33,4.38,4.09,2.52,5.19,2.39,3.66,2.29,2.88];
+            const minorProfile = [6.33,2.68,3.52,5.38,2.60,3.53,2.54,4.75,3.98,2.69,3.34,3.17];
+            const corr = (a, b) => {
+                const am = a.reduce((x,y)=>x+y,0)/a.length;
+                const bm = b.reduce((x,y)=>x+y,0)/b.length;
+                let num=0, da=0, db=0;
+                for (let i=0;i<a.length;i++) { const x=a[i]-am, y=b[i]-bm; num+=x*y; da+=x*x; db+=y*y; }
+                return num / (Math.sqrt(da*db) || 1);
+            };
+            let best = null;
+            for (let root=0; root<12; root++) {
+                for (const [mode, profile] of [['major', majorProfile], ['minor', minorProfile]]) {
+                    const rotated = values.map((_, i) => profile[(i-root+12)%12]);
+                    const score = corr(values, rotated);
+                    if (!best || score > best.score) best = { root, rootName: noteNames[root], mode, score };
+                }
+            }
+            return best;
+        }
+
+        function detectMIDIKey(notes) {
+            if (!notes || !notes.length) return null;
+            const pc = new Array(12).fill(0);
+            for (const n of notes) {
+                const duration = Math.max(1, (n.end ?? n.start + 1) - n.start);
+                pc[((n.note % 12)+12)%12] += duration * Math.max(1, n.velocity || 64);
+            }
+            return detectKeyFromPitchClass(pc);
+        }
+
+        async function analyzeAudio(audioData, sampleRate) {
+            const fftSize = 2048;
+            const chroma = new Array(12).fill(0);
+
+            const window = new Float64Array(fftSize);
+            for (let i = 0; i < fftSize; i++) {
+                window[i] = 0.5 * (1 - Math.cos(2 * Math.PI * i / (fftSize - 1)));
+            }
+
+            // Cover the FULL recording, not just the first ~100 frames (~1.2s).
+            // Target a bounded frame count so long files stay fast, by spacing
+            // hops out rather than truncating the analysis window.
+            const targetFrames = 1200;
+            const maxStart = Math.max(0, audioData.length - fftSize);
+            const hopSize = Math.max(256, Math.floor(maxStart / targetFrames) || 256);
+            const numFrames = Math.floor(maxStart / hopSize) + 1;
+
+            const spectrogram = []; // per-frame chroma, time-aligned
+            const frameTimes = [];  // seconds, frame center
+
+            const re = new Float64Array(fftSize);
+            const im = new Float64Array(fftSize);
+
+            for (let frame = 0; frame < numFrames; frame++) {
+                const start = frame * hopSize;
+                im.fill(0);
+                for (let i = 0; i < fftSize; i++) {
+                    re[i] = (audioData[start + i] || 0) * window[i];
+                }
+                fft(re, im);
+
+                const frameChroma = new Array(12).fill(0);
+                for (let bin = 1; bin < fftSize / 2; bin++) {
+                    const freq = bin * sampleRate / fftSize;
+                    if (freq < 50 || freq > 2000) continue;
+
+                    const midiNote = 69 + 12 * Math.log2(freq / 440);
+                    const chromaBin = Math.round(midiNote) % 12;
+                    const mag = Math.hypot(re[bin], im[bin]);
+                    frameChroma[chromaBin] += mag;
+                }
+
+                // Normalise within the frame so louder/quieter passages remain
+                // comparable — global normalisation would let one loud passage
+                // suppress the perceived support for everything else.
+                const frameMax = Math.max(...frameChroma);
+                if (frameMax > 0) {
+                    for (let i = 0; i < 12; i++) frameChroma[i] /= frameMax;
+                }
+
+                for (let i = 0; i < 12; i++) chroma[i] += frameChroma[i];
+                spectrogram.push(frameChroma);
+                frameTimes.push((start + fftSize / 2) / sampleRate);
+            }
+
+            // Normalize chromagram (used for key detection only)
+            const max = Math.max(...chroma);
+            if (max > 0) {
+                for (let i = 0; i < 12; i++) chroma[i] /= max;
+            }
+
+            state.chromagram = chroma;
+            state.spectrogram = spectrogram;
+            state.frameTimes = frameTimes;
+            
+            // Detect both major and minor keys with Krumhansl-Schmuckler profiles.
+            const audioKey = detectKeyFromPitchClass(chroma);
+            state.audioDetectedKey = audioKey;
+            state.detectedKey = audioKey;
+            $('audioKeyDisplay').textContent = audioKey ? `${audioKey.rootName} ${audioKey.mode}` : '—';
+            const detectBtn = $('useDetectedKeyBtn');
+            if (audioKey) {
+                detectBtn.textContent = `Use WAV key: ${audioKey.rootName} ${audioKey.mode}`;
+                detectBtn.style.display = 'block';
+            }
+            
+            // Simple beat detection
+            detectBeats(audioData, sampleRate);
+        }
+
+        function useDetectedKey() {
+            const detected = state.audioDetectedKey || state.midiDetectedKey || state.detectedKey;
+            if (!detected) return;
+            $('keyRootSelect').value = String(detected.root);
+            $('keyScaleSelect').value = detected.mode === 'minor' ? 'naturalMinor' : 'major';
+            $('keyModuleCheckbox').checked = true;
+            setStatus(`Key snap enabled: ${detected.rootName} ${detected.mode}`, '');
+        }
+
+        function detectBeats(audioData, sampleRate) {
+            const onsets = [];
+            const windowSize = 1024;
+            const hopSize = 256;
+            
+            for (let i = windowSize; i < audioData.length - windowSize; i += hopSize) {
+                let energy = 0;
+                let prevEnergy = 0;
+                for (let j = 0; j < windowSize; j++) {
+                    energy += audioData[i + j] * audioData[i + j];
+                    prevEnergy += audioData[i - windowSize + j] * audioData[i - windowSize + j];
+                }
+                const ratio = energy / (prevEnergy + 0.0001);
+                if (ratio > 2.0 && energy > 0.01) {
+                    onsets.push(i / sampleRate);
+                }
+            }
+            
+            state.onsets = onsets;
+            
+            // Simple beat detection
+            if (onsets.length > 4) {
+                const intervals = [];
+                for (let i = 1; i < Math.min(onsets.length, 30); i++) {
+                    intervals.push(onsets[i] - onsets[i-1]);
+                }
+                intervals.sort((a, b) => a - b);
+                const median = intervals[Math.floor(intervals.length / 2)];
+                if (median > 0.2 && median < 2) {
+                    state.beats = onsets.filter((_, i) => i % Math.round(median / 0.5) === 0);
+                }
+            }
+        }
+
+        function buildConfidenceMap() {
+            if (!state.notes.length || !state.audioData) return;
+            
+            state.confidenceMap.clear();
+            state.confidenceExplanations.clear();
+            
+            const key = state.detectedKey || 'C';
+            const keyRoot = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'].indexOf(key);
+            const spectrogram = state.spectrogram || [];
+            const frameTimes = state.frameTimes || [];
+            const ppq = state.ppq || 480;
+            const tempoMap = state.tempoMap;
+
+            for (const note of state.notes) {
+                let confidence = 50;
+                const reasons = [];
+                
+                // 1. Audio support — sample the chroma frames that overlap this
+                // note's actual playback window (converted from ticks to seconds
+                // via the tempo map), not a single global average taken from the
+                // start of the recording. A note late in a long piece must be
+                // checked against what the audio was doing at that moment.
+                const noteBin = note.note % 12;
+                let support = 0;
+                if (spectrogram.length && frameTimes.length) {
+                    const tStart = ticksToSeconds(note.start, ppq, tempoMap);
+                    const tEnd = ticksToSeconds(note.end ?? (note.start + 1), ppq, tempoMap);
+                    let sum = 0, count = 0;
+                    for (let i = 0; i < frameTimes.length; i++) {
+                        if (frameTimes[i] >= tStart && frameTimes[i] <= tEnd) {
+                            sum += spectrogram[i][noteBin] || 0;
+                            count++;
+                        }
+                    }
+                    if (!count) {
+                        // Short note between frame samples — use the nearest frame.
+                        let nearest = 0, best = Infinity;
+                        for (let i = 0; i < frameTimes.length; i++) {
+                            const d = Math.abs(frameTimes[i] - tStart);
+                            if (d < best) { best = d;
+                                nearest = i; }
+                        }
+                        sum = spectrogram[nearest][noteBin] || 0;
+                        count = 1;
+                    }
+                    support = sum / count;
+                }
+                confidence += support * 25;
+                if (support > 0.3) reasons.push('audio support');
+                
+                // 2. Key membership
+                if (keyRoot >= 0) {
+                    const scale = [0, 2, 4, 5, 7, 9, 11];
+                    if (scale.includes((noteBin - keyRoot + 12) % 12)) {
+                        confidence += 15;
+                        reasons.push('in key');
+                    }
+                }
+                
+                // 3. Duration
+                const duration = note.duration || 240;
+                if (duration > 60) confidence += 10;
+                else if (duration < 30) { confidence -= 15;
+                    reasons.push('very short'); }
+                else { confidence -= 5;
+                    reasons.push('short'); }
+                
+                // 4. Velocity
+                if (note.velocity > 10 && note.velocity < 120) confidence += 10;
+                else if (note.velocity < 5) { confidence -= 10;
+                    reasons.push('low velocity'); }
+                
+                // 5. Range
+                if (note.note >= 21 && note.note <= 108) confidence += 5;
+                else { confidence -= 10;
+                    reasons.push('out of range'); }
+                
+                // 6. Hanging
+                if (note.hanging) { confidence -= 15;
+                    reasons.push('hanging note'); }
+                
+                confidence = Math.max(0, Math.min(100, Math.round(confidence)));
+                state.confidenceMap.set(note.id || note, confidence);
+                state.confidenceExplanations.set(note.id || note, reasons);
+            }
+            
+            const avg = Array.from(state.confidenceMap.values()).reduce((a, b) => a + b, 0) / state.confidenceMap.size;
+            state.confidenceScore = Math.round(avg || 0);
+            updateConfidenceRing(state.confidenceScore);
+        }
+
+        // ---- Analysis ----
+        function runAnalysis() {
+            if (!state.notes || state.notes.length === 0) {
+                showModal('No Data', 'Please load a MIDI file first');
+                return;
+            }
+
+            setStatus('🔬 Analysing...', 'highlight');
+
+            state.midiDetectedKey = detectMIDIKey(state.notes);
+            $('midiKeyDisplay').textContent = state.midiDetectedKey
+                ? `${state.midiDetectedKey.rootName} ${state.midiDetectedKey.mode}` : '—';
+            if (!state.audioDetectedKey && state.midiDetectedKey) {
+                state.detectedKey = state.midiDetectedKey;
+                const detectBtn = $('useDetectedKeyBtn');
+                detectBtn.textContent = `Use MIDI key: ${state.midiDetectedKey.rootName} ${state.midiDetectedKey.mode}`;
+                detectBtn.style.display = 'block';
+            }
+            
+            // Build confidence if audio available
+            if (state.audioData) {
+                buildConfidenceMap();
+            }
+            
+            const stats = AnalysisEngine.analyze(state.notes, state.ppq, state.tempoMap);
+            state.stats = stats;
+            
+            // Display statistics
+            displayStats(stats);
+            $('statsPlaceholder').style.display = 'none';
+            $('statsContent').style.display = 'block';
+            
+            // Update confidence
+            if (!state.confidenceScore) {
+                state.confidenceScore = stats.confidence;
+                updateConfidenceRing(stats.confidence);
+            }
+            
+            // Update validation indicators
+            updateValidationIndicators(stats);
+            
+            setStatus(`✅ Analysis complete — ${stats.issues.length} issues found`, 'success');
+        }
+
+        function displayStats(stats) {
+            const grid = $('statGrid');
+            const items = [
+                { label: 'Notes', value: stats.noteCount },
+                { label: 'Duplicates', value: stats.duplicates, warn: stats.duplicates > 0 },
+                { label: 'Hanging', value: stats.hanging, warn: stats.hanging > 0 },
+                { label: 'Overlaps', value: stats.overlaps, warn: stats.overlaps > 0 },
+                { label: 'Out of Range', value: stats.outOfRange, warn: stats.outOfRange > 0 },
+                { label: 'Avg Velocity', value: stats.avgVelocity },
+                { label: 'Avg Duration', value: `${stats.avgDuration} ticks` },
+                { label: 'Pitch Range', value: stats.noteCount > 0 ? `${stats.minNote}–${stats.maxNote}` : '—' },
+            ];
+
+            grid.innerHTML = items.map(item => `
+                <div class="stat-item">
+                    <span class="label">${item.label}</span>
+                    <span class="value ${item.warn ? 'warning' : 'good'}">${item.value}</span>
+                </div>
+            `).join('');
+
+            // Issues
+            if (stats.issues.length > 0) {
+                grid.innerHTML += `
+                    <div style="grid-column:1/-1;margin-top:4px;border-top:1px solid var(--border-color);padding-top:4px">
+                        <div style="font-size:9px;color:var(--text-muted)">⚠️ ISSUES</div>
+                        ${stats.issues.map(i => `<div style="font-size:10px;color:var(--accent-orange)">• ${i}</div>`).join('')}
+                    </div>
+                `;
+            }
+
+            // Recommendations
+            const recs = [];
+            if (stats.duplicates > 0) recs.push('Duplicate Removal');
+            if (stats.hanging > 0) recs.push('Hanging Note Repair');
+            if (stats.overlaps > 0) recs.push('Overlap Repair');
+            if (stats.outOfRange > 0) recs.push('Pitch Flicker Repair');
+            if (stats.ghost > 0) recs.push('Ghost Note Removal');
+
+            if (recs.length > 0) {
+                grid.innerHTML += `
+                    <div style="grid-column:1/-1;margin-top:4px;border-top:1px solid var(--border-color);padding-top:4px">
+                        <div style="font-size:9px;color:var(--accent-blue)">💡 ${recs.join(' • ')}</div>
+                    </div>
+                `;
+            }
+        }
+
+        // ---- Restoration ----
+        function runRestoration() {
+            if (!state.notes || state.notes.length === 0) {
+                showModal('No Data', 'Please load a MIDI file first');
+                return;
+            }
+
+            if (state.isProcessing) return;
+            state.isProcessing = true;
+            
+            setStatus('🧹 Restoring...', 'processing');
+
+            // Get enabled modules
+            const checkboxes = document.querySelectorAll('#moduleGrid input[type="checkbox"]');
+            const modules = {};
+            checkboxes.forEach(cb => { modules[cb.dataset.module] = cb.checked; });
+            modules.key = $('keyModuleCheckbox').checked;
+
+            const instrument = $('instrumentSelect').value;
+            const keyRootValue = $('keyRootSelect').value;
+            const keyScaleValue = $('keyScaleSelect').value;
+
+            if (modules.key && keyRootValue === '') {
+                showModal('Key Not Selected', 'Please choose a key root before enabling "Snap notes to key", or uncheck that module to skip key correction.');
+                state.isProcessing = false;
+                return;
+            }
+            
+            // Build confidence map if audio available
+            if (modules.audio && !state.confidenceMap.size && state.audioData) {
+                buildConfidenceMap();
+            }
+
+            // Run restoration
+            const engine = new RestorationEngine(state.notes, state.ppq, state.tempoMap, state.originalMaxTime);
+            const cleaned = engine.restore(modules, instrument, state.confidenceMap, keyRootValue, keyScaleValue);
+
+            state.cleanedNotes = cleaned;
+            state.isCleaned = true;
+            editUndoStack.length = 0; selectedNoteIds.clear();
+            updateEditUndoButton(); updateDeleteButton();
+            const restorationStats = engine.getStats();
+
+            // Update confidence
+            if (state.confidenceMap.size > 0) {
+                const avg = Array.from(state.confidenceMap.values()).reduce((a, b) => a + b, 0) / state.confidenceMap.size;
+                state.confidenceScore = Math.round(avg);
+                updateConfidenceRing(state.confidenceScore);
+            }
+
+            // Run validation
+            const validation = ValidationEngine.validate(state.originalNotes, cleaned, state.tempoMap, state.ppq, state.originalMaxTime);
+            state.validationPassed = validation.passed;
+            state.validationErrors = validation.errors;
+
+            // Update validation badge
+            updateValidationBadge(validation);
+
+            // Render
+            renderPianoRoll();
+
+            const stats = engine.getStats();
+            const summary = `Removed ${stats.removed}, merged ${stats.merged}, repaired ${stats.repaired}, corrected ${stats.corrected}` +
+                (stats.keyCorrected ? `, ${stats.keyCorrected} snapped to key` : '');
+            setStatus(`✅ Restoration complete — ${summary}`, 'success');
+
+            $('previewBtn').disabled = false;
+            $('exportBtn').disabled = false;
+            
+            state.isProcessing = false;
+
+            showModal('Restoration Complete',
+                `✅ MIDI restored successfully!\n\n` +
+                `${summary}\n` +
+                `${cleaned.length} notes remaining\n` +
+                `Confidence: ${state.confidenceScore}%\n` +
+                `Validation: ${validation.passed ? '✅ PASSED' : '⚠️ ' + validation.errors.join(', ')}\n` +
+                `${validation.warnings.length ? 'Warnings: ' + validation.warnings.join(', ') + '\n' : ''}\n` +
+                `Export your cleaned MIDI using the Export button.`
+            );
+        }
+
+        // ---- Validation ----
+        function runValidation() {
+            if (!state.notes || state.notes.length === 0) {
+                showModal('No Data', 'Please load a MIDI file first');
+                return;
+            }
+
+            const notesToCheck = state.isCleaned && state.cleanedNotes.length > 0 ?
+                state.cleanedNotes :
+                state.notes;
+
+            const validation = ValidationEngine.validate(state.originalNotes, notesToCheck, state.tempoMap, state.ppq, state.originalMaxTime);
+            state.validationPassed = validation.passed;
+            state.validationErrors = validation.errors;
+
+            updateValidationBadge(validation);
+            
+            showModal('Validation Results',
+                `${validation.passed ? '✅ All validation checks passed!' : '⚠️ Validation found issues:'}\n\n` +
+                `${validation.errors.length > 0 ? validation.errors.map(e => '• ' + e).join('\n') : 'No errors'}\n` +
+                `${validation.warnings.length > 0 ? '\nWarnings:\n' + validation.warnings.map(w => '• ' + w).join('\n') : ''}\n\n` +
+                `${validation.passed ? 'Ready for export.' : 'Please fix issues before exporting.'}`
+            );
+        }
+
+        function updateValidationBadge(validation) {
+            const badge = $('validationBadge');
+            if (validation.passed) {
+                badge.className = 'validation-badge pass';
+                badge.textContent = '✓ Validated';
+            } else {
+                badge.className = 'validation-badge fail';
+                badge.textContent = '⚠️ ' + validation.errors.length + ' issues';
+            }
+        }
+
+        function updateValidationIndicators(stats) {
+            const duration = $('valDuration');
+            const tempo = $('valTempo');
+            const notes = $('valNotes');
+            
+            duration.textContent = `⏱ ${state.duration ? state.duration.toFixed(2) + 's' : '—'}`;
+            duration.className = state.duration > 0 ? 'pass' : 'fail';
+            
+            tempo.textContent = `🎵 ${state.detectedTempo || '—'} BPM`;
+            tempo.className = state.detectedTempo > 30 ? 'pass' : 'fail';
+            
+            notes.textContent = `📝 ${stats.noteCount || 0} notes`;
+            notes.className = stats.noteCount > 0 ? 'pass' : 'fail';
+        }
+
+        // ---- Export ----
+        function exportMIDI() {
+            if (!state.isCleaned || !state.cleanedNotes || state.cleanedNotes.length === 0) {
+                showModal('No Cleaned Data', 'Please run restoration first');
+                return;
+            }
+
+            // Run validation before export
+            const validation = ValidationEngine.validate(state.originalNotes, state.cleanedNotes, state.tempoMap, state.ppq, state.originalMaxTime);
+            if (!validation.passed) {
+                showModal('Validation Failed',
+                    `Cannot export - validation failed:\n\n` +
+                    `${validation.errors.map(e => '• ' + e).join('\n')}\n\n` +
+                    `Please fix these issues before exporting.`
+                );
+                return;
+            }
+
+            try {
+                const notes = state.cleanedNotes;
+                const ppq = state.ppq || 480;
+                const tempoMap = state.tempoMap || [{ time: 0, tempo: 500000 }];
+                
+                const midiData = MIDIWriter.write(
+                    notes, ppq, tempoMap, state.timeSignatures || [], state.keySignatures || [], 0, state.originalMaxTime
+                );
+                const blob = new Blob([midiData], { type: 'audio/midi' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                const base = (state.midiFileName || 'restored').replace(/\.(mid|midi)$/i, '');
+                a.href = url;
+                a.download = `${base}_restored.mid`;
+                a.click();
+                URL.revokeObjectURL(url);
+
+                setStatus('✅ Exported restored MIDI', 'success');
+            } catch (err) {
+                showModal('Export Error', `Failed to export: ${err.message}`);
+                console.error(err);
+            }
+        }
+
+        // ---- Piano Roll ----
+        function renderPianoRoll() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = rect.height;
+
+            const w = canvas.width;
+            const h = canvas.height;
+
+            const notes = state.isCleaned && state.cleanedNotes.length > 0 ?
+                state.cleanedNotes :
+                state.notes;
+
+            if (!notes || notes.length === 0) {
+                rollLayout = null;
+                ctx.fillStyle = 'var(--bg-tertiary)';
+                ctx.fillRect(0, 0, w, h);
+                ctx.fillStyle = 'var(--text-muted)';
+                ctx.font = '14px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('No notes to display', w / 2, h / 2);
+                return;
+            }
+
+            const minNote = Math.max(21, Math.min(...notes.map(n => n.note)) - 2);
+            const maxNote = Math.min(108, Math.max(...notes.map(n => n.note)) + 2);
+            const noteRange = maxNote - minNote + 1;
+            const maxTime = Math.max(...notes.map(n => n.end || n.start + 1000)) + 1000;
+
+            const padding = { top: 16, bottom: 28, left: 32, right: 12 };
+            const plotW = w - padding.left - padding.right;
+            const plotH = h - padding.top - padding.bottom;
+
+            const noteHeight = Math.min(plotH / noteRange, 9);
+            const timeScale = plotW / maxTime * state.zoomLevel;
+
+            // Expose the layout used for this draw so pointer-based editing (select/move/resize)
+            // can hit-test against exactly what's on screen.
+            rollLayout = { padding, timeScale, noteHeight, minNote, maxNote, maxTime, notes };
+
+            // Background
+            ctx.fillStyle = 'var(--bg-tertiary)';
+            ctx.fillRect(0, 0, w, h);
+
+            // Waveform overlay
+            if (state.showWaveformOverlay && state.audioData) {
+                const step = Math.floor(state.audioData.length / plotW);
+                ctx.strokeStyle = 'rgba(59, 130, 246, 0.1)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                for (let i = 0; i < plotW; i++) {
+                    let sum = 0;
+                    for (let j = 0; j < step && i * step + j < state.audioData.length; j++) {
+                        sum += Math.abs(state.audioData[i * step + j]);
+                    }
+                    const val = sum / step;
+                    const x = padding.left + i;
+                    const y = padding.top + plotH / 2 - val * plotH * 0.3;
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+            }
+
+            // Grid
+            ctx.strokeStyle = 'var(--border-color)';
+            ctx.lineWidth = 0.5;
+
+            for (let i = 0; i <= noteRange; i++) {
+                const y = padding.top + i * noteHeight;
+                ctx.beginPath();
+                ctx.moveTo(padding.left, y);
+                ctx.lineTo(w - padding.right, y);
+                ctx.stroke();
+            }
+
+            const beatInterval = 240 * state.zoomLevel;
+            for (let t = 0; t < maxTime; t += beatInterval) {
+                const x = padding.left + t * timeScale;
+                if (x > w - padding.right) break;
+                ctx.beginPath();
+                ctx.moveTo(x, padding.top);
+                ctx.lineTo(x, h - padding.bottom);
+                ctx.stroke();
+            }
+
+            // Chord overlay
+            if (state.showChordOverlay && state.chords && state.chords.length > 0) {
+                for (const chord of state.chords) {
+                    const x = padding.left + (chord.time || 0) * timeScale * 480 * 0.5;
+                    if (x > w) break;
+                    ctx.fillStyle = 'rgba(139, 92, 246, 0.12)';
+                    ctx.fillRect(x, padding.top, 30, plotH);
+                    ctx.fillStyle = 'var(--accent-purple)';
+                    ctx.font = '7px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(chord.root || '', x + 15, padding.top + 12);
+                }
+            }
+
+            // Draw notes
+            for (const n of notes) {
+                const x = padding.left + n.start * timeScale;
+                const endX = padding.left + (n.end || n.start + 1000) * timeScale;
+                const y = padding.top + (maxNote - n.note) * noteHeight;
+                const width = Math.max(endX - x, 1);
+                const height = Math.max(noteHeight - 1, 1);
+
+                let confidence = 50;
+                if (state.confidenceMap) {
+                    confidence = state.confidenceMap.get(n.id || n) || 50;
+                }
+
+                let color;
+                if (state.showConfidence && state.confidenceMap.size > 0) {
+                    if (confidence >= 70) {
+                        color = `rgba(63, 185, 80, ${0.3 + (confidence/100) * 0.5})`;
+                    } else if (confidence >= 40) {
+                        color = `rgba(210, 153, 34, ${0.3 + (confidence/100) * 0.5})`;
+                    } else {
+                        color = `rgba(248, 81, 73, ${0.3 + (confidence/100) * 0.5})`;
+                    }
+                } else {
+                    const vel = n.velocity / 127;
+                    color = state.isCleaned ?
+                        `rgba(63, 185, 80, ${0.3 + vel * 0.5})` :
+                        `rgba(88, 166, 255, ${0.3 + vel * 0.5})`;
+                }
+
+                ctx.fillStyle = color;
+                ctx.fillRect(x, y, width, height);
+
+                ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+                ctx.lineWidth = 0.5;
+                ctx.strokeRect(x, y, width, height);
+            }
+
+            // Selected-note outlines
+            if (selectedNoteIds.size) {
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 1.5;
+                for (const n of notes) {
+                    if (!selectedNoteIds.has(n.id)) continue;
+                    const x = padding.left + n.start * timeScale;
+                    const endX = padding.left + (n.end || n.start + 1000) * timeScale;
+                    const y = padding.top + (maxNote - n.note) * noteHeight;
+                    const width = Math.max(endX - x, 1);
+                    const height = Math.max(noteHeight - 1, 1);
+                    ctx.strokeRect(x + 0.75, y + 0.75, Math.max(1, width - 1.5), Math.max(1, height - 1.5));
+                }
+            }
+
+            // Marquee selection box
+            if (marqueeRect) {
+                const [ma, mb, mc, md] = marqueeRect;
+                const rx = Math.min(ma, mc), ry = Math.min(mb, md), rw = Math.abs(mc - ma), rh = Math.abs(md - mb);
+                ctx.fillStyle = 'rgba(88,166,255,.15)';
+                ctx.fillRect(rx, ry, rw, rh);
+                ctx.strokeStyle = '#58a6ff';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(rx + 0.5, ry + 0.5, Math.max(0, rw - 1), Math.max(0, rh - 1));
+            }
+
+
+            ctx.fillStyle = 'var(--text-muted)';
+            ctx.font = '7px sans-serif';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+
+            for (let n = minNote; n <= maxNote; n += 5) {
+                const y = padding.top + (maxNote - n) * noteHeight + noteHeight / 2;
+                ctx.fillText(n, padding.left - 4, y);
+            }
+
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            for (let t = 0; t < maxTime; t += beatInterval * 4) {
+                const x = padding.left + t * timeScale;
+                if (x > w - padding.right) break;
+                ctx.fillStyle = 'var(--text-muted)';
+                ctx.fillText(Math.round(t / 240), x, h - padding.bottom + 4);
+            }
+
+            // Status
+            ctx.fillStyle = 'var(--text-muted)';
+            ctx.font = '8px sans-serif';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'bottom';
+            const mode = state.isCleaned ? '✅ Restored' : '📝 Original';
+            const count = notes.length;
+            const confidence = state.confidenceScore || 0;
+            ctx.fillText(`${mode} • ${count} notes • Confidence: ${confidence}% • Zoom: ${Math.round(state.zoomLevel * 100)}%`,
+                padding.left, h - 4);
+        }
+
+        // ---- UI Helpers ----
+        function setStatus(text, className = '') {
+            const el = $('statusText');
+            el.textContent = text;
+            el.className = className;
+        }
+
+        function updateFileStatus() {
+            const status = $('fileStatus');
+            const hasMIDI = state.notes.length > 0;
+            const hasAudio = state.audioData !== null;
+
+            if (hasMIDI && hasAudio) {
+                status.className = 'file-status loaded';
+                status.innerHTML = `✅ ${state.midiFileName || 'MIDI'} + ${state.audioFileName || 'WAV'} loaded`;
+            } else if (hasMIDI) {
+                status.className = 'file-status loaded';
+                status.innerHTML = `✅ ${state.midiFileName || 'MIDI'} loaded (${state.notes.length} notes)`;
+            } else if (hasAudio) {
+                status.className = 'file-status loaded';
+                status.innerHTML = `✅ ${state.audioFileName || 'WAV'} loaded`;
+            } else {
+                status.className = 'file-status missing';
+                status.innerHTML = '⚠️ Load MIDI and/or WAV files';
+            }
+        }
+
+        function updateFileInfo(file) {
+            $('trackCount').textContent = state.tracks.length || 1;
+            $('noteCount').textContent = state.notes.length;
+            $('tempoDisplay').textContent = state.detectedTempo ? `${Math.round(state.detectedTempo)} BPM` : '—';
+            $('formatDisplay').textContent = `Type ${state.format}`;
+            updateFileStatus();
+        }
+
+        function updateAudioStatus(text) {
+            const el = $('audioStatus');
+            el.innerHTML = `<div style="color:var(--accent-green)">${text}</div>`;
+        }
+
+        function updateConfidenceRing(score) {
+            const ring = $('confidenceRing');
+            ring.textContent = `${score}%`;
+            ring.className = 'ring ' + (score >= 70 ? 'high' : score >= 40 ? 'medium' : 'low');
+
+            $('confidenceScore').textContent = score >= 70 ? '✅ Good' :
+                score >= 40 ? '⚠️ Moderate' : '❌ Low';
+            $('confidenceLabel').textContent = score >= 70 ? 'Ready for export' :
+                score >= 40 ? 'Review recommended' : 'Manual review advised';
+        }
+
+        function showModal(title, body) {
+            $('modalTitle').textContent = title;
+            $('modalBody').textContent = body;
+            $('modalOverlay').classList.add('active');
+        }
+
+        function closeModal() {
+            $('modalOverlay').classList.remove('active');
+        }
+        $('modalOverlay').addEventListener('click', e => {
+            if (e.target === e.currentTarget) closeModal();
+        });
+
+        function showHelp() {
+            showModal('📖 Help',
+                'MIDI Restoration Studio v4.0\n' +
+                '==========================\n\n' +
+                '1. Load a MIDI file (drag & drop or click)\n' +
+                '2. Optionally load the original WAV for audio assistance\n' +
+                '3. Click "Analyze" to see statistics and issues\n' +
+                '4. Select restoration modules to enable\n' +
+                '5. Click "Restore" to repair the MIDI\n' +
+                '6. Validate and export the restored MIDI\n\n' +
+                'Modules (all optional):\n' +
+                '• Duplicate Removal - removes identical notes\n' +
+                '• Ghost Note Removal - removes low-velocity/short notes\n' +
+                '• Overlap Repair - fixes overlapping same-pitch notes\n' +
+                '• Hanging Note Repair - fixes notes without note-off\n' +
+                '• Note Merge - merges fragmented notes\n' +
+                '• Timing Repair - quantises to beat grid\n' +
+                '• Velocity Smoothing - smooths dynamics\n' +
+                '• Pitch Flicker Repair - fixes C-C#-C patterns\n' +
+                '• Voice Separation - groups by track/channel\n' +
+                '• Phrase Continuity - repairs phrase gaps\n' +
+                '• Chord Consistency - adds missing chord notes\n' +
+                '• Audio-Assisted - uses WAV for confidence scoring'
+            );
+        }
+
+        function showAbout() {
+            showModal('🎵 MIDI Restoration Studio v4.0',
+                'Professional desktop-style application\n' +
+                'for restoring WAV-to-MIDI conversions.\n\n' +
+                'Core Principles:\n' +
+                '• Restoration, not composition\n' +
+                '• Non-destructive editing\n' +
+                '• Deterministic output\n' +
+                '• Standards-compliant MIDI\n\n' +
+                'Built with Web Audio API and Canvas.\n' +
+                'No data is sent to any server.'
+            );
+        }
+
+        // ---- Audition ----
+        function setAuditionMode(mode) {
+            state.auditionMode = mode;
+            document.querySelectorAll('.audition-toggle button').forEach(b => {
+                b.classList.toggle('active', b.textContent.toLowerCase() === mode);
+            });
+            setStatus(`Audition: ${mode} mode`, '');
+        }
+
+
+        function previewRestored() {
+            if (!state.isCleaned || !state.cleanedNotes || state.cleanedNotes.length === 0) {
+                showModal('Nothing to Preview', 'Run Restore first, then preview the restored MIDI.');
+                return;
+            }
+            stopAudition();
+            setAuditionMode('after');
+            playAudition();
+        }
+
+        function playAudition() {
+            const notes = state.auditionMode === 'after' && state.isCleaned ?
+                state.cleanedNotes :
+                state.notes;
+
+            if (!notes || notes.length === 0) {
+                showModal('No Notes', 'No notes to play');
+                return;
+            }
+
+            // Use Web Audio for playback
+            if (!state.audioContext) {
+                state.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+
+            const ctx = state.audioContext;
+            const sorted = [...notes].sort((a, b) => a.start - b.start);
+            const firstTime = sorted[0]?.start || 0;
+            const ppq = state.ppq || 480;
+            const tempo = state.detectedTempo || 120;
+            const beatDuration = 60 / tempo;
+            const ticksPerSecond = ppq / beatDuration;
+
+            // Stop any ongoing playback
+            stopAudition();
+
+            for (const n of sorted) {
+                const time = (n.start - firstTime) / ticksPerSecond;
+                const duration = Math.max(0.05, (n.duration || 240) / ticksPerSecond);
+                const velocity = Math.min(n.velocity / 127, 0.5);
+
+                const startTime = ctx.currentTime + time;
+                const endTime = startTime + duration;
+
+                try {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(440 * Math.pow(2, (n.note - 69) / 12), startTime);
+                    
+                    gain.gain.setValueAtTime(0, startTime);
+                    gain.gain.linearRampToValueAtTime(velocity * 0.1, startTime + 0.005);
+                    gain.gain.exponentialRampToValueAtTime(0.001, endTime);
+                    
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    
+                    osc.start(startTime);
+                    osc.stop(endTime + 0.01);
+                    
+                    // Store for cleanup
+                    if (!window._playbackOscillators) window._playbackOscillators = [];
+                    window._playbackOscillators.push({ osc, gain, endTime });
+                } catch (e) {
+                    // Ignore audio errors
+                }
+            }
+
+            setStatus(`▶ Playing ${sorted.length} notes (${state.auditionMode})`, '');
+        }
+
+        function stopAudition() {
+            if (window._playbackOscillators) {
+                for (const p of window._playbackOscillators) {
+                    try {
+                        p.osc.stop();
+                        p.osc.disconnect();
+                        p.gain.disconnect();
+                    } catch (e) {}
+                }
+                window._playbackOscillators = [];
+            }
+            setStatus('⏹ Stopped', '');
+        }
+
+        // ---- Manual note editing (select / move / resize / delete / undo on the piano roll) ----
+        // This complements the automatic Restoration Modules: it lets you fix whatever
+        // the algorithms missed (or reverse something they got wrong) by hand, then export.
+        function ensureEditable() {
+            if (!state.isCleaned) {
+                state.cleanedNotes = state.notes.map(n => ({ ...n }));
+                state.isCleaned = true;
+                $('previewBtn').disabled = false;
+                $('exportBtn').disabled = false;
+            }
+            return state.cleanedNotes;
+        }
+
+        function pushEditUndo() {
+            ensureEditable();
+            editUndoStack.push({
+                notes: state.cleanedNotes.map(n => ({ ...n })),
+                selected: new Set(selectedNoteIds)
+            });
+            if (editUndoStack.length > 100) editUndoStack.shift();
+            updateEditUndoButton();
+        }
+
+        function undoEdit() {
+            if (!editUndoStack.length) return;
+            const snap = editUndoStack.pop();
+            state.cleanedNotes = snap.notes;
+            selectedNoteIds = snap.selected;
+            updateEditUndoButton();
+            updateDeleteButton();
+            renderPianoRoll();
+            setStatus('↶ Undid last note edit', '');
+        }
+
+        function updateEditUndoButton() {
+            const btn = $('editUndoBtn');
+            if (btn) btn.disabled = !editUndoStack.length;
+        }
+
+        function updateDeleteButton() {
+            const btn = $('deleteNoteBtn');
+            if (!btn) return;
+            btn.disabled = selectedNoteIds.size === 0;
+            btn.title = selectedNoteIds.size > 1
+                ? `Delete ${selectedNoteIds.size} selected notes (Delete)`
+                : 'Delete selected note (Delete)';
+        }
+
+        function deleteSelectedNotes() {
+            if (!selectedNoteIds.size) return;
+            pushEditUndo();
+            state.cleanedNotes = state.cleanedNotes.filter(n => !selectedNoteIds.has(n.id));
+            selectedNoteIds.clear();
+            updateDeleteButton();
+            renderPianoRoll();
+            setStatus('🗑 Deleted selected note(s) — export or undo (↶) to revert', '');
+        }
+
+        function selectAllEditable() {
+            const notes = state.isCleaned ? state.cleanedNotes : state.notes;
+            selectedNoteIds = new Set(notes.map(n => n.id));
+            updateDeleteButton();
+            renderPianoRoll();
+        }
+
+        function canvasPointFromEvent(e) {
+            const r = canvas.getBoundingClientRect();
+            return [e.clientX - r.left, e.clientY - r.top];
+        }
+
+        function noteScreenRect(n, layout) {
+            const { padding, timeScale, noteHeight, maxNote } = layout;
+            const x = padding.left + n.start * timeScale;
+            const endX = padding.left + (n.end ?? (n.start + 1000)) * timeScale;
+            const y = padding.top + (maxNote - n.note) * noteHeight;
+            return [x, y, Math.max(endX - x, 1), Math.max(noteHeight - 1, 1)];
+        }
+
+        function hitTestNote(px, py, pointerType) {
+            if (!rollLayout) return null;
+            const edgeZone = pointerType === 'mouse' ? 6 : 14;
+            const notes = rollLayout.notes;
+            for (let i = notes.length - 1; i >= 0; i--) {
+                const n = notes[i];
+                const [x, y, w, h] = noteScreenRect(n, rollLayout);
+                if (px >= x && px <= x + w && py >= y && py <= y + h) {
+                    return { note: n, edge: px >= x + w - Math.min(edgeZone, w * 0.4) };
+                }
+            }
+            return null;
+        }
+
+        canvas.addEventListener('pointerdown', e => {
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
+            const notes = state.isCleaned ? state.cleanedNotes : state.notes;
+            if (!notes || !notes.length || !rollLayout) return;
+            const [px, py] = canvasPointFromEvent(e);
+            const additive = e.shiftKey || e.metaKey || e.ctrlKey;
+            const hit = hitTestNote(px, py, e.pointerType);
+
+            if (!hit) {
+                // Empty area → marquee-select.
+                e.preventDefault();
+                canvas.setPointerCapture(e.pointerId);
+                const baseSel = additive ? new Set(selectedNoteIds) : new Set();
+                if (!additive) { selectedNoteIds.clear(); updateDeleteButton(); renderPianoRoll(); }
+                marqueeRect = [px, py, px, py];
+                const onMove = ev => {
+                    if (ev.pointerId !== e.pointerId) return;
+                    const [mx, my] = canvasPointFromEvent(ev);
+                    marqueeRect = [px, py, mx, my];
+                    const rx = Math.min(px, mx), ry = Math.min(py, my), rw = Math.abs(mx - px), rh = Math.abs(my - py);
+                    const cur = state.isCleaned ? state.cleanedNotes : state.notes;
+                    const inside = new Set(baseSel);
+                    for (const n of cur) {
+                        const [nx, ny, nw, nh] = noteScreenRect(n, rollLayout);
+                        if (nx < rx + rw && nx + nw > rx && ny < ry + rh && ny + nh > ry) inside.add(n.id);
+                    }
+                    selectedNoteIds = inside;
+                    updateDeleteButton(); renderPianoRoll();
+                };
+                const onUp = ev => {
+                    if (ev.pointerId !== e.pointerId) return;
+                    marqueeRect = null; renderPianoRoll();
+                    canvas.removeEventListener('pointermove', onMove);
+                    canvas.removeEventListener('pointerup', onUp);
+                    canvas.removeEventListener('pointercancel', onUp);
+                };
+                canvas.addEventListener('pointermove', onMove);
+                canvas.addEventListener('pointerup', onUp);
+                canvas.addEventListener('pointercancel', onUp);
+                return;
+            }
+
+            e.preventDefault();
+            canvas.setPointerCapture(e.pointerId);
+            ensureEditable();
+            const workingNote = state.cleanedNotes.find(n => n.id === hit.note.id) || hit.note;
+
+            const already = selectedNoteIds.has(workingNote.id);
+            if (additive) {
+                if (already) selectedNoteIds.delete(workingNote.id); else selectedNoteIds.add(workingNote.id);
+            } else if (!already) {
+                selectedNoteIds = new Set([workingNote.id]);
+            }
+            updateDeleteButton(); renderPianoRoll();
+            if (!selectedNoteIds.has(workingNote.id)) return;
+
+            const groupIds = new Set(selectedNoteIds);
+            const originals = state.cleanedNotes
+                .filter(n => groupIds.has(n.id))
+                .map(n => ({ note: n, start: n.start, end: n.end, pitch: n.note }));
+            const mode = hit.edge ? 'resize' : 'move';
+            let moved = false, snapshotTaken = false;
+
+            const onMove = ev => {
+                if (ev.pointerId !== e.pointerId) return;
+                const [mx, my] = canvasPointFromEvent(ev);
+                const dTicks = (mx - px) / rollLayout.timeScale;
+                const dRows = (my - py) / rollLayout.noteHeight;
+                if (!moved && (Math.abs(mx - px) > 2 || Math.abs(my - py) > 2)) {
+                    moved = true;
+                    if (!snapshotTaken) { pushEditUndo(); snapshotTaken = true; }
+                }
+                if (!moved) return;
+                if (mode === 'resize') {
+                    for (const o of originals) {
+                        o.note.end = Math.max(o.start + 1, Math.round(o.end + dTicks));
+                    }
+                } else {
+                    const minStart = Math.min(...originals.map(o => o.start));
+                    const lowPitch = Math.min(...originals.map(o => o.pitch));
+                    const highPitch = Math.max(...originals.map(o => o.pitch));
+                    const sharedDx = Math.max(dTicks, -minStart);
+                    const sharedPitch = Math.max(-lowPitch, Math.min(-dRows, 127 - highPitch));
+                    for (const o of originals) {
+                        const ns = Math.round(o.start + sharedDx);
+                        o.note.start = ns;
+                        o.note.end = ns + (o.end - o.start);
+                        o.note.note = Math.round(o.pitch + sharedPitch);
+                    }
+                }
+                renderPianoRoll();
+            };
+            const onUp = ev => {
+                if (ev.pointerId !== e.pointerId) return;
+                if (moved) setStatus('✏️ Note edit applied — export, or undo (↶ / Ctrl-Z) to revert', '');
+                canvas.removeEventListener('pointermove', onMove);
+                canvas.removeEventListener('pointerup', onUp);
+                canvas.removeEventListener('pointercancel', onUp);
+            };
+            canvas.addEventListener('pointermove', onMove);
+            canvas.addEventListener('pointerup', onUp);
+            canvas.addEventListener('pointercancel', onUp);
+        });
+
+        canvas.addEventListener('pointermove', e => {
+            if (!rollLayout || e.pointerType !== 'mouse') return;
+            const [px, py] = canvasPointFromEvent(e);
+            const hit = hitTestNote(px, py, 'mouse');
+            canvas.style.cursor = hit ? (hit.edge ? 'ew-resize' : 'grab') : 'crosshair';
+        });
+
+        // ---- Zoom ----
+        function zoomPianoRoll(dir) {
+            state.zoomLevel = Math.max(0.1, Math.min(5, state.zoomLevel + dir * 0.1));
+            $('zoomDisplay').textContent = `${Math.round(state.zoomLevel * 100)}%`;
+            renderPianoRoll();
+        }
+
+        function resetApplication() {
+            stopAudition();
+            if (state.audioContext && state.audioContext.state !== 'closed') {
+                state.audioContext.close().catch(() => {});
+            }
+            const fresh = {
+                midiFileName:null,audioFileName:null,midiData:null,notes:[],originalNotes:[],cleanedNotes:[],tracks:[],
+                tempoMap:[{time:0,tempo:500000}],timeSignatures:[],keySignatures:[],ppq:480,format:1,duration:0,originalMaxTime:0,
+                audioData:null,audioBuffer:null,audioContext:null,sampleRate:44100,confidenceMap:new Map(),confidenceExplanations:new Map(),
+                chromagram:[],spectrogram:[],frameTimes:[],beats:[],onsets:[],detectedTempo:120,detectedKey:null,midiDetectedKey:null,audioDetectedKey:null,
+                chords:[],voices:[],phrases:[],stats:null,isCleaned:false,confidenceScore:0,zoomLevel:1,showConfidence:true,
+                showWaveformOverlay:false,showChordOverlay:false,auditionMode:'before',instrument:'piano',activePreset:'conservative',
+                noteIdCounter:0,validationPassed:false,validationErrors:[],isProcessing:false
+            };
+            Object.assign(state, fresh);
+            selectedNoteIds.clear(); editUndoStack.length = 0; marqueeRect = null; rollLayout = null;
+            updateEditUndoButton(); updateDeleteButton();
+            $('midiInput').value=''; $('audioInput').value='';
+            for (const id of ['midiFileName','audioFileName']) { $(id).textContent=''; $(id).style.display='none'; }
+            for (const id of ['trackCount','noteCount','tempoDisplay','formatDisplay','midiKeyDisplay','audioKeyDisplay']) $(id).textContent='—';
+            $('fileStatus').className='file-status missing'; $('fileStatus').textContent='No files loaded';
+            $('audioStatus').innerHTML='<div>⏳ Waiting for audio...</div>';
+            $('statsPlaceholder').style.display='block'; $('statsContent').style.display='none'; $('statGrid').innerHTML='';
+            $('analyzeBtn').disabled=true; $('restoreBtn').disabled=true; $('previewBtn').disabled=true; $('exportBtn').disabled=true;
+            $('keyRootSelect').value=''; $('keyScaleSelect').value='major'; $('keyModuleCheckbox').checked=false;
+            $('useDetectedKeyBtn').style.display='none';
+            $('confidenceRing').textContent='0%'; $('confidenceRing').className='ring low'; $('confidenceScore').textContent='—'; $('confidenceLabel').textContent='No data';
+            $('validationBadge').className='validation-badge';
+            renderPianoRoll(); drawWaveform(new Float32Array(0));
+            setStatus('Ready — Load MIDI and WAV files', '');
+        }
+
+        function resetView() {
+            state.zoomLevel = 1;
+            $('zoomDisplay').textContent = '100%';
+            renderPianoRoll();
+        }
+
+        function toggleConfidenceView() {
+            state.showConfidence = !state.showConfidence;
+            renderPianoRoll();
+        }
+
+        function toggleWaveformOverlay() {
+            state.showWaveformOverlay = !state.showWaveformOverlay;
+            renderPianoRoll();
+        }
+
+        function showChordOverlay() {
+            state.showChordOverlay = !state.showChordOverlay;
+            renderPianoRoll();
+        }
+
+        // ---- Waveform ----
+        function drawWaveform(audioData) {
+            const wc = $('waveformCanvas');
+            const rect = wc.parentElement.getBoundingClientRect();
+            wc.width = wc.parentElement.clientWidth || 300;
+            wc.height = 30;
+
+            const ctx2 = wc.getContext('2d');
+            const w = wc.width;
+            const h = wc.height;
+
+            ctx2.fillStyle = 'var(--bg-tertiary)';
+            ctx2.fillRect(0, 0, w, h);
+
+            if (!audioData) return;
+
+            const step = Math.floor(audioData.length / w);
+            ctx2.strokeStyle = 'var(--accent-blue)';
+            ctx2.lineWidth = 0.5;
+
+            ctx2.beginPath();
+            for (let i = 0; i < w; i++) {
+                let sum = 0;
+                for (let j = 0; j < step && i * step + j < audioData.length; j++) {
+                    sum += Math.abs(audioData[i * step + j]);
+                }
+                const val = sum / step;
+                const x = i;
+                const y = h / 2 - val * h * 0.8;
+                if (i === 0) ctx2.moveTo(x, y);
+                else ctx2.lineTo(x, y);
+            }
+            ctx2.stroke();
+
+            ctx2.beginPath();
+            for (let i = 0; i < w; i++) {
+                let sum = 0;
+                for (let j = 0; j < step && i * step + j < audioData.length; j++) {
+                    sum += Math.abs(audioData[i * step + j]);
+                }
+                const val = sum / step;
+                const x = i;
+                const y = h / 2 + val * h * 0.8;
+                if (i === 0) ctx2.moveTo(x, y);
+                else ctx2.lineTo(x, y);
+            }
+            ctx2.stroke();
+
+            // Beat markers
+            if (state.beats && state.beats.length > 0) {
+                const sampleRate = state.sampleRate || 44100;
+                ctx2.strokeStyle = 'var(--accent-orange)';
+                ctx2.lineWidth = 0.5;
+                for (const beat of state.beats) {
+                    const x = beat * sampleRate / audioData.length * w;
+                    if (x < w) {
+                        ctx2.beginPath();
+                        ctx2.moveTo(x, 0);
+                        ctx2.lineTo(x, h);
+                        ctx2.stroke();
+                    }
+                }
+            }
+        }
+
+        // ---- Presets ----
+        document.querySelectorAll('.preset-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                state.activePreset = this.dataset.preset;
+
+                const checkboxes = document.querySelectorAll('#moduleGrid input[type="checkbox"]');
+                const presets = {
+                    conservative: { duplicate: true, ghost: true, overlap: true, hanging: true, merge: true,
+                        timing: false, velocity: false, pitch: false, voice: false, phrase: false, chord: false,
+                        audio: true, key: false },
+                    standard: { duplicate: true, ghost: true, overlap: true, hanging: true, merge: true, timing: true,
+                        velocity: true, pitch: true, voice: true, phrase: true, chord: true, audio: true, key: false },
+                    aggressive: { duplicate: true, ghost: true, overlap: true, hanging: true, merge: true, timing: true,
+                        velocity: true, pitch: true, voice: true, phrase: true, chord: true, audio: true, key: false },
+                    piano: { duplicate: true, ghost: true, overlap: true, hanging: true, merge: true, timing: true,
+                        velocity: true, pitch: true, voice: true, phrase: true, chord: true, audio: true, key: false },
+                    guitar: { duplicate: true, ghost: true, overlap: true, hanging: true, merge: true, timing: true,
+                        velocity: true, pitch: true, voice: true, phrase: true, chord: false, audio: true, key: false },
+                    bass: { duplicate: true, ghost: true, overlap: true, hanging: true, merge: true, timing: true,
+                        velocity: true, pitch: true, voice: true, phrase: false, chord: false, audio: true, key: false },
+                    // For MIDI that was sequenced/composed directly (not transcribed from audio).
+                    // Only fixes technical errors that are never intentional — exact duplicate
+                    // events, overlapping same-pitch notes, and notes with no note-off. Leaves
+                    // everything an arranger could have meant on purpose untouched: no timing
+                    // quantization, no velocity smoothing, no pitch/phrase/chord "correction",
+                    // no ghost-note removal (short/quiet notes may be deliberate), no merging of
+                    // repeated notes, and no audio-confidence filtering (there's no transcription
+                    // to check against — the MIDI itself is the source of truth).
+                    composed: { duplicate: true, ghost: false, overlap: true, hanging: true, merge: false,
+                        timing: false, velocity: false, pitch: false, voice: false, phrase: false, chord: false,
+                        audio: false, key: false },
+                };
+
+                const hints = {
+                    composed: 'Fixes only technical errors (duplicate events, overlapping notes, missing note-offs). No quantization, velocity, pitch, or audio-based changes — safe for MIDI that wasn\u2019t transcribed from audio.',
+                };
+
+                const preset = presets[this.dataset.preset] || presets.standard;
+                checkboxes.forEach(cb => {
+                    cb.checked = preset[cb.dataset.module] !== undefined ? preset[cb.dataset.module] : true;
+                });
+                $('keyModuleCheckbox').checked = !!preset.key;
+                const hintEl = $('presetHint');
+                if (hints[this.dataset.preset]) {
+                    hintEl.textContent = hints[this.dataset.preset];
+                    hintEl.style.display = 'block';
+                } else {
+                    hintEl.style.display = 'none';
+                }
+                setStatus(`Preset: ${this.textContent} loaded`, '');
+            });
+        });
+
+        // ---- Instrument ----
+        $('instrumentSelect').addEventListener('change', function() {
+            state.instrument = this.value;
+            setStatus(`Instrument: ${this.options[this.selectedIndex].text}`, '');
+        });
+
+        // ---- Resize ----
+        window.addEventListener('resize', () => {
+            renderPianoRoll();
+            if (state.audioData) drawWaveform(state.audioData);
+        });
+
+        // ---- Keyboard ----
+        document.addEventListener('keydown', (e) => {
+            if (e.target.tagName === 'INPUT') return;
+
+            // Note-editing shortcuts use Ctrl/Cmd modifiers (or Delete/Backspace/Escape) so they
+            // never collide with the single-letter shortcuts in the switch below.
+            if ((e.key === 'z' || e.key === 'Z') && (e.metaKey || e.ctrlKey)) { e.preventDefault(); undoEdit(); return; }
+            if ((e.key === 'a' || e.key === 'A') && (e.metaKey || e.ctrlKey)) { e.preventDefault(); selectAllEditable(); return; }
+            if ((e.key === 'Delete' || e.key === 'Backspace') && selectedNoteIds.size) { e.preventDefault(); deleteSelectedNotes(); return; }
+            if (e.key === 'Escape' && selectedNoteIds.size) { selectedNoteIds.clear(); updateDeleteButton(); renderPianoRoll(); return; }
+
+            switch (e.key.toLowerCase()) {
+                case ' ':
+                    e.preventDefault();
+                    playAudition();
+                    break;
+                case 'r':
+                    resetView();
+                    break;
+                case '+':
+                    zoomPianoRoll(1);
+                    break;
+                case '-':
+                    zoomPianoRoll(-1);
+                    break;
+                case 'c':
+                    runRestoration();
+                    break;
+                case 'e':
+                    exportMIDI();
+                    break;
+                case 'a':
+                    runAnalysis();
+                    break;
+                case 'v':
+                    runValidation();
+                    break;
+                case 'escape':
+                    closeModal();
+                    break;
+            }
+        });
+
+        // ---- Init ----
+        function init() {
+            initFileHandling();
+            renderPianoRoll();
+            setStatus('🎵 MIDI Restoration Studio v5.0 — Load MIDI and WAV files', '');
+            console.log('🎵 MIDI Restoration Studio v5.0 — Ultimate Edition');
+            console.log('Core Principles: Restoration, not composition');
+            console.log('✅ Standards-compliant MIDI parser/writer');
+            console.log('✅ 12 restoration modules');
+            console.log('✅ Built-in validation');
+            console.log('✅ Manual piano-roll editing: select, move, resize, delete, undo');
+            console.log('📖 Press H for help, V for validation');
+        }
+
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

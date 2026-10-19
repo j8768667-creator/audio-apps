@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0b1020">
+<title>ChordFlow</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#eef2ff;background:#0b1020;color-scheme:dark}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:#0b1020}
+body{min-height:100svh;overscroll-behavior:none}
+button,select,input{font:inherit}button,select{min-height:48px;touch-action:manipulation}
+button{border:1px solid #293654;border-radius:16px;background:#151d31;color:#eef2ff;padding:0 18px;cursor:pointer}
+button:active{transform:scale(.98)}button:disabled{opacity:.42;cursor:not-allowed}
+button.primary{background:#35b9f2;color:#07111c;border:0;font-weight:700}
+.app{min-height:100svh;padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(20px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));max-width:1500px;margin:auto}
+.panel{border:1px solid #293654;border-radius:22px;background:#11182a;padding:18px;margin-bottom:16px;box-shadow:0 8px 30px #0003}
+.top{display:flex;justify-content:space-between;align-items:center;gap:16px}.top h1{margin:0;font-size:30px}.top p{margin:4px 0 0;color:#9da8be}
+.statuses{display:flex;gap:8px;flex-wrap:wrap}.status{padding:12px 15px;border-radius:999px;background:#1d273b;color:#aeb8cb}
+.controls{display:grid;grid-template-columns:1fr 1fr 1.1fr auto auto auto;gap:12px;align-items:end}
+label{display:grid;gap:7px;color:#9da8be}select{background:#20202a;border:1px solid #39435a;border-radius:15px;padding:0 12px;color:#fff}
+input[type=range]{width:100%;min-height:48px;accent-color:#35b9f2}
+.heading{display:flex;justify-content:space-between;align-items:center;gap:12px}.heading h2{margin:0;font-size:20px}.heading p{margin:5px 0 0;color:#9da8be}
+.presets{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:15px}
+.preset{text-align:left;min-height:104px;padding:15px}.preset strong{display:block}.preset span{display:block;color:#aeb8cb;margin-top:9px;font-size:15px}.preset.selected{outline:2px solid #35b9f2;background:#18283a}
+.arrangement{display:grid;gap:10px;margin-top:15px}.empty{color:#8e99ae;padding:20px;border:1px dashed #33405a;border-radius:16px}
+.block{display:grid;grid-template-columns:40px 1fr auto auto;gap:10px;align-items:center;background:#182238;border:1px solid #2d3a55;border-radius:16px;padding:10px}
+.block .roman{font-weight:700}.block .notes{color:#9da8be;font-size:13px;margin-top:4px}
+.tracks>div{display:grid;grid-template-columns:120px 1fr 80px;gap:12px;align-items:center;margin:12px 0}.meter{height:10px;border-radius:10px;background:#24324c;overflow:hidden}.meter i{display:block;width:0;height:100%;background:#35b9f2}
+.message{position:fixed;left:50%;bottom:max(18px,env(safe-area-inset-bottom));transform:translate(-50%,150%);background:#172238;border:1px solid #33405a;padding:13px 18px;border-radius:14px;transition:transform .2s;z-index:20;white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis}.message.show{transform:translate(-50%,0)}
+@media(max-width:950px){.controls{grid-template-columns:1fr 1fr}.controls label:nth-child(3){grid-column:1/-1}.presets{grid-template-columns:1fr 1fr}}
+@media(max-width:620px){.top{align-items:flex-start;flex-direction:column}.controls{grid-template-columns:1fr}.presets{grid-template-columns:1fr}.heading{align-items:flex-start;flex-direction:column}.tracks>div{grid-template-columns:85px 1fr 76px}.block{grid-template-columns:30px 1fr auto auto}}
+</style>
+</head>
+<body>
+<main class="app">
+<header class="panel top">
+  <div><h1>ChordFlow</h1><p>Multitrack chord progression sequencer</p></div>
+  <div class="statuses"><span id="audioStatus" class="status">Audio locked</span><span id="playStatus" class="status">Stopped</span></div>
+</header>
+
+<section class="panel controls">
+  <label>Key<select id="key">
+    <option>C major</option><option>G major</option><option>D major</option><option>A major</option><option>E major</option><option>F major</option>
+    <option>A minor</option><option>E minor</option><option>D minor</option><option>C minor</option>
+  </select></label>
+  <label>Genre<select id="genre">
+    <option value="pop">Pop</option><option value="rock">Rock</option><option value="country">Country</option>
+    <option value="hiphop">Hip-Hop</option><option value="orchestral">Orchestral</option><option value="soundtrack">Soundtrack</option>
+  </select></label>
+  <label>BPM <span id="bpmText">100</span><input id="bpm" type="range" min="60" max="160" value="100"></label>
+  <button id="audio" class="primary">Enable Audio</button>
+  <button id="play" disabled>Play</button>
+  <button id="stop">Stop</button>
+</section>
+
+<section class="panel">
+  <div class="heading"><h2>Progression Library</h2><button id="random">Randomize</button></div>
+  <div id="presets" class="presets"></div>
+</section>
+
+<section class="panel">
+  <div class="heading">
+    <div><h2>Arrangement</h2><p>Tap a preset. Then use the arrows to reorder.</p></div>
+    <div><button id="import">Import MIDI</button><button id="export">Export MIDI</button><input id="midi" type="file" accept=".mid,.midi" hidden></div>
+  </div>
+  <div id="arrangement" class="arrangement"></div>
+</section>
+
+<section class="panel tracks">
+  <div><span>01 Chords</span><div class="meter"><i id="m0"></i></div><button data-track="0">Mute</button></div>
+  <div><span>02 Bass</span><div class="meter"><i id="m1"></i></div><button data-track="1">Mute</button></div>
+  <div><span>03 Melody</span><div class="meter"><i id="m2"></i></div><button data-track="2">Mute</button></div>
+  <div><span>04 Drums</span><div class="meter"><i id="m3"></i></div><button data-track="3">Mute</button></div>
+</section>
+<div id="message" class="message"></div>
+</main>
+
+<script>
+(function(){
+"use strict";
+
+/* ---------- local chord catalog: no imports, no CDN, no service worker ---------- */
+const CATALOG={
+ pop:[["I","V","vi","IV"],["vi","IV","I","V"],["I","vi","IV","V"],["I","IV","V","IV"]],
+ rock:[["I","bVII","IV","I"],["I","IV","bVII","IV"],["i","bVII","bVI","bVII"],["I","V","IV","I"]],
+ country:[["I","IV","V","I"],["I","V","vi","IV"],["I","IV","I","V"],["I","vi","IV","V"]],
+ hiphop:[["i7","bVI","bVII","i7"],["i","iv","bVII","bVI"],["i7","iv7","bVImaj7","V7"],["i","bVII","bVI","V"]],
+ orchestral:[["i","bVI","bIII","bVII"],["i","iv","bVI","V"],["I","IV","vi","V"],["i","bVII","bVI","V"]],
+ soundtrack:[["i","bVI","bIII","bVII"],["i","bVI","iv","V"],["i","bVII","bVI","V"],["I","V","vi","IV"]]
+};
+const ROOTS={C:0,G:7,D:2,A:9,E:4,F:5,B:11};
+const SCALE={major:[0,2,4,5,7,9,11],minor:[0,2,3,5,7,8,10]};
+const DEG={I:0,II:1,III:2,IV:3,V:4,VI:5,VII:6};
+
+function $(id){return document.getElementById(id)}
+function noteArray(roman,key){
+  const match=/^([A-G])([#b]?)[ ]+(major|minor)$/i.exec(key)||["","C","","major"];
+  let pc=ROOTS[match[1].toUpperCase()]||0;
+  if(match[2]==="#")pc++; if(match[2]==="b")pc--;
+  const mode=match[3].toLowerCase(), scale=SCALE[mode];
+  let s=roman.replace(/(maj7|m7|7|dim|sus4|sus2|add9)$/i,"");
+  let accidental=0;if(s[0]==="b"){accidental=-1;s=s.slice(1)}else if(s[0]==="#"){accidental=1;s=s.slice(1)}
+  const degree=(s.toUpperCase()||"I"), idx=DEG[degree]||0;
+  let root=(pc+scale[idx]+accidental+120)%12;
+  const minor=/^[iv]+/.test(s), seventh=/7/.test(roman), maj7=/maj7/i.test(roman);
+  let ints=maj7?[0,4,7,11]:seventh?[0,4,7,10]:minor?[0,3,7]:[0,4,7];
+  return ints.map(n=>(root+n)%12);
+}
+function progressions(genre){return (CATALOG[genre]||CATALOG.pop).map((r,i)=>({id:genre+"-"+i,name:genre[0].toUpperCase()+genre.slice(1)+" Pattern "+(i+1),roman:r}))}
+
+/* ---------- UI ---------- */
+let blocks=[], selectedId=null, timer=null, audioCtx=null, master=null, muted=[false,false,false,false], bpm=100;
+
+function toast(t){const m=$("message");m.textContent=t;m.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>m.classList.remove("show"),2200)}
+function renderPresets(){
+  const box=$("presets");box.replaceChildren();
+  progressions($("genre").value).forEach(p=>{
+    const b=document.createElement("button");b.className="preset"+(p.id===selectedId?" selected":"");
+    const strong=document.createElement("strong");strong.textContent=p.name;
+    const span=document.createElement("span");span.textContent=p.roman.join(" · ");
+    b.append(strong,span);b.onclick=function(){load(p)};box.appendChild(b);
+  });
+}
+function renderArrangement(){
+  const box=$("arrangement");box.replaceChildren();
+  if(!blocks.length){box.className="arrangement empty";box.textContent="Choose a progression above.";return}
+  box.className="arrangement";
+  blocks.forEach((b,i)=>{
+    const row=document.createElement("div");row.className="block";
+    const n=document.createElement("span");n.textContent=i+1;
+    const info=document.createElement("div");
+    const r=document.createElement("div");r.className="roman";r.textContent=b.roman;
+    const notes=document.createElement("div");notes.className="notes";notes.textContent="MIDI "+b.notes.map(x=>x+60).join(" · ");
+    info.append(r,notes);
+    const up=document.createElement("button");up.textContent="↑";up.disabled=i===0;up.onclick=function(){[blocks[i-1],blocks[i]]=[blocks[i],blocks[i-1]];renderArrangement()};
+    const down=document.createElement("button");down.textContent="↓";down.disabled=i===blocks.length-1;down.onclick=function(){[blocks[i+1],blocks[i]]=[blocks[i],blocks[i+1]];renderArrangement()};
+    row.append(n,info,up,down);box.append(row);
+  });
+}
+function load(p){
+  selectedId=p.id;
+  blocks=p.roman.map((r,i)=>({roman:r,notes:noteArray(r,$("key").value),index:i}));
+  renderPresets();renderArrangement();$("play").disabled=!audioCtx;toast("Loaded "+p.name);
+}
+
+/* ---------- audio: native Web Audio only ---------- */
+async function enableAudio(){
+  try{
+    const AC=window.AudioContext||window.webkitAudioContext;if(!AC)throw Error("Web Audio is not supported.");
+    if(!audioCtx){audioCtx=new AC();master=audioCtx.createGain();master.gain.value=.5;master.connect(audioCtx.destination)}
+    if(audioCtx.state!=="running")await audioCtx.resume();
+    if(audioCtx.state!=="running")throw Error("Audio is still locked. Tap Enable Audio again.");
+    $("audioStatus").textContent="Audio ready";$("audio").textContent="Audio Ready";$("audio").disabled=true;$("play").disabled=!blocks.length;toast("Audio unlocked");
+  }catch(e){toast(e.message)}
+}
+function hz(n){return 440*Math.pow(2,(n-69)/12)}
+function synth(note,dur,type,gain,track){
+  if(!audioCtx||audioCtx.state!=="running"||muted[track])return;
+  const now=audioCtx.currentTime,o=audioCtx.createOscillator(),g=audioCtx.createGain();
+  o.type=type;o.frequency.value=hz(note);
+  g.gain.setValueAtTime(.0001,now);g.gain.exponentialRampToValueAtTime(gain,now+.015);g.gain.exponentialRampToValueAtTime(.0001,now+dur);
+  o.connect(g).connect(master);o.start(now);o.stop(now+dur+.03);
+}
+function kick(){if(!audioCtx||muted[3])return;const now=audioCtx.currentTime,o=audioCtx.createOscillator(),g=audioCtx.createGain();o.frequency.setValueAtTime(130,now);o.frequency.exponentialRampToValueAtTime(45,now+.13);g.gain.setValueAtTime(.22,now);g.gain.exponentialRampToValueAtTime(.001,now+.18);o.connect(g).connect(master);o.start();o.stop(now+.2)}
+function playBlock(block,index){
+  const beat=60000/bpm;
+  block.notes.forEach(n=>synth(n+60,.65,"triangle",.045,0));
+  const bassTimes=$("genre").value==="rock"?[0,.5,1,1.5,2,2.5,3,3.5]:[0,1,2,3];
+  bassTimes.forEach(t=>setTimeout(()=>synth(block.notes[0]+36,.25,"sawtooth",.03,1),t*beat));
+  block.notes.forEach((n,j)=>{if(Math.random()>.3)setTimeout(()=>synth(n+72,.22,"sine",.028,2),j*beat)});
+  [0,1,2,3].forEach(t=>setTimeout(kick,t*beat));
+  [1,3].forEach(t=>setTimeout(()=>synth(38,.08,"square",.02,3),t*beat));
+  ["m0","m1","m2","m3"].forEach((id,i)=>{const el=$(id);el.style.width="100%";setTimeout(()=>el.style.width="0",120)});
+}
+function start(){
+  if(!audioCtx||audioCtx.state!=="running"){toast("Tap Enable Audio first");return}
+  if(!blocks.length){toast("Choose a progression first");return}
+  stop();let i=0;const interval=60000/bpm*4;
+  const tick=()=>{if(!timer)return;playBlock(blocks[i%blocks.length],i);$("playStatus").textContent="Playing "+(i%blocks.length+1)+"/"+blocks.length;i++;timer=setTimeout(tick,interval)}
+  timer=setTimeout(tick,0);
+}
+function stop(){if(timer){clearTimeout(timer);timer=null}$("playStatus").textContent="Stopped"}
+
+/* ---------- MIDI export: standard SMF ---------- */
+function vlq(n){let buffer=n&127,bytes=[];while(n>>=7){buffer<<=8;buffer|=(n&127)|128}for(;;){bytes.push(buffer&255);if(buffer&128)buffer>>=8;else break}return bytes}
+function u32(n){return[(n>>>24)&255,(n>>>16)&255,(n>>>8)&255,n&255]}
+function makeTrack(events,channel,program){
+  const a=[];if(program!==null)a.push(0,0xc0|channel,program);let last=0;
+  events.sort((x,y)=>x.time-y.time).forEach(e=>{const t=Math.max(0,Math.round(e.time*480)),d=Math.max(1,Math.round(e.duration*480));a.push(...vlq(t-last),0x90|channel,e.pitch,Math.round((e.velocity||.7)*127),...vlq(d),0x80|channel,e.pitch,0);last=t+d});
+  a.push(0,255,47,0);return a;
+}
+function exportMidi(){
+  if(!blocks.length){toast("Choose a progression first");return}
+  const chords=[],bass=[],melody=[],drums=[];
+  blocks.forEach((b,i)=>{b.notes.forEach(n=>chords.push({time:i*4,duration:3.5,pitch:n+60,velocity:.65}));bass.push({time:i*4,duration:3.5,pitch:b.notes[0]+36,velocity:.7});b.notes.forEach((n,j)=>melody.push({time:i*4+j*.5,duration:.35,pitch:n+72,velocity:.55}));[0,1,2,3].forEach(t=>drums.push({time:i*4+t,duration:.1,pitch:36,velocity:.75}))});
+  const tracks=[makeTrack(chords,0,0),makeTrack(bass,1,33),makeTrack(melody,2,24),makeTrack(drums,9,null)];
+  let bytes=[77,84,104,100,0,0,0,6,0,1,0,4,1,224];
+  tracks.forEach(t=>bytes.push(77,84,114,107,...u32(t.length),...t));
+  const url=URL.createObjectURL(new Blob([new Uint8Array(bytes)],{type:"audio/midi"})),a=document.createElement("a");a.href=url;a.download="chordflow.mid";document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);toast("MIDI exported");
+}
+
+/* ---------- wiring ---------- */
+$("audio").onclick=enableAudio;
+$("play").onclick=start;
+$("stop").onclick=stop;
+$("random").onclick=function(){const p=progressions($("genre").value)[Math.floor(Math.random()*4)];load(p)};
+$("genre").onchange=function(){selectedId=null;renderPresets()};
+$("key").onchange=function(){if(selectedId){const p=progressions($("genre").value).find(x=>x.id===selectedId);if(p)load(p)}};
+$("bpm").oninput=function(){bpm=Number(this.value);$("bpmText").textContent=bpm};
+document.querySelectorAll(".tracks button").forEach(b=>b.onclick=function(){const i=Number(this.dataset.track);muted[i]=!muted[i];this.textContent=muted[i]?"Unmute":"Mute";});
+$("export").onclick=exportMidi;
+$("import").onclick=function(){$("midi").click()};
+$("midi").onchange=function(){const f=this.files&&this.files[0];if(f){toast("MIDI selected: "+f.name+" (import parser will be added after the baseline UI is confirmed)")}this.value=""};
+
+window.addEventListener("pagehide",stop);
+bpm=100;$("bpmText").textContent="100";
+renderPresets();renderArrangement();
+})();
+</script>
+</body>
+</html>

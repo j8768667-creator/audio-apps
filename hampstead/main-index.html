@@ -1,0 +1,605 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hampstead</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&display=swap">
+<style>
+/* Layout: wide = story with docked controls on the left, map and bag rail on the right; narrow = three tabbed panes. */
+:root{
+  --bg:#ECEFEA; --surface:#F8F9F6; --ink:#17201D; --muted:#5A6760; --line:#C9D0C9; --soft:#E0E6DF;
+  --plaque:#1C4A8A; --plaque-ink:#F4F7FC; --good:#2B6A47; --bad:#9C3F2B;
+  --display:'Barlow Condensed','Arial Narrow',sans-serif;
+  --ui:'Barlow',system-ui,-apple-system,sans-serif;
+  --read:'Libre Caslon Text',Georgia,'Times New Roman',serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E1412; --surface:#161F1B; --ink:#E7ECE7; --muted:#92A098; --line:#2A3630; --soft:#1F2B26;
+    --plaque:#5B8FD8; --plaque-ink:#0A111F; --good:#6CBF93; --bad:#E58B73; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E1412; --surface:#161F1B; --ink:#E7ECE7; --muted:#92A098; --line:#2A3630; --soft:#1F2B26;
+  --plaque:#5B8FD8; --plaque-ink:#0A111F; --good:#6CBF93; --bad:#E58B73; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; background:var(--bg); color:var(--ink); font-family:var(--ui); font-size:17px;
+  padding-block:12px; padding-left:max(16px,env(safe-area-inset-left,0px)); padding-right:max(16px,env(safe-area-inset-right,0px));
+  -webkit-text-size-adjust:100%;
+}
+button{font:inherit; color:inherit; cursor:pointer; -webkit-tap-highlight-color:transparent}
+button:focus-visible,input:focus-visible{outline:3px solid var(--plaque); outline-offset:2px}
+
+.app{height:100%; display:grid; grid-template-columns:minmax(0,1fr) 310px; grid-template-rows:auto auto minmax(0,1fr); gap:12px 18px}
+.top{grid-column:1/-1; display:flex; align-items:center; gap:14px 26px; flex-wrap:wrap}
+.plaque{
+  background:var(--plaque); color:var(--plaque-ink); border-radius:999px; padding:7px 24px 8px; text-align:center;
+  box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--plaque); margin:4px;
+}
+.plaque b{display:block; font-family:var(--display); font-size:27px; font-weight:700; letter-spacing:.16em; line-height:1.05}
+.plaque span{display:block; font-family:var(--display); font-size:11.5px; font-weight:600; letter-spacing:.2em; text-transform:uppercase; opacity:.92}
+.stats{display:flex; align-items:flex-end; gap:12px 28px; flex:1; min-width:0; flex-wrap:wrap}
+.stat{min-width:0}
+.lab{font-family:var(--display); font-size:12.5px; font-weight:600; letter-spacing:.16em; text-transform:uppercase; color:var(--muted)}
+.val{font-family:var(--display); font-size:28px; font-weight:600; line-height:1.1; font-variant-numeric:tabular-nums}
+.stand{flex:1 1 280px; max-width:460px}
+.stand .row{display:flex; align-items:baseline; gap:10px}
+.rung{font-family:var(--ui); font-size:15px; font-weight:500; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.bar{position:relative; height:9px; background:var(--soft); border-radius:99px; margin-top:6px; overflow:hidden}
+.bar i{position:absolute; inset:0 auto 0 0; background:var(--plaque); border-radius:99px; transition:width .35s}
+.bar u{position:absolute; top:0; bottom:0; width:2px; background:var(--bg)}
+
+.tabs{display:none; grid-column:1/-1; grid-template-columns:repeat(3,1fr); gap:8px}
+.tabs button{min-height:46px; border:1.5px solid var(--line); border-radius:12px; background:var(--surface); font-family:var(--display); font-size:17px; font-weight:600; letter-spacing:.12em; text-transform:uppercase}
+.tabs button[aria-pressed="true"]{background:var(--ink); color:var(--bg); border-color:var(--ink)}
+
+.story{display:flex; flex-direction:column; min-height:0; min-width:0; background:var(--surface); border:1px solid var(--line); border-radius:16px; overflow:hidden}
+#log{position:relative; flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:10px 28px 22px; -webkit-overflow-scrolling:touch}
+#log>*{max-width:64ch}
+.p{font-family:var(--read); font-size:20px; line-height:1.62; margin:0 0 .85em}
+.p em{font-style:italic}
+.p.aside{color:var(--muted); font-size:18px; font-style:italic}
+.p.lede{font-size:22px}
+.kicker{font-family:var(--display); font-size:14px; letter-spacing:.2em; text-transform:uppercase; color:var(--plaque); font-weight:600; margin:18px 0 6px}
+.tip{font-family:var(--ui); font-size:15.5px; color:var(--muted); border-top:1px solid var(--line); padding-top:12px; margin-top:6px}
+.loc{display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; border-top:2px solid var(--ink); margin:26px 0 12px; padding-top:8px}
+.loc h2{margin:0; font-family:var(--display); font-size:30px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; line-height:1.1; text-wrap:balance}
+.loc .sub{font-family:var(--display); font-size:14px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted); font-weight:500}
+.cmd{font-family:var(--ui); font-size:15.5px; color:var(--muted); margin:16px 0 8px; padding-left:12px; border-left:3px solid var(--plaque)}
+.delta{display:inline-block; font-size:14.5px; font-weight:600; padding:2px 11px; margin:0 8px 12px 0; border-radius:99px; border:1.5px solid currentColor; font-variant-numeric:tabular-nums}
+.delta.good{color:var(--good)} .delta.bad{color:var(--bad)}
+.choices{display:flex; flex-wrap:wrap; gap:8px; margin:0 0 14px}
+.end{border:2px solid var(--plaque); border-radius:16px; padding:6px 22px 18px; margin:22px 0 8px}
+.end h3{font-family:var(--display); font-size:34px; letter-spacing:.08em; text-transform:uppercase; margin:12px 0 4px; color:var(--plaque)}
+.end .score{font-family:var(--display); font-size:19px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin-bottom:12px}
+.end ul{list-style:none; padding:0; margin:0 0 14px; font-size:16px}
+.end li{display:flex; gap:12px; padding:5px 0; border-bottom:1px solid var(--line)}
+.end li b{min-width:44px; font-variant-numeric:tabular-nums}
+
+.dock{border-top:1px solid var(--line); padding:12px 16px 14px; display:grid; gap:10px; max-height:50%; overflow-y:auto; background:var(--surface)}
+.exits{display:grid; grid-template-columns:repeat(auto-fit,minmax(168px,1fr)); gap:8px}
+.exit{display:flex; align-items:center; gap:10px; min-height:52px; padding:6px 14px 6px 8px; text-align:left; border:1.5px solid var(--line); background:var(--bg); border-radius:14px; font-size:17px; font-weight:500}
+.dir{flex:none; min-width:32px; height:32px; padding:0 6px; display:grid; place-items:center; border-radius:99px; background:var(--ink); color:var(--bg); font-family:var(--display); font-size:14.5px; font-weight:700; letter-spacing:.06em}
+.acts{display:flex; flex-wrap:wrap; gap:8px}
+.act,.go{min-height:48px; padding:0 20px; border-radius:99px; border:1.5px solid var(--plaque); color:var(--plaque); background:transparent; font-size:17px; font-weight:600}
+.sys{display:flex; flex-wrap:wrap; gap:8px}
+.ghost{min-height:44px; padding:0 16px; border-radius:12px; border:1.5px solid var(--line); background:transparent; font-size:15.5px; font-weight:500; color:var(--muted)}
+.cmdline{display:flex; gap:8px}
+.cmdline input{flex:1; min-width:0; min-height:48px; padding:0 16px; font:inherit; font-size:18px; color:var(--ink); background:var(--bg); border:1.5px solid var(--line); border-radius:14px}
+.cmdline input::placeholder{color:var(--muted)}
+.go{background:var(--plaque); color:var(--plaque-ink)}
+.exit:active,.act:active,.ghost:active,.go:active{transform:scale(.975)}
+@media (hover:hover){
+  .exit:hover{border-color:var(--plaque)} .act:hover{background:var(--plaque); color:var(--plaque-ink)} .ghost:hover{color:var(--ink); border-color:var(--ink)}
+}
+
+.side{display:flex; flex-direction:column; gap:12px; min-height:0; min-width:0; overflow-y:auto}
+.card{background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:14px 16px 16px}
+.card h3{margin:0 0 8px; font-family:var(--display); font-size:15px; font-weight:600; letter-spacing:.18em; text-transform:uppercase; color:var(--muted)}
+#map{display:block; width:100%; height:auto}
+.mnode{fill:var(--surface); stroke:var(--ink); stroke-width:2}
+.mnode.here{fill:var(--plaque); stroke:var(--plaque)}
+.mnode.fog{fill:none; stroke:var(--muted); stroke-dasharray:3 3; stroke-width:1.5}
+.mring{fill:none; stroke:var(--plaque); stroke-width:1.5; opacity:.45}
+.medge{stroke:var(--line); stroke-width:2.5; stroke-linecap:round}
+.mlab{font-family:var(--display); font-size:12.5px; font-weight:600; letter-spacing:.09em; text-transform:uppercase; fill:var(--ink)}
+.mlab.here{fill:var(--plaque); font-weight:700}
+.mnote{font-family:var(--display); font-size:13px; font-weight:700; fill:var(--muted); letter-spacing:.1em}
+.bag{list-style:none; margin:0; padding:0; display:grid; gap:6px}
+.bag button{width:100%; min-height:46px; display:flex; justify-content:space-between; align-items:center; gap:8px; padding:6px 12px; text-align:left; border:1px solid var(--line); border-radius:12px; background:var(--bg); font-size:16.5px}
+.bag .tag{font-family:var(--display); font-size:12.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--plaque); font-weight:700}
+.money{margin:10px 0 0; font-size:15.5px; color:var(--muted)}
+.notes{list-style:none; margin:0; padding:0; display:grid; gap:8px; font-size:15.5px; line-height:1.4}
+.notes li{padding-left:12px; border-left:3px solid var(--line)}
+.empty{color:var(--muted); font-size:15.5px; margin:0}
+.restart{align-self:flex-start}
+
+@media (max-width:899px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  .tabs{display:grid}
+  .story,.side{grid-column:1}
+  .app[data-pane="story"] .side{display:none}
+  .app[data-pane="map"] .story,.app[data-pane="bag"] .story{display:none}
+  .app[data-pane="map"] .bagc,.app[data-pane="bag"] .mapc{display:none}
+  .app[data-pane="map"] .side,.app[data-pane="bag"] .side{overflow:visible}
+  #log{padding:6px 18px 18px}
+  .p{font-size:19px}
+  .val{font-size:25px}
+}
+@media (prefers-reduced-motion:reduce){.bar i{transition:none} .exit:active,.act:active,.ghost:active,.go:active{transform:none}}
+</style>
+</head>
+<body>
+
+<div class="app" id="app" data-pane="story">
+  <header class="top">
+    <div class="plaque"><b>HAMPSTEAD</b><span>N.W.3 · A Social Ascent</span></div>
+    <div class="stats">
+      <div class="stat stand">
+        <div class="lab">Standing</div>
+        <div class="row"><span class="val" id="stand">5</span><span class="rung" id="rung"></span></div>
+        <div class="bar" id="barwrap"><i id="bar"></i></div>
+      </div>
+      <div class="stat"><div class="lab">Cash</div><div class="val" id="cash">£21.80</div></div>
+      <div class="stat"><div class="lab">Sat 14 June 1986</div><div class="val" id="clock">09:00</div></div>
+    </div>
+  </header>
+
+  <nav class="tabs" aria-label="Panels">
+    <button type="button" data-pane="story" aria-pressed="true">Story</button>
+    <button type="button" data-pane="map" aria-pressed="false">Map</button>
+    <button type="button" data-pane="bag" aria-pressed="false">Bag</button>
+  </nav>
+
+  <section class="story" aria-label="Story">
+    <div id="log" role="log" aria-live="polite"></div>
+    <div class="dock">
+      <div class="exits" id="exits"></div>
+      <div class="acts" id="acts"></div>
+      <div class="sys" id="sys"></div>
+      <form class="cmdline" id="cmd" autocomplete="off">
+        <input id="in" type="text" placeholder="Or type what you want to do, e.g. buy paper" enterkeyhint="go" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" aria-label="Type a command">
+        <button class="go" type="submit">Go</button>
+      </form>
+    </div>
+  </section>
+
+  <aside class="side">
+    <div class="card mapc"><h3>The Village</h3><svg id="map" viewBox="0 0 300 360" role="img" aria-label="Map of Hampstead"></svg></div>
+    <div class="card bagc">
+      <h3>Bag</h3>
+      <ul class="bag" id="bag"></ul>
+      <p class="money" id="money"></p>
+      <h3 style="margin-top:16px">Filofax</h3>
+      <ul class="notes" id="notes"></ul>
+      <button class="ghost restart" id="restart" type="button" style="margin-top:16px">New game</button>
+    </div>
+  </aside>
+</div>
+
+<script>
+(function(){
+'use strict';
+var KEY='hampstead-1986-save-v1';
+var START_CASH=2180, OPEN=30, SHUT=510, PARTY=630, LATE=720;
+var $=function(s){return document.querySelector(s)};
+var pad=function(n){return String(n).padStart(2,'0')};
+var money=function(p){return '£'+(Math.abs(p)/100).toFixed(2)};
+var clock=function(t){var m=540+t;return pad(Math.floor(m/60)%24)+':'+pad(m%60)};
+var LADDER=[[0,'Off the Northern Line'],[15,'Seen on the Heath'],[30,'Known to the Newsagent'],[45,'Nodded at in the Deli'],[60,'Recognised at the Flask'],[75,'Provisionally Interesting'],[90,'Church Row']];
+var rung=function(n){var r=LADDER[0][1];LADDER.forEach(function(l){if(n>=l[0])r=l[1]});return r};
+
+var ITEMS={
+  filofax:['Filofax','Black, gilt-edged, and containing exactly one number: your mother’s.'],
+  ham:['Ham & High','This week’s local paper, already creased by someone with opinions.'],
+  keats_book:['Collected Keats','A second-hand paperback. Someone has underlined the word “fever” twice.'],
+  straws:['Cheese straws','A paper bag of them, still warm. Dogs have committed worse crimes for less.'],
+  wine:['Pommard','A bottle of red Burgundy with a label that suggests it knows things.'],
+  liebfraumilch:['Liebfraumilch','Sweet, German, and priced to be forgiven.'],
+  blazer:['Navy blazer','Gilt buttons, a little stiff. It makes you look like someone’s idea of a godfather.'],
+  invitation:['Invitation','A stiff white card. Lady Ottoline Fane. Number 9, Church Row. Half past seven.']
+};
+
+var S;
+function fresh(){return {v:1,loc:'station',t:0,standing:5,cash:START_CASH,inv:['filofax'],flags:{},visited:{station:1},log:[],end:null}}
+var has=function(id){return S.inv.indexOf(id)>-1};
+var give=function(id){if(!has(id))S.inv.push(id)};
+var drop=function(id){S.inv=S.inv.filter(function(x){return x!==id})};
+var adv=function(m){S.t+=m};
+function say(h,c){S.log.push({k:'p',h:h,c:c||''})}
+function stand(n){S.standing=Math.max(0,Math.min(100,S.standing+n));S.log.push({k:'delta',h:(n>=0?'+':'−')+Math.abs(n)+' Standing',tone:n>=0?'good':'bad'})}
+function earn(p){S.cash+=p;S.log.push({k:'delta',h:'+'+money(p),tone:'good'})}
+function pay(p){
+  if(S.cash<p){say('You count your money twice. It stays at '+money(S.cash)+'. You need '+money(p)+'.','aside');return false}
+  S.cash-=p;S.log.push({k:'delta',h:'−'+money(p),tone:'bad'});return true;
+}
+var open=function(){return S.t>=OPEN&&S.t<SHUT};
+var tarquinHere=function(){return S.t>=120&&S.t<360};
+function A(label,kw,run,grp){return {label:label,kw:kw||'',run:run,grp:grp||'do'}}
+
+/* ---------- World ---------- */
+var LOC={
+ station:{n:'Hampstead Station',m:'Station',s:'Northern Line · 55 m down',x:150,y:195,
+  ex:[{d:'n',to:'heath_st',l:'Heath Street'},{d:'s',to:'high_st',l:'High Street'}],
+  d:function(){return 'The lift gates clatter open and the deepest station on the Underground releases you into the light, slightly pale. Behind you the lift attendant is reading a paperback with the contentment of a man who has watched everyone arrive and no one leave. Heath Street climbs north. The High Street slopes away south. By the exit, a newsagent’s stand holds a stack of the <em>Ham &amp; High</em>.'},
+  a:function(){var r=[];
+   if(!has('ham')&&!S.flags.read)r.push(A('Buy the Ham & High (30p)','buy paper newspaper ham high news',function(){if(!pay(30))return;give('ham');adv(5);say('The newsagent hands it over at the speed of a man who has handed over a great many and approved of none.')}));
+   r.push(A('Talk to the lift attendant','talk lift attendant man ask',function(){adv(5);
+     if(!S.flags.lift){S.flags.lift=1;say('‘Church Row?’ He lowers the paperback an inch. ‘Down the High Street, then left. Sorry, right. West. Number 9 has the blue door, and has never once opened it to anyone who wasn’t expected.’ He raises the paperback again. The conversation has been, for him, a considerable event.')}
+     else say('He turns a page. It is the most eloquent thing he has said all day.')}));
+   return r}},
+ heath_st:{n:'Heath Street',m:'Heath St',s:'NW3',x:150,y:120,
+  ex:[{d:'s',to:'station',l:'Station'},{d:'n',to:'pond',l:'Whitestone Pond'},{d:'w',to:'deli',l:'Le Petit Pain',k:'deli shop enter'},{d:'e',to:'bookshop',l:'Dunsany & Hale',k:'bookshop books enter'}],
+  d:function(){return 'Heath Street climbs between shopfronts that have never needed a sale. A deli to the west has a window full of things that are not quite food yet. To the east a second-hand bookshop has a tabby asleep across the threshold. Northward the road gives up on commerce and turns toward the Heath. The station is back down the hill.'},
+  a:function(){return []}},
+ deli:{n:'Le Petit Pain',m:'Deli',s:'Heath Street',x:75,y:120,shop:1,parent:'heath_st',
+  ex:[{d:'out',to:'heath_st',l:'Back to Heath Street'}],
+  d:function(){return 'A narrow deli lit like a jeweller’s. A woman in an apron the colour of clotted cream regards you the way a customs officer regards a suitcase. Cheeses sit under glass domes. Along one wall is a short shelf of wine arranged by price, the dear end facing the door.'},
+  a:function(){var r=[],F=S.flags;
+   if(!has('straws'))r.push(A('Buy cheese straws (£1.50)','buy cheese straws bag',function(){if(!pay(150))return;give('straws');adv(5);say('She twists the paper bag shut with great finality. ‘Gruyère,’ she says. ‘Not for dogs.’ You thank her for the warning.')}));
+   if(!has('wine'))r.push(A('Buy the Pommard (£14.00)','buy pommard burgundy red wine expensive',function(){if(!pay(1400))return;give('wine');adv(5);say('‘A sound choice,’ she says, in the voice of someone granting a pardon.')}));
+   if(!has('wine')&&!has('liebfraumilch'))r.push(A('Buy the Liebfraumilch (£2.99)','buy liebfraumilch cheap wine german white',function(){if(!pay(299))return;give('liebfraumilch');adv(5);say('She wraps it. She says nothing at all. It is the loudest thing she has said all morning.')}));
+   if(!F.wineAdvice)r.push(A('Ask what to bring to a party','ask advice wine party bring',function(){F.wineAdvice=1;adv(5);say('‘For a house like that? The Pommard.’ She lifts the other bottle by its neck, briefly, like evidence. ‘The Liebfraumilch is what people bring when they would like to be forgotten.’')}));
+   return r}},
+ bookshop:{n:'Dunsany & Hale',m:'Bookshop',s:'Booksellers · Heath Street',x:225,y:120,shop:1,parent:'heath_st',
+  ex:[{d:'out',to:'heath_st',l:'Back to Heath Street'}],
+  d:function(){return 'Paperbacks from floor to ceiling, a ladder, a cat, and a proprietor who speaks only to customers he approves of. The poetry shelf is at eye level, which is unusual and a little hopeful.'},
+  a:function(){var r=[],F=S.flags;
+   if(!has('keats_book')&&!F.keats)r.push(A('Buy the Collected Keats (£2.00)','buy keats book poetry paperback',function(){if(!pay(200))return;give('keats_book');adv(5);say('The proprietor takes your money without looking at it, then looks at you, once, in a way that suggests you are on probation.')}));
+   if(!F.browsed)r.push(A('Browse the poetry shelf','browse poetry shelf look books',function(){F.browsed=1;adv(10);say('You learn that Keats lived round the corner, that he died in Rome at twenty-five, and that this is considered a perfectly normal thing to know in these parts.')}));
+   return r}},
+ pond:{n:'Whitestone Pond',m:'Whitestone Pond',s:'The Heath · NW3',x:150,y:45,
+  ex:[{d:'s',to:'heath_st',l:'Heath Street'},{d:'e',to:'kenwood',l:'Kenwood (across the Heath)',k:'kenwood house path'}],
+  d:function(){var F=S.flags;return 'At the top of the hill a small round pond sits in a green saucer, ringed by benches and men with radio-controlled boats. The air is suddenly four degrees cleaner. London lies below, sulking in haze. '+((!F.dogWith&&!F.dogReturned)?'Under the nearest bench, something small, beige and furious is looking at you.':'Under the nearest bench there is only a dent in the grass the shape of a Pekingese’s resentment.')},
+  a:function(){var r=[],F=S.flags;
+   if(!F.dogWith&&!F.dogReturned){
+     if(has('straws'))r.push(A('Coax the dog with cheese straws','coax dog cheese straws offer feed bartholomew',function(){drop('straws');F.dogWith=1;adv(10);say('Bartholomew considers the straw, then your character, then the straw. He takes it with the delicacy of a bishop accepting a cheque. Within a minute he is at your heel, tail curled like a question mark that has been answered in his favour.')}));
+     r.push(A('Pick up the dog','pick up dog grab bartholomew',function(){adv(10);stand(-2);say('Bartholomew bites you on the thumb with the precision of a surgeon and returns to the bench. A man with a model yacht pretends not to have seen.')}));
+   }
+   return r}},
+ kenwood:{n:'Kenwood House',m:'Kenwood',s:'The Iveagh Bequest',x:255,y:45,
+  ex:[{d:'w',to:'pond',l:'Whitestone Pond'}],
+  d:function(){return 'A white mansion rises from the lawn like a wedding cake that has been to university. Inside, the Iveagh Bequest hangs on the walls: a Vermeer, some Gainsboroughs, and an old man in a cap who looks at you as though you owe him money.'},
+  a:function(){var r=[];
+   if(!S.flags.art)r.push(A('Study the Rembrandt (20 min)','study rembrandt self portrait painting art',function(){S.flags.art=1;adv(20);say('You stand in front of the self-portrait until you can say something. The something is: ‘He has painted himself without vanity, which is the most vain thing a man can do.’ You have no idea whether this is true. It will go down very well.');stand(5)}));
+   return r}},
+ high_st:{n:'Hampstead High Street',m:'High St',s:'NW3',x:150,y:265,
+  ex:[{d:'n',to:'station',l:'Station'},{d:'w',to:'church_row',l:'Church Row'},{d:'e',to:'flask',l:'Flask Walk',k:'flask pub'},{d:'s',to:'keats',l:'Keats Grove',k:'keats house downshire hill'},{d:'in',to:'boutique',l:'Hennessy & Dunn',k:'boutique clothes shop enter'},{d:'in',to:'salon',l:'Maurice et Fils',k:'salon hairdresser barber shop enter'}],
+  d:function(){return 'The High Street bends downhill past a bank, a chemist, an estate agent and two shops selling the same cardigan at different moral levels. A cash machine is set into the wall of the bank. Flask Walk slips off to the east, Church Row lies to the west, and Downshire Hill drops south toward Keats Grove.'},
+  a:function(){var r=[],F=S.flags;
+   r.push(A('Use the cash machine','use cash machine atm bank withdraw money',function(){adv(5);
+     if(!F.atm){F.atm=1;say('The machine considers your account for a long moment and releases twenty pounds, as one might release a trout.');earn(2000)}
+     else say('The screen says <em>Daily limit reached</em>. It sounds pleased about it.')}));
+   if(!F.prices)r.push(A('Study the estate agent’s window','study estate agent window house prices look',function(){F.prices=1;adv(5);say('A two-bedroom flat is £189,950. You earn £6,100 a year. You do the sum, feel faint, and decide this is exactly the information you will want at a party.');stand(1)}));
+   return r}},
+ boutique:{n:'Hennessy & Dunn',m:'Boutique',s:'Gentlemen’s Outfitters',x:222,y:232,shop:1,parent:'high_st',
+  ex:[{d:'out',to:'high_st',l:'Back to the High Street'}],
+  d:function(){return 'Carpet that swallows footsteps. A rail of blazers in a single, confident shade of navy. The assistant, a young man in a very good suit, says ‘sir’ in a way that carries a full costing.'},
+  a:function(){var r=[],F=S.flags;
+   if(!has('blazer')&&!F.worn)r.push(A('Buy the navy blazer (£22.00)','buy navy blazer jacket clothes',function(){if(!pay(2200))return;give('blazer');adv(10);say('The assistant folds it into tissue paper with great tenderness, as if it were a baby. ‘Sir will find it draws the eye away from the rest of him,’ he says.')}));
+   return r}},
+ salon:{n:'Maurice et Fils',m:'Salon',s:'Gentlemen & Ladies',x:222,y:308,shop:1,parent:'high_st',
+  ex:[{d:'out',to:'high_st',l:'Back to the High Street'}],
+  d:function(){return 'Three mirrors, a boy with a broom, and Maurice, who is from Croydon and has never once been to France. He looks at your head the way a surveyor looks at a ceiling.'},
+  a:function(){var r=[];
+   if(!S.flags.hair)r.push(A('Get a haircut (£8.00, 40 min)','get haircut hair cut barber',function(){if(!pay(800))return;S.flags.hair=1;adv(40);say('‘Something for the weekend?’ says Maurice, to no one. Forty minutes later you emerge with the sides of an accountant and the front of a minor poet. The mirror, for once, is not sceptical.');stand(8)}));
+   return r}},
+ flask:{n:'The Flask',m:'The Flask',s:'Flask Walk',x:222,y:270,
+  ex:[{d:'w',to:'high_st',l:'High Street'}],
+  d:function(){
+   if(tarquinHere())return 'A low brown pub of the kind that has been listed so the council can stop it improving. At a corner table by the window Tarquin Peake, society diarist, is making something on a notepad look like work. The place smells of gin and ambition.';
+   if(S.t<120)return 'The pub has only just opened. The corner table by the window is empty, with a glass ring on it and a strong sense that Tarquin has not arrived yet.';
+   return 'The corner table by the window is empty. Tarquin has gone, leaving a glass ring and several rumours in the air.'},
+  a:function(){var r=[],F=S.flags;
+   if(tarquinHere()&&!F.tarquin)r.push(A('Buy Tarquin a large gin (£3.20)','buy tarquin gin drink talk peake',function(){if(!pay(320))return;F.tarquin=1;F.etiq=1;F.rudge=1;adv(30);
+     say('Tarquin takes the gin the way a tide takes a sandcastle. ‘Rule one,’ he says. ‘It is <em>how do you do</em>. Never <em>pleased to meet you</em>. And nobody in that house has a lounge, a serviette or a pardon.’');
+     say('‘Rule two. Sir Julian Fane adores precisely one man alive: his squash partner, Gideon Rudge. Say Gideon sent you and doors open. Say it to the wrong person and they will ring Gideon.’ He finishes the gin. ‘You did not hear it from me. You heard it from everyone.’');stand(4)}));
+   if(tarquinHere()&&F.dogWith&&!F.tarqDog)r.push(A('Show Tarquin the dog','show tarquin dog bartholomew',function(){F.tarqDog=1;adv(5);say('‘Good God,’ says Tarquin, putting down his pen. ‘That is Ottoline’s Pekingese.’ He looks at you with new and slightly frightening interest. ‘I shall say nothing. Obviously I shall say everything.’');stand(3)}));
+   return r}},
+ keats:{n:'Keats House',m:'Keats House',s:'Keats Grove',x:150,y:335,
+  ex:[{d:'n',to:'high_st',l:'High Street'}],
+  d:function(){return 'A white Regency villa behind a garden with a mulberry and a plum tree. A young man lived here and wrote things that outlasted everything the local authority has since built. A volunteer in a cardigan sits at the door with the ticket book of a person who has never been rushed.'},
+  a:function(){var r=[];
+   if(!S.flags.keatsTour)r.push(A('Take the tour (50p, 30 min)','take tour keats house ticket visit',function(){if(!pay(50))return;S.flags.keatsTour=1;adv(30);
+     if(S.flags.keats){say('You see the plum tree, the front room, the small bed. You knew most of it already, but the cardigan is delighted by you.')}
+     else{S.flags.keats=1;say('You are shown the plum tree, the front room and the very small bed. The volunteer tells you where the poem was written and exactly how many people have wept there. You leave able to mention Keats at the correct moment in a sentence.');stand(5)}}));
+   return r}},
+ church_row:{n:'Church Row',m:'Church Row',s:'NW3',x:75,y:265,
+  ex:[{d:'e',to:'high_st',l:'High Street'},{d:'w',to:'churchyard',l:'St John’s churchyard',k:'church churchyard'}],
+  d:function(){var late=S.t>=PARTY;return 'A street of Georgian terraces so correct that the lime trees seem to have been consulted. Number 9 has a blue door and a brass knocker in the shape of a fist holding a rose. '+(late?'Every window is lit and someone inside is laughing at the right volume.':'The curtains are drawn against the day, as though the house has seen enough of it.')+' At the western end the church tower looks down on everything with the patience of the long-dead.'},
+  a:function(){var r=[],F=S.flags;
+   if(F.dogWith)r.push(A('Return Bartholomew at No. 9','ring bell return dog bartholomew door knock no 9 lady fane',returnDog));
+   else if(!F.invited&&!F.onlist)r.push(A('Ring the bell at No. 9','ring bell door knock no 9 pettigrew butler',ringBell));
+   if(F.rudge&&!F.invited&&!F.onlist&&!F.dogWith)r.push(A('Say Gideon Rudge sent you','say gideon rudge name drop sent',nameDrop));
+   if(F.invited||F.onlist)r.push(A('Present yourself at the door','present yourself door enter party go in no 9',door));
+   return r}},
+ churchyard:{n:'St John’s Churchyard',m:'Churchyard',s:'Church Row',x:30,y:310,
+  ex:[{d:'e',to:'church_row',l:'Church Row'}],
+  d:function(){var s='Leaning tombstones, wet grass, and a bench occupied by Mrs Tilling, who has been here since the 1950s and is expected to be buried here as well. Constable’s tomb is nearby, mild and rarely visited.';
+   if(!S.flags.fiver)s+=' Under the bench lies a crisp five pound note, folded as though someone meant it as a tip.';return s},
+  a:function(){var r=[],F=S.flags;
+   if(!F.fiver)r.push(A('Pick up the fiver','pick up take fiver five pound note money',function(){F.fiver=1;adv(5);say('You pick it up. Mrs Tilling watches you with the expression of someone who put it there in 1974.');earn(500)}));
+   if(!F.tilling)r.push(A('Sit with Mrs Tilling (20 min)','sit talk mrs tilling bench ask',function(){F.tilling=1;adv(20);
+     say('‘Ottoline?’ says Mrs Tilling. ‘Adores that dog. Cannot abide her husband’s friends. Marvellous woman.’ She pats the bench. ‘You must say you have read something, dear. It does not matter what. If you say nothing at all, they assume you are in banking.’');stand(3)}));
+   return r}}
+};
+
+var NOTES=[
+ ['read','Tonight: Lady Fane’s party, No. 9 Church Row, 7.30, by card only.'],
+ ['read','Bartholomew, her Pekingese, is missing near Whitestone Pond.'],
+ ['read','Tarquin Peake drinks at the Flask from eleven.'],
+ ['wineAdvice','Take the Pommard. Never the Liebfraumilch.'],
+ ['etiq','Say “How do you do”. Never “pleased to meet you”, “pardon” or “serviette”.'],
+ ['rudge','Name to drop at the door: Gideon Rudge, Sir Julian’s squash partner.'],
+ ['tilling','Lady Fane adores the dog. Say you have read something.'],
+ ['atm','Cash machine: one withdrawal a day.']
+];
+
+/* ---------- Core ---------- */
+function describe(){
+  var L=LOC[S.loc];
+  S.log.push({k:'loc',n:L.n,s:L.s});
+  say(L.d());
+  if(S.flags.dogWith)say('Bartholomew trots at your heel with the expression of a duke persuaded to use public transport.','aside');
+}
+function go(e){
+  var to=LOC[e.to];
+  if(to.shop&&!open()){say('<em>'+to.n+'</em> is shut. A card on the door says <em>Open 9.30 to 5.30</em>, in the handwriting of someone who enjoys saying no.','aside');return}
+  adv(10);S.loc=e.to;S.visited[e.to]=1;describe();
+}
+var DIRW={n:'n north up',s:'s south down',e:'e east',w:'w west','in':'in enter inside go',out:'out leave exit back'};
+function exitAction(e){return A(e.l,(DIRW[e.d]||'')+' '+(e.k||'')+' '+e.l,function(){go(e)},'move')}
+function sysActions(){return [
+  A('Look around','look l around describe',function(){describe()},'sys'),
+  A('Bag','bag inventory i items',function(){bagSay()},'sys'),
+  A('Hint','hint help clue stuck',function(){say(hint(),'aside')},'sys'),
+  A('Wait ten minutes','wait z rest',function(){adv(10);say('Ten minutes pass in the Hampstead manner: slowly, and with a view.','aside')},'sys')
+]}
+function itemActions(){var r=[],F=S.flags;
+  if(has('ham')&&!F.read)r.push(A('Read the Ham & High','read ham high paper newspaper',function(){F.read=1;adv(5);
+    say('<em>Ham &amp; High, p. 7. Society Notes, by T. Peake.</em> ‘Lady Ottoline Fane gives her summer party tonight at No. 9 Church Row, half past seven for eight, by card only. Guests are asked to arrive neither early nor with anyone they met this week. Lady F. is distracted by the disappearance of Bartholomew, her Pekingese, last seen on Thursday near Whitestone Pond. I shall be in the Flask from eleven, as always, for anyone who wishes to be indiscreet.’');
+    say('Below it, a small advertisement: <em>Hennessy &amp; Dunn, High Street. Summer blazers, £22.</em>');stand(2)}));
+  if(has('keats_book')&&!F.keats)r.push(A('Read the Collected Keats (20 min)','read keats book poetry collected',function(){F.keats=1;adv(20);say('You read on a bench until the words stop being homework. By the end you can say <em>negative capability</em> without wincing, and you have an opinion about the odes. It is a small opinion. It will do.');stand(5)}));
+  if(has('blazer')&&!F.worn)r.push(A('Put on the navy blazer','put on wear navy blazer jacket',function(){F.worn=1;adv(5);say('You put it on in the shop doorway and become, briefly, a man in a better life. A passing woman almost makes eye contact.');stand(10)}));
+  return r}
+function avail(){
+  var L=LOC[S.loc];
+  return L.ex.map(exitAction).concat(L.a(),itemActions(),sysActions());
+}
+function bagSay(){
+  var names=S.inv.map(function(id){return ITEMS[id][0]+(id==='blazer'&&S.flags.worn?' (worn)':'')});
+  say('You are carrying: '+names.join(', ')+'. You have '+money(S.cash)+'.','aside');
+}
+function hint(){var F=S.flags;
+  if(!F.read)return 'Buy the Ham & High at the station and read it. The gossip column is the cheapest education in NW3.';
+  if(!F.invited&&!F.onlist&&!F.dogWith&&!has('straws'))return 'A hungry dog will follow almost anything made of cheese. The deli on Heath Street sells it, and the Pond is at the top of the hill.';
+  if(has('straws')&&!F.dogWith)return 'Take the cheese straws up Heath Street to Whitestone Pond.';
+  if(F.dogWith)return 'Church Row is west of the High Street. Number 9 has the blue door.';
+  if(!has('blazer')&&!F.worn)return 'Hennessy & Dunn on the High Street sell a blazer. You will not get past the butler in that jumper.';
+  if(has('blazer')&&!F.worn)return 'Put the blazer on. It is doing nothing in your bag.';
+  if(!F.tarquin&&S.t<360)return 'Tarquin Peake at the Flask, between eleven and three, tells people things for gin.';
+  if(!F.hair)return 'Maurice et Fils, on the High Street, can do something about the hair.';
+  if(!F.keats)return 'Keats House, or a paperback from the bookshop, will give you something to say.';
+  if(!F.art)return 'Kenwood House has a Rembrandt worth having an opinion about. It is across the Heath from the Pond.';
+  if(!has('wine'))return 'Bring a bottle. The deli on Heath Street has the right one, and it is not the cheap one.';
+  return 'Be at the door of No. 9 between half past seven and nine, invited, in your blazer, with the right bottle.';
+}
+
+/* ---------- Church Row ---------- */
+function ringBell(){
+  adv(5);
+  say('The door opens eight inches. Pettigrew, the butler, looks at your shoes, then at your face, then back at the shoes, which have clearly been the more persuasive. ‘Madam is not at home to callers, sir.’ ‘Is she at home to anyone?’ ‘Not to callers.’ The door closes with the sound of a decision.');
+}
+function nameDrop(){
+  adv(5);
+  if(S.standing<25){say('‘Mr Rudge,’ says Pettigrew, ‘is in Tuscany, sir. Perhaps you are thinking of another Mr Rudge.’ He closes the door slowly, so you can watch it happen.');stand(-3);return}
+  S.flags.onlist=true;
+  say('‘Mr Rudge. Sir Julian’s squash partner.’ Pettigrew consults a ledger the size of a paving slab. ‘I shall add a name. I shall not ask which.’ Your name goes into the book in a hand that has spent forty years not being impressed.');stand(5);
+}
+function returnDog(){
+  var F=S.flags;F.dogWith=false;F.dogReturned=true;F.invited=true;give('invitation');adv(10);
+  say('Pettigrew opens the door the width of his disapproval. It widens when Bartholomew barks. There is a cry from inside, a clatter of heels, and Lady Ottoline Fane arrives in a silk dressing-gown the colour of a good intention, scoops up the dog and kisses him on a part of the head you would not have thought kissable.');
+  say('‘Where?’ she asks. ‘The Pond. You clever, clever person. Pettigrew, a card.’ An invitation is placed in your hand. ‘Half past seven. And do wear something that isn’t corduroy.’ The door closes in the manner of a very expensive refrigerator.');
+  stand(25);
+}
+function door(){
+  var F=S.flags;
+  if(S.t<PARTY){adv(5);say('It is not yet half past seven. Pettigrew opens the door, regards you and the evening air, and says, ‘Madam receives at half past, sir.’ He closes it with the delicacy of a man burying a goldfish.');stand(-2);return}
+  if(!F.worn&&S.standing<70){adv(5);say('Pettigrew studies the jumper. ‘I am afraid, sir, that it is a blazer sort of evening.’ The door closes. Somewhere behind it a cello is tuning, as if to underline the point.');return}
+  party();
+}
+function party(){
+  var F=S.flags,sc=S.standing,rows=[];
+  function add(n,w){sc+=n;rows.push([n,w])}
+  if(has('wine'))add(8,'You handed over the Pommard and Pettigrew almost smiled.');
+  else if(has('liebfraumilch'))add(-12,'You handed over the Liebfraumilch. It was received like a summons.');
+  else add(-4,'You arrived empty-handed, which in Hampstead counts as a statement.');
+  if(F.etiq)add(6,'You said <em>how do you do</em> and nobody flinched.');
+  if(F.keats)add(6,'You mentioned Keats at exactly the right moment.');
+  if(F.art)add(6,'You said something about Rembrandt that sounded true.');
+  if(F.dogReturned)add(8,'Lady Fane told everyone about the dog. You were the ending of the story.');
+  if(F.prices)add(2,'You knew what the houses cost, and said so with a shudder.');
+  if(F.onlist&&!F.invited)add(-6,'Gideon Rudge was in Tuscany. It came up.');
+  sc=Math.max(0,sc);
+  var title,body;
+  if(sc>=90){title='A Fixture';body='Lady Fane takes your arm at the foot of the stairs and introduces you, in order, to a judge, a cellist, a man who owns a river, and her mother. By ten you have been asked to lunch, a christening, and ‘something in Gloucestershire’. Tarquin Peake files your name in his column with the adjective <em>rising</em>. The accent has become a talking point. You have been called <em>refreshing</em>, the highest compliment the neighbourhood pays to a person it cannot place. On the Northern Line home you remember that the lift attendant is still reading his paperback. You nod to him as to an equal. He does not look up.'}
+  else if(sc>=65){title='Seen';body='You are noticed, which is not the same as welcomed. You spend the evening near the canapés, where conversation comes to you in small unhurried pieces. You are asked what you do, answer truthfully, and are told it sounds fascinating by a woman looking over your shoulder. Still: two cards, a promise of a drink, and Tarquin writing something down. Next Saturday, you think, there may be another party.'}
+  else if(sc>=40){title='Tolerated';body='You are let in, handed a glass, and parked in the kitchen with the caterers, who are the only honest people in the building. You learn a great deal about the Fanes from a boy called Dev who is studying law. At midnight Pettigrew calls you a taxi, which is the Hampstead way of saying goodbye. It is not nothing. It is also not Church Row.'}
+  else{title='Escorted Out';body='You are inside for eleven minutes. In that time you commit three small crimes against the English language and one against a sofa. Pettigrew, who has waited all evening for exactly this, shows you out with the gentleness of a man closing a safe. The door shuts. Somewhere inside someone laughs, and you cannot tell whether it is at you.'}
+  S.log.push({k:'p',h:'Half past seven. Pettigrew opens the door wide, as if it costs him nothing, which is the most expensive thing he does. Behind him a hall the size of your bedsit’s entire postcode, a staircase, a cello, and the sound of a hundred people agreeing with each other.'});
+  S.end={title:title};
+  S.log.push({k:'end',title:title,body:body,score:sc,rows:rows});
+}
+function lateEnd(){
+  S.end={title:'Left Outside'};
+  S.log.push({k:'end',title:'Left Outside',score:S.standing,
+   body:'The church clock strikes nine. Through the windows of No. 9 a cello begins and a hundred conversations rise to meet it. You are on the pavement with the evening, your ambitions, and an excellent view of other people’s hallway. Hampstead has not noticed you, and now it will not. Next Saturday, perhaps.',
+   rows:[[0,'You were not through the door before it mattered.']]});
+}
+
+/* ---------- Turn loop ---------- */
+function after(){
+  var L=LOC[S.loc];
+  if(L.shop&&!open()&&!S.end){say('The assistant begins to turn the sign and to look at you in a way that says it is closing time. You are shown out, politely, the way a cat is shown out.','aside');S.loc=L.parent;S.visited[S.loc]=1;describe()}
+  if(S.t>=480&&!S.flags.n5){S.flags.n5=1;say('Five o’clock. Shutters begin to rattle down the High Street. The shops close at half past.','aside')}
+  if(S.t>=PARTY&&!S.flags.n7&&!S.end){S.flags.n7=1;say('Half past seven. Somewhere on Church Row a door opens, and the people who matter begin to arrive.','aside')}
+  if(S.t>=LATE&&!S.end)lateEnd();
+}
+function exec(a,typedText){
+  if(S.end)return;
+  S.log.push({k:'cmd',h:typedText?'“'+typedText+'” → '+a.label:a.label});
+  a.run();after();save();renderAll();
+}
+var STOP={the:1,a:1,an:1,to:1,go:1,at:1,with:1,of:1,some:1,please:1,and:1,for:1,on:1,up:1,my:1,me:1};
+function typed(v){
+  if(S.end)return;
+  var all=avail();
+  var toks=v.toLowerCase().split(/[^a-z0-9]+/).filter(function(t){return t&&!STOP[t]});
+  var scored=all.map(function(a){
+    var words=(a.label+' '+a.kw).toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+    var sc=0;
+    toks.forEach(function(t){
+      if(words.indexOf(t)>-1)sc+=2;
+      else if(t.length>=3&&words.some(function(w){return w.length>=3&&(w.indexOf(t)===0||t.indexOf(w)===0)}))sc+=1;
+    });
+    return {a:a,sc:sc};
+  }).filter(function(x){return x.sc>0}).sort(function(x,y){return y.sc-x.sc});
+  if(!scored.length){
+    S.log.push({k:'cmd',h:'“'+v+'”'});
+    say('That doesn’t lead anywhere. Tap one of the choices below, or try something like <em>buy paper</em>, <em>talk to attendant</em> or <em>north</em>.','aside');
+    save();renderAll();return;
+  }
+  var top=scored.filter(function(x){return x.sc===scored[0].sc});
+  if(top.length===1){exec(top[0].a,v);return}
+  S.log.push({k:'cmd',h:'“'+v+'”'});
+  say('Which did you mean?','aside');
+  S.log.push({k:'choices',opts:top.slice(0,4).map(function(x){return x.a.label})});
+  save();renderAll();
+}
+function runLabel(label){var a=avail().filter(function(x){return x.label===label})[0];if(a)exec(a)}
+
+/* ---------- Render ---------- */
+var rendered=0;
+function entryEl(e){
+  var d=document.createElement('div');
+  if(e.k==='loc'){d.className='loc';d.innerHTML='<h2>'+e.n+'</h2><span class="sub">'+e.s+'</span>'}
+  else if(e.k==='cmd'){d.className='cmd';d.textContent=e.h}
+  else if(e.k==='delta'){d.className='delta '+e.tone;d.textContent=e.h}
+  else if(e.k==='intro'){
+    d.innerHTML='<div class="kicker">Saturday 14 June 1986 · 9.00 a.m.</div>'+
+    '<p class="p lede">You arrived in London with an Essex accent, a Filofax containing one number, and the conviction that people in Hampstead are no cleverer than you, merely better introduced.</p>'+
+    '<p class="p">Tonight Lady Ottoline Fane gives her summer party at No. 9 Church Row. Everybody who matters will be there. You intend to be among them, glass in hand, with an anecdote. You have £21.80, a jumper you are beginning to doubt, and until half past nine to arrange it.</p>'+
+    '<p class="tip">Tap a choice below, or type what you want to do. <b>Hint</b> gives a nudge. Time passes as you move, and the shops shut at half past five.</p>';
+  }
+  else if(e.k==='choices'){d.className='choices';e.opts.forEach(function(l){var b=document.createElement('button');b.type='button';b.className='act';b.textContent=l;b.addEventListener('click',function(){runLabel(l)});d.appendChild(b)})}
+  else if(e.k==='end'){
+    d.className='end';
+    var h='<h3>'+e.title+'</h3><div class="score">Final standing '+e.score+'</div><p class="p">'+e.body+'</p><ul>';
+    e.rows.forEach(function(r){h+='<li><b>'+(r[0]>0?'+':r[0]<0?'−':'')+(r[0]?Math.abs(r[0]):'')+'</b><span>'+r[1]+'</span></li>'});
+    h+='</ul>';d.innerHTML=h;
+    var b=document.createElement('button');b.type='button';b.className='go';b.textContent='Play again';b.addEventListener('click',newGame);d.appendChild(b);
+  }
+  else{d.className='p '+(e.c||'');d.innerHTML=e.h}
+  return d;
+}
+function btn(label,cls,fn){var b=document.createElement('button');b.type='button';b.className=cls;b.textContent=label;b.addEventListener('click',fn);return b}
+function renderAll(){
+  $('#clock').textContent=clock(Math.min(S.t,LATE));
+  $('#cash').textContent=money(S.cash);
+  $('#stand').textContent=S.standing;
+  $('#rung').textContent=rung(S.standing);
+  $('#bar').style.width=S.standing+'%';
+  var log=$('#log'),firstNew=null,added=0;
+  while(rendered<S.log.length){var el=entryEl(S.log[rendered]);if(S.log[rendered].k==='loc'||S.log[rendered].k==='end'||S.log[rendered].k==='intro'){if(!firstNew)firstNew=el}log.appendChild(el);rendered++;added++}
+  if(added){ if(firstNew&&S.log.length>1)log.scrollTop=firstNew.offsetTop-8; else log.scrollTop=log.scrollHeight; if(!firstNew)log.scrollTop=log.scrollHeight; }
+  drawDock();drawBag();drawMap();
+}
+function drawDock(){
+  var ex=$('#exits'),ac=$('#acts'),sy=$('#sys');
+  ex.innerHTML='';ac.innerHTML='';sy.innerHTML='';
+  var form=$('#cmd');
+  if(S.end){form.hidden=true;ac.appendChild(btn('Play again','go',newGame));return}
+  form.hidden=false;
+  avail().forEach(function(a){
+    if(a.grp==='move'){
+      var e=LOC[S.loc].ex.filter(function(x){return x.l===a.label})[0];
+      var b=document.createElement('button');b.type='button';b.className='exit';
+      var dl={n:'N',s:'S',e:'E',w:'W','in':'IN',out:'OUT'}[e.d];
+      b.innerHTML='<span class="dir">'+dl+'</span><span></span>';b.lastChild.textContent=a.label;
+      b.addEventListener('click',function(){exec(a)});ex.appendChild(b);
+    }else if(a.grp==='do')ac.appendChild(btn(a.label,'act',function(){exec(a)}));
+    else sy.appendChild(btn(a.label,'ghost',function(){exec(a)}));
+  });
+}
+function drawBag(){
+  var ul=$('#bag');ul.innerHTML='';
+  S.inv.forEach(function(id){
+    var li=document.createElement('li');
+    var b=document.createElement('button');b.type='button';
+    var tag=(id==='blazer'&&S.flags.worn)?'<span class="tag">worn</span>':'';
+    b.innerHTML='<span></span>'+tag;b.firstChild.textContent=ITEMS[id][0];
+    b.addEventListener('click',function(){S.log.push({k:'p',h:ITEMS[id][1],c:'aside'});save();renderAll();$('#app').setAttribute('data-pane','story');syncTabs()});
+    li.appendChild(b);ul.appendChild(li);
+  });
+  $('#money').textContent='Cash in pocket: '+money(S.cash);
+  var n=$('#notes');n.innerHTML='';
+  var any=false;
+  NOTES.forEach(function(x){if(S.flags[x[0]]){any=true;var li=document.createElement('li');li.textContent=x[1];n.appendChild(li)}});
+  if(!any){var li=document.createElement('li');li.className='empty';li.style.borderLeftColor='transparent';li.textContent='One number: your mother’s. Things you learn will be written here.';n.appendChild(li)}
+}
+function drawMap(){
+  var vis=S.visited,shown={},h='',seen={};
+  Object.keys(vis).forEach(function(k){shown[k]=1;LOC[k].ex.forEach(function(e){shown[e.to]=1})});
+  Object.keys(shown).forEach(function(k){LOC[k].ex.forEach(function(e){
+    if(!shown[e.to]||!(vis[k]||vis[e.to]))return;
+    var key=[k,e.to].sort().join('|');if(seen[key])return;seen[key]=1;
+    h+='<line class="medge" x1="'+LOC[k].x+'" y1="'+LOC[k].y+'" x2="'+LOC[e.to].x+'" y2="'+LOC[e.to].y+'"/>';
+  })});
+  Object.keys(shown).forEach(function(k){
+    var L=LOC[k],here=k===S.loc,v=vis[k];
+    if(here)h+='<circle class="mring" cx="'+L.x+'" cy="'+L.y+'" r="15"/>';
+    h+='<circle class="mnode'+(here?' here':v?'':' fog')+'" cx="'+L.x+'" cy="'+L.y+'" r="'+(here?9:7)+'"/>';
+    if(v){
+      var right=L.x>=200&&L.y>=220;
+      h+='<text class="mlab'+(here?' here':'')+'" x="'+(right?L.x+15:L.x)+'" y="'+(right?L.y+4:L.y+25)+'" text-anchor="'+(right?'start':'middle')+'">'+L.m+'</text>';
+    }
+  });
+  h+='<text class="mnote" x="288" y="16" text-anchor="end">N ↑</text>';
+  $('#map').innerHTML=h;
+}
+function syncTabs(){
+  var p=$('#app').getAttribute('data-pane');
+  document.querySelectorAll('.tabs button').forEach(function(b){b.setAttribute('aria-pressed',b.getAttribute('data-pane')===p?'true':'false')});
+}
+
+/* ---------- Save / restart ---------- */
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function load(){try{var j=localStorage.getItem(KEY);if(j){var o=JSON.parse(j);if(o&&o.v===1&&LOC[o.loc])return o}}catch(e){}return null}
+function newGame(){
+  S=fresh();S.log.push({k:'intro'});describe();
+  rendered=0;$('#log').innerHTML='';save();renderAll();$('#log').scrollTop=0;
+  $('#app').setAttribute('data-pane','story');syncTabs();
+}
+
+/* ---------- Boot ---------- */
+document.querySelectorAll('.tabs button').forEach(function(b){b.addEventListener('click',function(){$('#app').setAttribute('data-pane',b.getAttribute('data-pane'));syncTabs()})});
+$('#cmd').addEventListener('submit',function(e){e.preventDefault();var i=$('#in'),v=i.value.trim();i.value='';if(v)typed(v)});
+var rt=null;
+$('#restart').addEventListener('click',function(){
+  var b=$('#restart');
+  if(rt){clearTimeout(rt);rt=null;b.textContent='New game';newGame();return}
+  b.textContent='Tap again to restart';rt=setTimeout(function(){rt=null;b.textContent='New game'},3000);
+});
+var saved=load();
+if(saved){S=saved;rendered=0;renderAll();var lg=$('#log');lg.scrollTop=lg.scrollHeight}
+else newGame();
+})();
+</script>
+
+</body>
+</html>

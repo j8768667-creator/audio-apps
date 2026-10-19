@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Continuo — Seamless MIDI Phrase Extension</title>
+
+<!-- Global safety net: if anything on the page throws, surface it visibly instead of
+     failing silently. This is registered before any other script runs. -->
+<script>
+  window.addEventListener('error', function (e) {
+    try {
+      var eb = document.getElementById('errorBanner');
+      var et = document.getElementById('errorTitle');
+      var ed = document.getElementById('errorDetail');
+      if (eb && et && ed) {
+        et.textContent = 'A script error occurred';
+        ed.textContent = (e.message || 'Unknown error') + (e.filename ? (' — ' + e.filename + ':' + e.lineno) : '');
+        eb.classList.remove('hidden');
+      }
+    } catch (_) { /* no-op */ }
+  });
+</script>
+
+<!-- Fonts: Space Grotesk (display), Inter (body), JetBrains Mono (data readouts) -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+
+<!-- Tailwind CSS (CDN, JIT) -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          base:   '#0B0D10',
+          panel:  '#14171C',
+          panel2: '#1A1E25',
+          line:   '#262B33',
+          ink:    '#E7E5E0',
+          muted:  '#8B8F98',
+          gold:   '#E8A33D',
+          teal:   '#3DDBD9',
+          danger: '#E5595E',
+          ok:     '#6FCF97'
+        },
+        fontFamily: {
+          display: ['"Space Grotesk"', 'sans-serif'],
+          body: ['Inter', 'sans-serif'],
+          mono: ['"JetBrains Mono"', 'monospace']
+        },
+        boxShadow: {
+          glow: '0 0 0 1px rgba(232,163,61,0.25), 0 0 24px rgba(232,163,61,0.08)'
+        }
+      }
+    }
+  };
+</script>
+
+<!-- Tone.js (audio synthesis + transport) -->
+<script src="https://cdn.jsdelivr.net/npm/tone@14.8.49/build/Tone.js"></script>
+<!-- @tonejs/midi (MIDI parsing + generation) -->
+<script src="https://unpkg.com/@tonejs/midi@2.0.28/build/Midi.js"></script>
+
+<style>
+  ::-webkit-scrollbar { height: 10px; width: 10px; }
+  ::-webkit-scrollbar-track { background: #14171C; }
+  ::-webkit-scrollbar-thumb { background: #2C323C; border-radius: 999px; }
+  ::-webkit-scrollbar-thumb:hover { background: #3A414D; }
+
+  body {
+    background-image:
+      radial-gradient(circle at 1px 1px, rgba(232,163,61,0.06) 1px, transparent 0);
+    background-size: 26px 26px;
+  }
+
+  .dropzone-active {
+    border-color: #E8A33D !important;
+    background-color: rgba(232,163,61,0.06);
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner { animation: spin 0.9s linear infinite; }
+
+  @keyframes pulseBar {
+    0%, 100% { opacity: .35; }
+    50% { opacity: 1; }
+  }
+  .pulse-bar { animation: pulseBar 1.4s ease-in-out infinite; }
+
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    opacity: 1;
+  }
+
+  :focus-visible {
+    outline: 2px solid #E8A33D;
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .spinner, .pulse-bar { animation: none; }
+  }
+
+  #pianoRollCanvas { image-rendering: pixelated; }
+</style>
+</head>
+
+<body class="bg-base text-ink font-body min-h-screen antialiased">
+
+  <!-- ============================= HEADER ============================= -->
+  <header class="border-b border-line bg-panel/60 backdrop-blur sticky top-0 z-30">
+    <div class="max-w-6xl mx-auto px-5 sm:px-8 py-4 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <svg width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg" class="shrink-0">
+          <rect x="1" y="1" width="28" height="28" rx="6" stroke="#E8A33D" stroke-width="1.5"/>
+          <rect x="6" y="20" width="3" height="4" rx="1" fill="#E8A33D"/>
+          <rect x="11" y="14" width="3" height="10" rx="1" fill="#3DDBD9"/>
+          <rect x="16" y="9" width="3" height="15" rx="1" fill="#E8A33D"/>
+          <rect x="21" y="16" width="3" height="8" rx="1" fill="#3DDBD9" opacity="0.55"/>
+        </svg>
+        <div>
+          <h1 class="font-display font-semibold text-lg leading-none tracking-tight">Continuo</h1>
+          <p class="text-[11px] text-muted leading-none mt-1">Seamless MIDI phrase extension</p>
+        </div>
+      </div>
+      <div id="fileBadge" class="hidden items-center gap-2 text-xs text-muted font-mono bg-panel2 border border-line rounded-full px-3 py-1.5">
+        <span class="w-1.5 h-1.5 rounded-full bg-ok"></span>
+        <span id="fileBadgeName">—</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-5 sm:px-8 py-8 space-y-6">
+
+    <!-- ============================= ERROR BANNER ============================= -->
+    <div id="errorBanner" class="hidden border border-danger/40 bg-danger/10 text-danger rounded-xl px-4 py-3 text-sm flex items-start gap-3">
+      <svg class="shrink-0 mt-0.5" width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.4"/><path d="M8 4.5V9" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="11.3" r="0.9" fill="currentColor"/></svg>
+      <div>
+        <p class="font-medium" id="errorTitle">Something went wrong</p>
+        <p class="text-danger/80 text-xs mt-0.5" id="errorDetail"></p>
+      </div>
+      <button id="errorDismiss" class="ml-auto text-danger/60 hover:text-danger text-xs">Dismiss</button>
+    </div>
+
+    <!-- ============================= UPLOAD ============================= -->
+    <section id="uploadSection">
+      <div id="dropzone" tabindex="0" role="button" aria-label="Upload a MIDI file"
+        class="border-2 border-dashed border-line rounded-2xl bg-panel/40 hover:bg-panel/70 transition-colors cursor-pointer px-6 py-12 text-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold">
+        <input id="fileInput" type="file" accept=".mid,.midi,audio/midi,audio/x-midi" class="hidden" />
+        <div class="flex flex-col items-center gap-3">
+          <div class="w-12 h-12 rounded-xl bg-panel2 border border-line flex items-center justify-center">
+            <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M11 3v11m0 0-4-4m4 4 4-4" stroke="#E8A33D" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 15v2.5A1.5 1.5 0 0 0 5.5 19h11A1.5 1.5 0 0 0 18 17.5V15" stroke="#E8A33D" stroke-width="1.6" stroke-linecap="round"/></svg>
+          </div>
+          <p class="font-display font-medium text-[15px]">Tap to choose a .mid / .midi file</p>
+          <p class="text-muted text-xs">or drag one here — analysis runs entirely in your browser</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================= DASHBOARD (hidden until file loaded) ============================= -->
+    <section id="dashboard" class="hidden space-y-6">
+
+      <!-- File summary row -->
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="w-9 h-9 rounded-lg bg-panel2 border border-line flex items-center justify-center shrink-0">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 2h8l4 4v8H2V2Z" stroke="#8B8F98" stroke-width="1.3" stroke-linejoin="round"/><path d="M10 2v4h4" stroke="#8B8F98" stroke-width="1.3" stroke-linejoin="round"/></svg>
+          </div>
+          <p id="fileName" class="font-medium text-sm truncate max-w-[280px]">—</p>
+        </div>
+        <button id="changeFileBtn" class="text-xs text-muted hover:text-ink border border-line rounded-lg px-3 py-1.5 transition-colors">Change file</button>
+      </div>
+
+      <!-- Metadata stat cards -->
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <div class="bg-panel border border-line rounded-xl px-4 py-3">
+          <p class="text-[10px] uppercase tracking-wider text-muted mb-1">Tempo</p>
+          <p id="statBpm" class="font-mono text-lg text-gold">—</p>
+        </div>
+        <div class="bg-panel border border-line rounded-xl px-4 py-3">
+          <p class="text-[10px] uppercase tracking-wider text-muted mb-1">Time Sig.</p>
+          <p id="statTimeSig" class="font-mono text-lg">—</p>
+        </div>
+        <div class="bg-panel border border-line rounded-xl px-4 py-3">
+          <p class="text-[10px] uppercase tracking-wider text-muted mb-1">Key</p>
+          <p id="statKey" class="font-mono text-lg text-teal">—</p>
+        </div>
+        <div class="bg-panel border border-line rounded-xl px-4 py-3">
+          <p class="text-[10px] uppercase tracking-wider text-muted mb-1">Bars detected</p>
+          <p id="statBars" class="font-mono text-lg">—</p>
+        </div>
+        <div class="bg-panel border border-line rounded-xl px-4 py-3">
+          <p class="text-[10px] uppercase tracking-wider text-muted mb-1">Duration</p>
+          <p id="statDuration" class="font-mono text-lg">—</p>
+        </div>
+        <div class="bg-panel border border-line rounded-xl px-4 py-3">
+          <p class="text-[10px] uppercase tracking-wider text-muted mb-1">Tracks</p>
+          <p id="statTracks" class="font-mono text-lg">—</p>
+        </div>
+      </div>
+
+      <!-- Track list -->
+      <div class="bg-panel border border-line rounded-xl overflow-hidden">
+        <div class="px-4 py-3 border-b border-line">
+          <h2 class="font-display text-sm font-medium">Active tracks</h2>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-[10px] uppercase tracking-wider text-muted text-left">
+                <th class="px-4 py-2 font-medium">Track</th>
+                <th class="px-4 py-2 font-medium">Instrument</th>
+                <th class="px-4 py-2 font-medium">Notes</th>
+                <th class="px-4 py-2 font-medium">Density</th>
+                <th class="px-4 py-2 font-medium">Avg. velocity</th>
+              </tr>
+            </thead>
+            <tbody id="trackTableBody" class="font-mono text-xs"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Extension controls -->
+      <div class="bg-panel border border-line rounded-xl p-4 sm:p-5">
+        <h2 class="font-display text-sm font-medium mb-4">Extend composition</h2>
+        <div class="flex flex-wrap items-end gap-4">
+          <div>
+            <label for="barsInput" class="block text-[10px] uppercase tracking-wider text-muted mb-1.5">Bars to add</label>
+            <input id="barsInput" type="number" min="1" max="64" value="8"
+              class="w-28 bg-panel2 border border-line rounded-lg px-3 py-2 font-mono text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold" />
+          </div>
+          <div>
+            <label for="windowInput" class="block text-[10px] uppercase tracking-wider text-muted mb-1.5">Analysis window</label>
+            <select id="windowInput"
+              class="bg-panel2 border border-line rounded-lg px-3 py-2 font-mono text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold">
+              <option value="auto">Auto (4–8 bars)</option>
+              <option value="4">Last 4 bars</option>
+              <option value="6">Last 6 bars</option>
+              <option value="8">Last 8 bars</option>
+            </select>
+          </div>
+          <button id="generateBtn"
+            class="ml-auto bg-gold text-base font-semibold text-sm rounded-lg px-5 py-2.5 hover:brightness-110 active:brightness-95 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v3M7 10v3M1 7h3M10 7h3M2.8 2.8l2.1 2.1M9.1 9.1l2.1 2.1M2.8 11.2l2.1-2.1M9.1 4.9l2.1-2.1" stroke="#0B0D10" stroke-width="1.3" stroke-linecap="round"/></svg>
+            Generate extension
+          </button>
+        </div>
+
+        <!-- Progress -->
+        <div id="progressWrap" class="hidden mt-5">
+          <div class="flex items-center justify-between mb-2">
+            <p id="progressLabel" class="text-xs text-muted font-mono">Analyzing structure…</p>
+            <p id="progressPct" class="text-xs text-muted font-mono">0%</p>
+          </div>
+          <div class="h-1.5 w-full bg-panel2 rounded-full overflow-hidden">
+            <div id="progressBar" class="h-full bg-gold rounded-full transition-all duration-300" style="width:0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Piano roll visualization (signature element) -->
+      <div id="rollSection" class="hidden bg-panel border border-line rounded-xl p-4 sm:p-5">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <h2 class="font-display text-sm font-medium">Piano roll — original vs. generated</h2>
+          <div class="flex items-center gap-4 text-[11px] text-muted font-mono">
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-gold inline-block"></span> Original</span>
+            <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-teal inline-block opacity-70"></span> Generated</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 border-t border-dashed border-ink/50 inline-block"></span> Seam</span>
+          </div>
+        </div>
+        <div class="relative overflow-x-auto border border-line rounded-lg bg-base">
+          <canvas id="pianoRollCanvas" class="block"></canvas>
+          <div id="playhead" class="absolute top-0 bottom-0 w-px bg-ink/70 pointer-events-none" style="left:0; display:none;"></div>
+        </div>
+      </div>
+
+      <!-- Transport + export -->
+      <div id="transportSection" class="hidden bg-panel border border-line rounded-xl p-4 sm:p-5">
+        <div class="flex flex-wrap items-center gap-4">
+          <div class="flex items-center gap-2">
+            <button id="playBtn" class="w-10 h-10 rounded-full bg-gold flex items-center justify-center hover:brightness-110 transition" aria-label="Play">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="#0B0D10"><path d="M3 1.8v10.4a.9.9 0 0 0 1.37.77l8.3-5.2a.9.9 0 0 0 0-1.54l-8.3-5.2A.9.9 0 0 0 3 1.8Z"/></svg>
+            </button>
+            <button id="pauseBtn" class="w-10 h-10 rounded-full bg-panel2 border border-line flex items-center justify-center hover:bg-line transition" aria-label="Pause">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="#E7E5E0"><rect x="3" y="2" width="3" height="10" rx="1"/><rect x="8" y="2" width="3" height="10" rx="1"/></svg>
+            </button>
+            <button id="stopBtn" class="w-10 h-10 rounded-full bg-panel2 border border-line flex items-center justify-center hover:bg-line transition" aria-label="Stop">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="#E7E5E0"><rect x="2.5" y="2.5" width="9" height="9" rx="1.5"/></svg>
+            </button>
+          </div>
+
+          <div class="font-mono text-xs text-muted">
+            <span id="timeReadout">00:00.0</span> / <span id="timeTotal">00:00.0</span>
+          </div>
+
+          <label class="flex items-center gap-2 text-xs text-muted ml-2">
+            <input id="previewToggle" type="checkbox" checked class="accent-gold w-3.5 h-3.5" />
+            Include generated extension
+          </label>
+
+          <button id="downloadBtn" disabled
+            class="ml-auto bg-teal text-base font-semibold text-sm rounded-lg px-5 py-2.5 hover:brightness-110 active:brightness-95 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v8m0 0-3-3m3 3 3-3" stroke="#0B0D10" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M1.5 10.5v1.6A1.4 1.4 0 0 0 2.9 13.5h8.2a1.4 1.4 0 0 0 1.4-1.4v-1.6" stroke="#0B0D10" stroke-width="1.4" stroke-linecap="round"/></svg>
+            Download extended MIDI
+          </button>
+        </div>
+      </div>
+
+    </section>
+
+    <p class="text-center text-[11px] text-muted pt-4 pb-2">
+      All parsing, analysis and generation happens locally in your browser. No file is ever uploaded to a server.
+    </p>
+  </main>
+
+<script>
+/* =============================================================================================
+   CONTINUO — MIDI phrase extension engine
+   ============================================================================================= */
+
+(function () {
+  'use strict';
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  $('errorDismiss').addEventListener('click', function () { $('errorBanner').classList.add('hidden'); });
+
+  // ---------------------------------------------------------------------------------------
+  // Guard: make sure the CDN libraries actually loaded before wiring anything up.
+  // This is the #1 cause of "nothing happens when I pick a file" on locked-down
+  // networks, content blockers, or offline testing.
+  // ---------------------------------------------------------------------------------------
+  if (typeof Tone === 'undefined' || typeof Midi === 'undefined') {
+    var eb0 = $('errorBanner'), et0 = $('errorTitle'), ed0 = $('errorDetail');
+    et0.textContent = 'Required libraries failed to load';
+    ed0.textContent = 'Tone.js and/or @tonejs/midi did not load from the CDN. Check your internet connection, then reload the page.';
+    eb0.classList.remove('hidden');
+    return;
+  }
+
+  var dropzone        = $('dropzone');
+  var fileInput       = $('fileInput');
+  var uploadSection    = $('uploadSection');
+  var dashboard        = $('dashboard');
+  var fileBadge        = $('fileBadge');
+  var fileBadgeName    = $('fileBadgeName');
+  var fileNameEl       = $('fileName');
+  var changeFileBtn    = $('changeFileBtn');
+
+  var errorBanner = $('errorBanner');
+  var errorTitle   = $('errorTitle');
+  var errorDetail  = $('errorDetail');
+
+  var statBpm      = $('statBpm');
+  var statTimeSig  = $('statTimeSig');
+  var statKey      = $('statKey');
+  var statBars     = $('statBars');
+  var statDuration = $('statDuration');
+  var statTracks   = $('statTracks');
+  var trackTableBody = $('trackTableBody');
+
+  var barsInput    = $('barsInput');
+  var windowInput  = $('windowInput');
+  var generateBtn  = $('generateBtn');
+
+  var progressWrap  = $('progressWrap');
+  var progressLabel = $('progressLabel');
+  var progressPct   = $('progressPct');
+  var progressBar   = $('progressBar');
+
+  var rollSection      = $('rollSection');
+  var pianoRollCanvas  = $('pianoRollCanvas');
+  var rollCtx          = pianoRollCanvas.getContext('2d');
+  var playhead         = $('playhead');
+
+  var transportSection = $('transportSection');
+  var playBtn   = $('playBtn');
+  var pauseBtn  = $('pauseBtn');
+  var stopBtn   = $('stopBtn');
+  var timeReadout = $('timeReadout');
+  var timeTotal    = $('timeTotal');
+  var previewToggle = $('previewToggle');
+  var downloadBtn   = $('downloadBtn');
+
+  var state = {
+    fileName: null,
+    arrayBuffer: null,
+    midi: null,
+    bpm: 120,
+    timeSig: [4, 4],
+    barSeconds: 2,
+    detectedKey: '—',
+    originalBars: 0,
+    originalDuration: 0,
+    extendedMidi: null,
+    originalEndSeconds: 0,
+    totalEndSeconds: 0,
+    trackColors: [],
+    synths: [],
+    parts: [],
+    isPlaying: false,
+    rafId: null
+  };
+
+  var TRACK_PALETTE = ['#E8A33D', '#3DDBD9', '#B98CE0', '#7FD858', '#F2789F', '#5FA8E0', '#F2C14E', '#E5595E'];
+  var PITCH_CLASSES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+  var KS_MAJOR = [6.35,2.23,3.48,2.33,4.38,4.09,2.52,5.19,2.39,3.66,2.29,2.88];
+  var KS_MINOR = [6.33,2.68,3.52,5.38,2.60,3.53,2.54,4.75,3.98,2.69,3.34,3.17];
+
+  function showError(title, detail) {
+    errorTitle.textContent = title;
+    errorDetail.textContent = detail || '';
+    errorBanner.classList.remove('hidden');
+    errorBanner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+  function clearError() { errorBanner.classList.add('hidden'); }
+
+  function fmtTime(sec) {
+    if (!isFinite(sec) || sec < 0) sec = 0;
+    var m = Math.floor(sec / 60);
+    var s = (sec - m * 60).toFixed(1);
+    return (m < 10 ? '0' + m : '' + m) + ':' + (s.length < 4 ? '0' + s : s);
+  }
+
+  function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+  function weightedPick(arr) {
+    var total = 0, i;
+    for (i = 0; i < arr.length; i++) total += arr[i].weight;
+    if (total <= 0) return arr[Math.floor(Math.random() * arr.length)].item;
+    var r = Math.random() * total;
+    for (i = 0; i < arr.length; i++) {
+      r -= arr[i].weight;
+      if (r <= 0) return arr[i].item;
+    }
+    return arr[arr.length - 1].item;
+  }
+
+  // ---------------------------------------------------------------------------------------
+  // File input wiring (drag & drop + tap-to-pick — iOS Safari uses the native picker)
+  // ---------------------------------------------------------------------------------------
+  dropzone.addEventListener('click', function () { fileInput.click(); });
+  dropzone.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
+  });
+  ['dragenter', 'dragover'].forEach(function (evt) {
+    dropzone.addEventListener(evt, function (e) { e.preventDefault(); dropzone.classList.add('dropzone-active'); });
+  });
+  ['dragleave', 'drop'].forEach(function (evt) {
+    dropzone.addEventListener(evt, function (e) { e.preventDefault(); dropzone.classList.remove('dropzone-active'); });
+  });
+  dropzone.addEventListener('drop', function (e) {
+    var file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  });
+  fileInput.addEventListener('change', function (e) {
+    var file = e.target.files && e.target.files[0];
+    if (file) handleFile(file);
+  });
+  changeFileBtn.addEventListener('click', function () {
+    resetForNewFile();
+    uploadSection.classList.remove('hidden');
+    dashboard.classList.add('hidden');
+    fileBadge.classList.add('hidden');
+    fileInput.value = '';
+  });
+
+  function resetForNewFile() {
+    stopPlayback();
+    state.midi = null;
+    state.extendedMidi = null;
+    rollSection.classList.add('hidden');
+    transportSection.classList.add('hidden');
+    downloadBtn.disabled = true;
+    trackTableBody.innerHTML = '';
+  }
+
+  // ---------------------------------------------------------------------------------------
+  // Step 1: Load + parse the MIDI file
+  // ---------------------------------------------------------------------------------------
+  function handleFile(file) {
+    clearError();
+    var lower = file.name.toLowerCase();
+    if (lower.indexOf('.mid') === -1 && lower.indexOf('.midi') === -1) {
+      showError('Unsupported file type', 'Please upload a standard .mid or .midi file.');
+      return;
+    }
+
+    var reader = new FileReader();
+    reader.onerror = function () {
+      showError('Could not read file', 'The browser was unable to read the selected file.');
+    };
+    reader.onload = function () {
+      try {
+        var buffer = reader.result;
+        if (!buffer || buffer.byteLength < 14) {
+          throw new Error('File is too small to be a valid MIDI file.');
+        }
+
+        var midi;
+        try {
+          midi = new Midi(buffer);
+        } catch (parseErr) {
+          throw new Error('The file could not be parsed as MIDI — it may be corrupt or in an unsupported format.');
+        }
+
+        if (!midi.tracks || midi.tracks.length === 0) {
+          throw new Error('No tracks were found in this file.');
+        }
+        var totalNotes = 0;
+        midi.tracks.forEach(function (t) { totalNotes += t.notes.length; });
+        if (totalNotes === 0) {
+          throw new Error('No notes were found in any track — nothing to analyze or extend.');
+        }
+
+       resetForNewFile();    
+        state.fileName = file.name;
+        state.arrayBuffer = buffer;
+        state.midi = midi;
+        
+        analyzeMidi();
+
+        uploadSection.classList.add('hidden');
+        dashboard.classList.remove('hidden');
+        fileBadge.classList.remove('hidden');
+        fileBadge.classList.add('flex');
+        fileBadgeName.textContent = file.name;
+        fileNameEl.textContent = file.name;
+
+      } catch (err) {
+        console.error(err);
+        showError('Could not load MIDI file', err.message || String(err));
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  // ---------------------------------------------------------------------------------------
+  // Step 2: Analysis
+  // ---------------------------------------------------------------------------------------
+  function analyzeMidi() {
+    var midi = state.midi;
+
+    var bpm = (midi.header.tempos && midi.header.tempos.length) ? midi.header.tempos[0].bpm : 120;
+    var ts  = (midi.header.timeSignatures && midi.header.timeSignatures.length)
+      ? midi.header.timeSignatures[0].timeSignature
+      : [4, 4];
+
+    var beatSeconds = 60 / bpm;
+    var barSeconds  = beatSeconds * ts[0] * (4 / ts[1]);
+
+    var duration = midi.duration || 0;
+    var bars = barSeconds > 0 ? Math.max(1, Math.round(duration / barSeconds)) : 0;
+
+    state.bpm = bpm;
+    state.timeSig = ts;
+    state.barSeconds = barSeconds;
+    state.originalDuration = duration;
+    state.originalBars = bars;
+    state.originalEndSeconds = duration;
+    state.totalEndSeconds = duration;
+    state.trackColors = midi.tracks.map(function (_, i) { return TRACK_PALETTE[i % TRACK_PALETTE.length]; });
+
+    var key = detectKey(midi);
+    state.detectedKey = key;
+
+    statBpm.textContent = Math.round(bpm) + ' BPM';
+    statTimeSig.textContent = ts[0] + '/' + ts[1];
+    statKey.textContent = key;
+    statBars.textContent = bars + ' bars';
+    statDuration.textContent = fmtTime(duration);
+    var activeTrackCount = midi.tracks.filter(function (t) { return t.notes.length > 0; }).length;
+    statTracks.textContent = '' + activeTrackCount;
+
+    trackTableBody.innerHTML = '';
+    midi.tracks.forEach(function (track, i) {
+      if (track.notes.length === 0) return;
+      var dur = duration || 1;
+      var density = (track.notes.length / (dur / barSeconds || 1)).toFixed(1);
+      var avgVel = Math.round(
+        track.notes.reduce(function (s, n) { return s + n.velocity; }, 0) / track.notes.length * 127
+      );
+      var row = document.createElement('tr');
+      row.className = 'border-t border-line';
+      var trackLabel = track.name && track.name.trim() ? track.name : ('Track ' + (i + 1));
+      row.innerHTML =
+        '<td class="px-4 py-2 flex items-center gap-2">' +
+          '<span class="w-2 h-2 rounded-sm inline-block" style="background:' + state.trackColors[i] + '"></span>' +
+          escapeHtml(trackLabel) +
+        '</td>' +
+        '<td class="px-4 py-2 text-muted">' + escapeHtml(track.instrument ? track.instrument.name : 'unknown') + '</td>' +
+        '<td class="px-4 py-2">' + track.notes.length + '</td>' +
+        '<td class="px-4 py-2">' + density + '/bar</td>' +
+        '<td class="px-4 py-2">' + avgVel + '</td>';
+      trackTableBody.appendChild(row);
+    });
+
+    drawPianoRoll();
+  }
+
+  function escapeHtml(str) {
+    var d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  function detectKey(midi) {
+    var histogram = new Array(12).fill(0);
+    midi.tracks.forEach(function (track) {
+      track.notes.forEach(function (note) {
+        var pc = ((note.midi % 12) + 12) % 12;
+        histogram[pc] += note.duration;
+      });
+    });
+
+    var total = histogram.reduce(function (a, b) { return a + b; }, 0);
+    if (total === 0) return '—';
+    var norm = histogram.map(function (v) { return v / total; });
+
+    function correlate(a, b) {
+      var meanA = a.reduce(function (s, v) { return s + v; }, 0) / a.length;
+      var meanB = b.reduce(function (s, v) { return s + v; }, 0) / b.length;
+      var num = 0, denA = 0, denB = 0;
+      for (var i = 0; i < a.length; i++) {
+        var da = a[i] - meanA, db = b[i] - meanB;
+        num += da * db; denA += da * da; denB += db * db;
+      }
+      var den = Math.sqrt(denA * denB);
+      return den === 0 ? 0 : num / den;
+    }
+
+    var best = { score: -Infinity, name: '—' };
+    for (var root = 0; root < 12; root++) {
+      var majorProfile = rotate(KS_MAJOR, root);
+      var minorProfile = rotate(KS_MINOR, root);
+      var majorScore = correlate(norm, majorProfile);
+      var minorScore = correlate(norm, minorProfile);
+      if (majorScore > best.score) best = { score: majorScore, name: PITCH_CLASSES[root] + ' major' };
+      if (minorScore > best.score) best = { score: minorScore, name: PITCH_CLASSES[root] + ' minor' };
+    }
+    return best.name;
+  }
+
+  function rotate(arr, n) {
+    var out = new Array(arr.length);
+    for (var i = 0; i < arr.length; i++) out[(i + n) % arr.length] = arr[i];
+    return out;
+  }
+
+  function scaleForKey(keyName) {
+    if (!keyName || keyName === '—') return [0,1,2,3,4,5,6,7,8,9,10,11];
+    var parts = keyName.split(' ');
+    var rootName = parts[0], mode = parts[1];
+    var root = PITCH_CLASSES.indexOf(rootName);
+    if (root === -1) return [0,1,2,3,4,5,6,7,8,9,10,11];
+    var majorSteps = [0,2,4,5,7,9,11];
+    var minorSteps = [0,2,3,5,7,8,10];
+    var steps = mode === 'minor' ? minorSteps : majorSteps;
+    return steps.map(function (s) { return (s + root) % 12; });
+  }
+
+  // ---------------------------------------------------------------------------------------
+  // Step 3: Generate extension
+  // ---------------------------------------------------------------------------------------
+  generateBtn.addEventListener('click', function () {
+    if (!state.midi) return;
+
+    var barsToAdd = clamp(parseInt(barsInput.value, 10) || 8, 1, 64);
+    barsInput.value = barsToAdd;
+
+    generateBtn.disabled = true;
+    progressWrap.classList.remove('hidden');
+
+    runStep('Analyzing final bars…', 20)
+      .then(function () {
+        var windowBars = resolveAnalysisWindow();
+        return runStep('Building pattern & Markov models…', 45).then(function () { return windowBars; });
+      })
+      .then(function (windowBars) {
+        var analyses = analyzeTracksForExtension(state.midi, windowBars);
+        return runStep('Generating new bars…', 75).then(function () { return analyses; });
+      })
+      .then(function (analyses) {
+        var extendedMidi = buildExtendedMidi(state.arrayBuffer, analyses, barsToAdd);
+        return runStep('Rendering piano roll…', 100).then(function () { return extendedMidi; });
+      })
+      .then(function (extendedMidi) {
+        state.extendedMidi = extendedMidi;
+        state.totalEndSeconds = extendedMidi.duration;
+
+        drawPianoRoll();
+        rollSection.classList.remove('hidden');
+        transportSection.classList.remove('hidden');
+        downloadBtn.disabled = false;
+        timeTotal.textContent = fmtTime(state.totalEndSeconds);
+      })
+      .catch(function (err) {
+        console.error(err);
+        showError('Extension generation failed', err.message || String(err));
+      })
+      .finally(function () {
+        progressWrap.classList.add('hidden');
+        generateBtn.disabled = false;
+      });
+  });
+
+  function runStep(label, pct) {
+    progressLabel.textContent = label;
+    progressPct.textContent = pct + '%';
+    progressBar.style.width = pct + '%';
+    return new Promise(function (res) {
+      requestAnimationFrame(function () { setTimeout(res, 120); });
+    });
+  }
+
+  function resolveAnalysisWindow() {
+    var v = windowInput.value;
+    if (v === 'auto') return clamp(state.originalBars >= 8 ? 8 : Math.max(4, state.originalBars), 4, 8);
+    return clamp(parseInt(v, 10), 1, state.originalBars || 8);
+  }
+
+  function analyzeTracksForExtension(midi, windowBars) {
+    var sixteenth = (60 / state.bpm) / 4;
+    var barSeconds = state.barSeconds;
+    var scale = scaleForKey(state.detectedKey);
+
+    return midi.tracks.map(function (track, trackIndex) {
+      if (track.notes.length === 0) return null;
+
+      var windowStart = Math.max(0, state.originalEndSeconds - windowBars * barSeconds);
+      var windowNotes = track.notes.filter(function (n) { return n.time >= windowStart - 1e-6; });
+      if (windowNotes.length === 0) windowNotes = track.notes.slice(-8);
+
+      var usedBars = Math.max(1, Math.round((state.originalEndSeconds - Math.min(windowStart, windowNotes[0].time)) / barSeconds));
+
+      var barTemplates = [];
+      for (var b = 0; b < usedBars; b++) barTemplates.push({});
+
+      windowNotes.forEach(function (note) {
+        var relTime = note.time - windowStart;
+        var barIdx = Math.floor(relTime / barSeconds);
+        barIdx = clamp(barIdx, 0, usedBars - 1);
+        var barStart = barIdx * barSeconds;
+        var slot = Math.round((relTime - barStart) / sixteenth);
+        slot = clamp(slot, 0, 15);
+        var durSlots = Math.max(1, Math.round(note.duration / sixteenth));
+        if (!barTemplates[barIdx][slot]) barTemplates[barIdx][slot] = [];
+        barTemplates[barIdx][slot].push({ midi: note.midi, velocity: note.velocity, durSlots: durSlots });
+      });
+
+      var sortedSlotKeys = [];
+      barTemplates.forEach(function (bar, bIdx) {
+        Object.keys(bar).map(Number).sort(function (a, b) { return a - b; }).forEach(function (slot) {
+          sortedSlotKeys.push({ bIdx: bIdx, slot: slot, notes: bar[slot] });
+        });
+      });
+      var eventKeyOf = function (notes) { return notes.map(function (n) { return n.midi; }).sort(function (a, b) { return a - b; }).join(','); };
+      var transitions = {};
+      for (var i = 0; i < sortedSlotKeys.length - 1; i++) {
+        var fromKey = eventKeyOf(sortedSlotKeys[i].notes);
+        var toNotes = sortedSlotKeys[i + 1].notes;
+        if (!transitions[fromKey]) transitions[fromKey] = [];
+        transitions[fromKey].push({ item: toNotes, weight: 1 });
+      }
+
+      var velocities = windowNotes.map(function (n) { return n.velocity; });
+      var meanVel = velocities.reduce(function (a, b) { return a + b; }, 0) / velocities.length;
+      var variance = velocities.reduce(function (s, v) { return s + Math.pow(v - meanVel, 2); }, 0) / velocities.length;
+      var stdVel = Math.sqrt(variance);
+
+      return {
+        trackIndex: trackIndex,
+        barTemplates: barTemplates,
+        transitions: transitions,
+        allObservedNotes: windowNotes.map(function (n) { return { midi: n.midi, velocity: n.velocity }; }),
+        meanVel: meanVel, stdVel: stdVel,
+        scale: scale
+      };
+    });
+  }
+
+  function snapToScale(pitch, scale) {
+    var pc = ((pitch % 12) + 12) % 12;
+    if (scale.indexOf(pc) !== -1) return pitch;
+    var best = pitch, bestDist = Infinity;
+    for (var d = 1; d <= 6; d++) {
+      var candidates = [pitch - d, pitch + d];
+      for (var c = 0; c < candidates.length; c++) {
+        var cand = candidates[c];
+        var cpc = ((cand % 12) + 12) % 12;
+        if (scale.indexOf(cpc) !== -1 && d < bestDist) { best = cand; bestDist = d; }
+      }
+      if (bestDist <= d) break;
+    }
+    return best;
+  }
+
+  function buildExtendedMidi(arrayBuffer, analyses, barsToAdd) {
+    var extended = new Midi(arrayBuffer);
+    var sixteenth = (60 / state.bpm) / 4;
+    var barSeconds = state.barSeconds;
+    var originalEnd = state.originalEndSeconds;
+
+    extended.tracks.forEach(function (track, i) {
+      var a = analyses[i];
+      if (!a) return;
+      var hasTransitions = Object.keys(a.transitions).length > 0;
+      if (!hasTransitions && a.allObservedNotes.length === 0) return;
+
+      var barCount = a.barTemplates.length;
+      var lastEventKey = null;
+
+      for (var barGen = 0; barGen < barsToAdd; barGen++) {
+        var templateBar = a.barTemplates[barGen % barCount];
+        var barStartTime = originalEnd + barGen * barSeconds;
+
+        Object.keys(templateBar).map(Number).sort(function (x, y) { return x - y; }).forEach(function (slot) {
+          var templateNotes = templateBar[slot];
+          var eventKey = templateNotes.map(function (n) { return n.midi; }).sort(function (x, y) { return x - y; }).join(',');
+
+          var chosenNotes = templateNotes;
+          var candidates = a.transitions[lastEventKey];
+          if (candidates && candidates.length > 0 && Math.random() < 0.65) {
+            chosenNotes = weightedPick(candidates);
+          }
+          lastEventKey = eventKey;
+
+          chosenNotes.forEach(function (n) {
+            var pitch = n.midi;
+            if (Math.random() < 0.18) {
+              pitch += Math.random() < 0.5 ? -2 : 2;
+            }
+            pitch = snapToScale(clamp(pitch, 0, 127), a.scale);
+
+            var velocityJitter = (Math.random() - 0.5) * a.stdVel * 0.6;
+            var velocity127 = clamp(Math.round(n.velocity * 127 + velocityJitter), 1, 127);
+
+            var time = barStartTime + slot * sixteenth;
+            var duration = Math.max(sixteenth * 0.5, (n.durSlots || 1) * sixteenth * 0.95);
+
+            track.addNote({
+              midi: pitch,
+              time: time,
+              duration: duration,
+              velocity: velocity127 / 127
+            });
+          });
+        });
+      }
+    });
+
+    return extended;
+  }
+
+  // ---------------------------------------------------------------------------------------
+  // Piano roll visualization
+  // ---------------------------------------------------------------------------------------
+  function drawPianoRoll() {
+    var midiToRender = state.extendedMidi || state.midi;
+    if (!midiToRender) return;
+
+    var originalEnd = state.originalEndSeconds;
+    var totalEnd = state.extendedMidi ? state.extendedMidi.duration : state.originalDuration;
+    state.totalEndSeconds = totalEnd;
+
+    var minPitch = 127, maxPitch = 0;
+    midiToRender.tracks.forEach(function (t) {
+      t.notes.forEach(function (n) {
+        minPitch = Math.min(minPitch, n.midi);
+        maxPitch = Math.max(maxPitch, n.midi);
+      });
+    });
+    if (minPitch > maxPitch) { minPitch = 48; maxPitch = 72; }
+    minPitch -= 2; maxPitch += 2;
+    var pitchRange = Math.max(12, maxPitch - minPitch);
+
+    var pxPerSecond = 90;
+    var rowHeight = 5;
+    var width = Math.max(600, Math.ceil(totalEnd * pxPerSecond) + 20);
+    var height = pitchRange * rowHeight;
+
+    var dpr = window.devicePixelRatio || 1;
+    pianoRollCanvas.width = width * dpr;
+    pianoRollCanvas.height = height * dpr;
+    pianoRollCanvas.style.width = width + 'px';
+    pianoRollCanvas.style.height = height + 'px';
+    rollCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    rollCtx.clearRect(0, 0, width, height);
+    rollCtx.fillStyle = '#0B0D10';
+    rollCtx.fillRect(0, 0, width, height);
+
+    rollCtx.strokeStyle = 'rgba(255,255,255,0.04)';
+    rollCtx.lineWidth = 1;
+    for (var p = Math.ceil(minPitch / 12) * 12; p <= maxPitch; p += 12) {
+      var y = height - (p - minPitch) * rowHeight;
+      rollCtx.beginPath();
+      rollCtx.moveTo(0, y);
+      rollCtx.lineTo(width, y);
+      rollCtx.stroke();
+    }
+
+    rollCtx.strokeStyle = 'rgba(255,255,255,0.05)';
+    for (var t = 0; t <= totalEnd; t += state.barSeconds) {
+      var x = t * pxPerSecond;
+      rollCtx.beginPath();
+      rollCtx.moveTo(x, 0);
+      rollCtx.lineTo(x, height);
+      rollCtx.stroke();
+    }
+
+    midiToRender.tracks.forEach(function (track, i) {
+      var color = state.trackColors[i] || TRACK_PALETTE[i % TRACK_PALETTE.length];
+      track.notes.forEach(function (note) {
+        var isGenerated = note.time >= originalEnd - 1e-6;
+        var nx = note.time * pxPerSecond;
+        var w = Math.max(2, note.duration * pxPerSecond - 1);
+        var ny = height - (note.midi - minPitch) * rowHeight;
+        rollCtx.fillStyle = color;
+        rollCtx.globalAlpha = isGenerated ? 0.55 : 0.95;
+        rollCtx.fillRect(nx, ny - rowHeight + 1, w, rowHeight - 1);
+        if (isGenerated) {
+          rollCtx.strokeStyle = '#3DDBD9';
+          rollCtx.lineWidth = 0.6;
+          rollCtx.strokeRect(nx, ny - rowHeight + 1, w, rowHeight - 1);
+        }
+      });
+    });
+    rollCtx.globalAlpha = 1;
+
+    if (state.extendedMidi) {
+      var seamX = originalEnd * pxPerSecond;
+      rollCtx.setLineDash([4, 3]);
+      rollCtx.strokeStyle = 'rgba(231,229,224,0.6)';
+      rollCtx.lineWidth = 1.5;
+      rollCtx.beginPath();
+      rollCtx.moveTo(seamX, 0);
+      rollCtx.lineTo(seamX, height);
+      rollCtx.stroke();
+      rollCtx.setLineDash([]);
+    }
+
+    rollSection.classList.remove('hidden');
+  }
+
+  // ---------------------------------------------------------------------------------------
+  // Playback (Tone.js)
+  // ---------------------------------------------------------------------------------------
+  function disposeAudioGraph() {
+    state.parts.forEach(function (p) { p.dispose(); });
+    state.synths.forEach(function (s) { s.dispose(); });
+    state.parts = [];
+    state.synths = [];
+  }
+
+  function buildAudioGraph() {
+    disposeAudioGraph();
+    var midiToPlay = state.extendedMidi || state.midi;
+    var includeExtension = previewToggle.checked;
+    var cutoff = includeExtension ? Infinity : state.originalEndSeconds + 1e-6;
+
+    midiToPlay.tracks.forEach(function (track) {
+      if (track.notes.length === 0) return;
+      var synth = new Tone.PolySynth(Tone.Synth, {
+        envelope: { attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.4 }
+      }).toDestination();
+      synth.volume.value = -8;
+
+      var events = track.notes
+        .filter(function (n) { return n.time < cutoff; })
+        .map(function (n) {
+          return { time: n.time, note: Tone.Frequency(n.midi, 'midi').toNote(), duration: n.duration, velocity: n.velocity };
+        });
+
+      var part = new Tone.Part(function (time, ev) {
+        synth.triggerAttackRelease(ev.note, ev.duration, time, ev.velocity);
+      }, events);
+      part.start(0);
+
+      state.synths.push(synth);
+      state.parts.push(part);
+    });
+
+    Tone.Transport.bpm.value = state.bpm;
+    var total = includeExtension ? state.totalEndSeconds : state.originalEndSeconds;
+    timeTotal.textContent = fmtTime(total);
+  }
+
+  playBtn.addEventListener('click', function () {
+    if (!state.midi) return;
+    Tone.start().then(function () {
+      if (!state.isPlaying) {
+        if (Tone.Transport.state !== 'paused') buildAudioGraph();
+        Tone.Transport.start();
+        state.isPlaying = true;
+        playhead.style.display = 'block';
+        tickPlayhead();
+      }
+    });
+  });
+
+  pauseBtn.addEventListener('click', function () {
+    Tone.Transport.pause();
+    state.isPlaying = false;
+    if (state.rafId) cancelAnimationFrame(state.rafId);
+  });
+
+  stopBtn.addEventListener('click', stopPlayback);
+
+  function stopPlayback() {
+    Tone.Transport.stop();
+    Tone.Transport.position = 0;
+    disposeAudioGraph();
+    state.isPlaying = false;
+    if (state.rafId) cancelAnimationFrame(state.rafId);
+    playhead.style.display = 'none';
+    timeReadout.textContent = '00:00.0';
+  }
+
+  previewToggle.addEventListener('change', function () {
+    if (state.isPlaying) { stopPlayback(); }
+  });
+
+  function tickPlayhead() {
+    if (!state.isPlaying) return;
+    var t = Tone.Transport.seconds;
+    var includeExtension = previewToggle.checked;
+    var total = includeExtension ? state.totalEndSeconds : state.originalEndSeconds;
+
+    timeReadout.textContent = fmtTime(t);
+    var pxPerSecond = 90;
+    playhead.style.left = (t * pxPerSecond) + 'px';
+
+    if (t >= total) {
+      stopPlayback();
+      return;
+    }
+    state.rafId = requestAnimationFrame(tickPlayhead);
+  }
+
+  // ---------------------------------------------------------------------------------------
+  // Export
+  // ---------------------------------------------------------------------------------------
+  downloadBtn.addEventListener('click', function () {
+    if (!state.extendedMidi) return;
+    try {
+      var bytes = state.extendedMidi.toArray();
+      var blob = new Blob([bytes], { type: 'audio/midi' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      var base = (state.fileName || 'composition.mid').replace(/\.(mid|midi)$/i, '');
+      a.href = url;
+      a.download = base + '-extended.mid';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+    } catch (err) {
+      console.error(err);
+      showError('Export failed', err.message || String(err));
+    }
+  });
+
+})();
+</script>
+</body>
+</html>

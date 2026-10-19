@@ -1,0 +1,956 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Scaler 3 Conversion Toolkit v2.4</title>
+<style>
+:root{
+  --bg:#f4f6fa;--panel:#fff;--ink:#18202a;--muted:#667085;
+  --accent:#5b5bd6;--accent2:#ececff;--border:#d9dee8;
+  --ok:#18794e;--danger:#b42318
+}
+*{box-sizing:border-box}
+body{
+  margin:0;background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif
+}
+main{max-width:980px;margin:auto;padding:24px}
+h1{margin:0 0 6px;font-size:clamp(28px,6vw,44px)}
+h2{margin:0 0 10px}
+.sub{margin:0 0 22px;color:var(--muted)}
+.card{
+  background:var(--panel);border:1px solid var(--border);border-radius:16px;
+  padding:18px;margin:14px 0;box-shadow:0 8px 24px rgba(16,24,40,.05)
+}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.tab{
+  background:#eef0f5;color:var(--ink);border:0;border-radius:10px;
+  padding:10px 13px;font:inherit;font-weight:700;cursor:pointer
+}
+.tab.active{background:var(--accent);color:#fff}
+.panel{display:none}.panel.active{display:block}
+.drop{
+  border:2px dashed var(--border);border-radius:14px;padding:30px 18px;
+  text-align:center;cursor:pointer;transition:.15s
+}
+.drop.drag,.drop:hover{border-color:var(--accent);background:var(--accent2)}
+.drop strong{display:block;font-size:18px;margin-bottom:6px}
+input[type=file]{display:none}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+label{display:block;font-size:13px;font-weight:650;margin:0 0 6px}
+select,input[type=number],input[type=text],textarea{
+  width:100%;padding:10px;border:1px solid var(--border);
+  border-radius:9px;background:#fff;color:var(--ink);font:inherit
+}
+textarea{min-height:105px;resize:vertical}
+.controls{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+button{
+  border:0;border-radius:10px;padding:11px 15px;font:inherit;font-weight:700;
+  cursor:pointer;background:var(--accent);color:white
+}
+button.secondary{background:#eef0f5;color:var(--ink)}
+button:disabled{opacity:.45;cursor:not-allowed}
+.status{margin-top:12px;color:var(--muted);font-size:14px;min-height:20px}
+.status.ok{color:var(--ok)} .status.error{color:var(--danger)}
+.meta{display:flex;gap:18px;flex-wrap:wrap;color:var(--muted);font-size:14px}
+.chords{display:grid;grid-template-columns:repeat(auto-fill,minmax(125px,1fr));gap:8px}
+.chord{
+  padding:10px;border:1px solid var(--border);border-radius:10px;background:#fafbfc
+}
+.chord b{display:block;font-size:16px}
+.chord small{color:var(--muted)}
+.note{color:var(--muted);font-size:13px;line-height:1.45}
+.hidden{display:none}
+.table-wrap{overflow:auto}
+table{width:100%;border-collapse:collapse}
+th,td{padding:9px;border-bottom:1px solid var(--border);text-align:left}
+th{font-size:13px;color:var(--muted)}
+td input[type=number]{min-width:80px}
+@media(max-width:680px){.grid,.grid.two{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<main>
+  <h1>Scaler 3 Conversion Toolkit v2.4</h1>
+  <p class="sub">MIDI ↔ Scaler 3 XML, with improved chord recognition and voice-leading.</p>
+
+  <div class="tabs">
+    <button class="tab active" data-tab="typed">Typed chords → XML / MIDI</button>
+    <button class="tab" data-tab="midi">MIDI → XML</button>
+    <button class="tab" data-tab="xml">XML → MIDI</button>
+  </div>
+
+  <section id="typed" class="panel active">
+    <div class="card">
+      <h2>Typed progression → Scaler 3 XML / MIDI</h2>
+      <label for="typedInput">Chord progression</label>
+      <textarea id="typedInput">C(2) | G(1) | Am(2) | F(1)</textarea>
+      <p class="note">
+        Separate chords with spaces, commas, pipes or new lines.
+        Put the number of bars in brackets after each chord: <b>C(2)</b>, <b>Am7(0.5)</b>.
+        Chords without brackets use the default below.
+      </p>
+      <div class="grid two">
+        <div>
+          <label for="typedDefaultBars">Default bars per chord</label>
+          <input id="typedDefaultBars" type="number" min="0.25" step="0.25" value="1">
+        </div>
+        <div>
+          <label for="typedOctave">Chord octave</label>
+          <select id="typedOctave">
+            <option value="3">Low</option>
+            <option value="4" selected>Middle</option>
+            <option value="5">High</option>
+          </select>
+        </div>
+      </div>
+      
+      <div class="grid two">
+        <div><label for="typedTempo">Tempo (BPM)</label><input id="typedTempo" type="number" value="120" min="30" max="300"></div>
+        <div><label for="typedVelocity">Velocity</label><input id="typedVelocity" type="number" value="90" min="1" max="127"></div>
+      </div>
+
+      <div class="controls">
+        <button id="typedParse">Preview progression</button>
+        <button id="typedExportXml" disabled>Export Scaler XML</button>
+        <button id="typedExportMidi" disabled>Export MIDI</button>
+      </div>
+      <div id="typedStatus" class="status"></div>
+    </div>
+
+    <div id="typedPreviewCard" class="card hidden">
+      <h2>Progression preview</h2>
+      <div id="typedPreview" class="chords"></div>
+    </div>
+  </section>
+
+  <section id="midi" class="panel">
+    <div class="card">
+      <h2>MIDI → Scaler 3 XML</h2>
+      <div id="midiDrop" class="drop" tabindex="0">
+        <strong>Drop a MIDI file here</strong>
+        <span>or tap to choose a .mid / .midi file</span>
+      </div>
+      <input id="midiFile" type="file" accept=".mid,.midi,audio/midi,audio/x-midi">
+      <div id="midiStatus" class="status">No file loaded.</div>
+    </div>
+
+    <div id="midiSettings" class="card hidden">
+      <div id="midiMeta" class="meta"></div>
+      <div class="grid" style="margin-top:16px">
+        <div>
+          <label for="midiTrack">MIDI track</label>
+          <select id="midiTrack"></select>
+        </div>
+        <div>
+          <label for="midiWindow">Arpeggio grouping</label>
+          <select id="midiWindow">
+            <option value="0.125">1/8 beat</option>
+            <option value="0.25" selected>1/4 beat</option>
+            <option value="0.5">1/2 beat</option>
+            <option value="1">1 beat</option>
+          </select>
+        </div>
+        <div>
+          <label for="midiMinimum">Minimum notes</label>
+          <select id="midiMinimum">
+            <option value="2">2</option>
+            <option value="3" selected>3</option>
+            <option value="4">4</option>
+          </select>
+        </div>
+      </div>
+      <div class="controls">
+        <button id="midiDetect">Detect chords</button>
+        <button id="midiExport" disabled>Export Scaler XML</button>
+        <button id="midiClear" class="secondary">Clear</button>
+      </div>
+    </div>
+
+    <div id="midiResults" class="card hidden">
+      <h2>Detected progression</h2>
+      <div id="midiSummary" class="status"></div>
+      <div id="midiChords" class="chords"></div>
+    </div>
+  </section>
+
+  <section id="xml" class="panel">
+    <div class="card">
+      <h2>Scaler 3 XML → MIDI</h2>
+      <div id="xmlDrop" class="drop" tabindex="0">
+        <strong>Drop a Scaler 3 XML file here</strong>
+        <span>or tap to choose an .xml file</span>
+      </div>
+      <input id="xmlFile" type="file" accept=".xml,application/xml,text/xml">
+      <div id="xmlStatus" class="status">No XML file loaded.</div>
+    </div>
+
+    <div id="xmlSettings" class="card hidden">
+      <div class="grid">
+        <div>
+          <label for="xmlTempo">Tempo (BPM)</label>
+          <input id="xmlTempo" type="number" min="30" max="300" value="120">
+        </div>
+        <div>
+          <label for="xmlVelocity">Velocity</label>
+          <input id="xmlVelocity" type="number" min="1" max="127" value="90">
+        </div>
+        <div>
+          <label for="xmlDefaultBars">Set all chords to bars</label>
+          <input id="xmlDefaultBars" type="number" min="0.25" step="0.25" value="1">
+        </div>
+      </div>
+      <div class="controls">
+        <button id="xmlApplyBars" class="secondary">Apply bars to all</button>
+        <button id="xmlExportMidi">Export MIDI</button>
+        <button id="xmlClear" class="secondary">Clear</button>
+      </div>
+    </div>
+
+    <div id="xmlTableCard" class="card hidden">
+      <h2>Chord durations</h2>
+      <p class="note">Scaler chord-set XML does not store timing, so set the number of bars for each chord here.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Chord</th><th>Notes</th><th>Bars</th></tr></thead>
+          <tbody id="xmlRows"></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+"use strict";
+
+const $=id=>document.getElementById(id);
+const PC_NAMES=["C","C♯","D","E♭","E","F","F♯","G","A♭","A","B♭","B"];
+const state={typed:[],midi:null,midiName:"",midiChords:[],xmlName:"",xmlChords:[]};
+
+// Tab switching
+document.querySelectorAll(".tab").forEach(btn=>btn.addEventListener("click",()=>{
+  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+  document.querySelectorAll(".panel").forEach(x=>x.classList.remove("active"));
+  btn.classList.add("active");
+  $(btn.dataset.tab).classList.add("active");
+}));
+
+// Utilities
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function midiName(n){return PC_NAMES[((n%12)+12)%12]+(Math.floor(n/12)-1)}
+function saveBlob(data,type,name){
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(new Blob([data],{type}));
+  a.download=name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+function uuid(){
+  if(crypto.randomUUID)return crypto.randomUUID();
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,c=>{
+    const r=Math.random()*16|0,v=c==="x"?r:(r&3|8);return v.toString(16);
+  });
+}
+
+// ============================================================
+// CHORD RECOGNITION ENGINE - v2.4
+// ============================================================
+
+const ROOTS={
+  "C":0,"C#":1,"DB":1,"D":2,"D#":3,"EB":3,"E":4,"FB":4,
+  "E#":5,"F":5,"F#":6,"GB":6,"G":7,"G#":8,"AB":8,
+  "A":9,"A#":10,"BB":10,"B":11,"CB":11,"B#":0
+};
+
+// Chord quality definitions with case-sensitive matching
+// Format: [regex (case-sensitive), intervals, displayName, isExtended, qualityWeight]
+const QUALITIES = [
+  // Extended chords - case-sensitive to distinguish M (major) from m (minor)
+  [ /^maj13$/, [0,4,7,11,14,21], "maj13", true, 100 ],
+  [ /^M13$/, [0,4,7,11,14,21], "maj13", true, 100 ],
+  [ /^Δ13$/, [0,4,7,11,14,21], "maj13", true, 100 ],
+  [ /^m13$/, [0,3,7,10,14,21], "m13", true, 100 ],
+  [ /^min13$/, [0,3,7,10,14,21], "m13", true, 100 ],
+  [ /^13$/, [0,4,7,10,14,21], "13", true, 100 ],
+  
+  [ /^maj11$/, [0,4,7,11,14,17], "maj11", true, 95 ],
+  [ /^M11$/, [0,4,7,11,14,17], "maj11", true, 95 ],
+  [ /^Δ11$/, [0,4,7,11,14,17], "maj11", true, 95 ],
+  [ /^m11$/, [0,3,7,10,14,17], "m11", true, 95 ],
+  [ /^min11$/, [0,3,7,10,14,17], "m11", true, 95 ],
+  [ /^11$/, [0,4,7,10,14,17], "11", true, 95 ],
+  
+  [ /^maj9$/, [0,4,7,11,14], "maj9", true, 90 ],
+  [ /^M9$/, [0,4,7,11,14], "maj9", true, 90 ],
+  [ /^Δ9$/, [0,4,7,11,14], "maj9", true, 90 ],
+  [ /^m9$/, [0,3,7,10,14], "m9", true, 90 ],
+  [ /^min9$/, [0,3,7,10,14], "m9", true, 90 ],
+  [ /^9$/, [0,4,7,10,14], "9", true, 90 ],
+  
+  // Seventh chords
+  [ /^maj7$/, [0,4,7,11], "maj7", false, 80 ],
+  [ /^M7$/, [0,4,7,11], "maj7", false, 80 ],
+  [ /^Δ7$/, [0,4,7,11], "maj7", false, 80 ],
+  [ /^Δ$/, [0,4,7,11], "maj7", false, 80 ],
+  [ /^mmaj7$/, [0,3,7,11], "mMaj7", false, 80 ],
+  [ /^minmaj7$/, [0,3,7,11], "mMaj7", false, 80 ],
+  [ /^mM7$/, [0,3,7,11], "mMaj7", false, 80 ],
+  [ /^m7b5$/, [0,3,6,10], "m7♭5", false, 85 ],
+  [ /^min7b5$/, [0,3,6,10], "m7♭5", false, 85 ],
+  [ /^ø7$/, [0,3,6,10], "m7♭5", false, 85 ],
+  [ /^ø$/, [0,3,6,10], "m7♭5", false, 85 ],
+  [ /^dim7$/, [0,3,6,9], "dim7", false, 85 ],
+  [ /^o7$/, [0,3,6,9], "dim7", false, 85 ],
+  [ /^°7$/, [0,3,6,9], "dim7", false, 85 ],
+  [ /^m7$/, [0,3,7,10], "m7", false, 80 ],
+  [ /^min7$/, [0,3,7,10], "m7", false, 80 ],
+  [ /^-7$/, [0,3,7,10], "m7", false, 80 ],
+  [ /^7$/, [0,4,7,10], "7", false, 80 ],
+  
+  // Sixth chords
+  [ /^m6$/, [0,3,7,9], "m6", false, 75 ],
+  [ /^min6$/, [0,3,7,9], "m6", false, 75 ],
+  [ /^-6$/, [0,3,7,9], "m6", false, 75 ],
+  [ /^6$/, [0,4,7,9], "6", false, 75 ],
+  [ /^m6add9$/, [0,3,7,9,14], "m6add9", true, 70 ],
+  [ /^min6add9$/, [0,3,7,9,14], "m6add9", true, 70 ],
+  [ /^6add9$/, [0,4,7,9,14], "6add9", true, 70 ],
+  
+  // Suspended
+  [ /^sus2$/, [0,2,7], "sus2", false, 65 ],
+  [ /^sus4$/, [0,5,7], "sus4", false, 65 ],
+  [ /^sus$/, [0,5,7], "sus4", false, 65 ],
+  [ /^7sus4$/, [0,5,7,10], "7sus4", false, 70 ],
+  [ /^7sus$/, [0,5,7,10], "7sus4", false, 70 ],
+  [ /^maj7sus4$/, [0,5,7,11], "maj7sus4", false, 70 ],
+  [ /^M7sus4$/, [0,5,7,11], "maj7sus4", false, 70 ],
+  
+  // Augmented and diminished
+  [ /^aug$/, [0,4,8], "aug", false, 60 ],
+  [ /^\+$/, [0,4,8], "aug", false, 60 ],
+  [ /^dim$/, [0,3,6], "dim", false, 60 ],
+  [ /^o$/, [0,3,6], "dim", false, 60 ],
+  [ /^°$/, [0,3,6], "dim", false, 60 ],
+  
+  // Triads
+  [ /^m$/, [0,3,7], "m", false, 50 ],
+  [ /^min$/, [0,3,7], "m", false, 50 ],
+  [ /^-$/, [0,3,7], "m", false, 50 ],
+  [ /^$/, [0,4,7], "", false, 50 ],
+  
+  // Add chords
+  [ /^add9$/, [0,4,7,14], "add9", true, 55 ],
+  [ /^add2$/, [0,4,7,14], "add9", true, 55 ],
+  [ /^madd9$/, [0,3,7,14], "madd9", true, 55 ],
+  [ /^madd2$/, [0,3,7,14], "madd9", true, 55 ],
+  [ /^minadd9$/, [0,3,7,14], "madd9", true, 55 ],
+  [ /^add11$/, [0,4,7,17], "add11", true, 55 ],
+  [ /^add13$/, [0,4,7,21], "add13", true, 55 ]
+];
+
+// Delta symbol handling
+function parseDelta(symbol) {
+  let result = symbol;
+  if (symbol.includes('Δ')) {
+    // Replace Δ with maj (case-sensitive)
+    const deltaMatch = symbol.match(/Δ(\d+)/);
+    if (deltaMatch) {
+      const num = deltaMatch[1];
+      result = symbol.replace(/Δ\d+/, 'maj' + num);
+    } else {
+      result = symbol.replace(/Δ/, 'maj7');
+    }
+  }
+  return result;
+}
+
+function chordToNotes(symbol, octave=4){
+  // First parse delta notation
+  const cleaned = parseDelta(symbol.trim().replace(/♯/g,"#").replace(/♭/g,"b"));
+  const m = cleaned.match(/^([A-Ga-g])([#b]?)([^\/]*)(?:\/([A-Ga-g])([#b]?))?$/);
+  if(!m) throw new Error(`Unsupported chord: ${symbol}`);
+  
+  const rootKey = (m[1] + m[2]).toUpperCase();
+  const root = ROOTS[rootKey];
+  if(root === undefined) throw new Error(`Unknown root in chord: ${symbol}`);
+  
+  const suffix = m[3] || "";
+  let intervals = null, qualityName = "";
+  for(const [re, ints, qn] of QUALITIES){
+    if(re.test(suffix)){ intervals = ints; qualityName = qn; break; }
+  }
+  if(!intervals) throw new Error(`Unsupported chord quality: ${symbol}`);
+  
+  const rootMidi = 12 * (Number(octave) + 1) + root;
+  let notes = intervals.map(i => rootMidi + i);
+  
+  if(m[4]){
+    const bass = ROOTS[(m[4] + (m[5] || "")).toUpperCase()];
+    if(bass !== undefined && bass !== root){
+      let bassMidi = 12 * Number(octave) + bass;
+      const lowest = Math.min(...notes);
+      while(bassMidi >= lowest && bassMidi > 24) bassMidi -= 12;
+      notes = [bassMidi, ...notes];
+    }
+  }
+  return [...new Set(notes)].filter(n => n >= 0 && n <= 127).sort((a,b) => a-b);
+}
+
+function nameChord(notes){
+  if(!notes || notes.length === 0) return "";
+  
+  const pcs = [...new Set(notes.map(n => n % 12))];
+  const bass = Math.min(...notes) % 12;
+  
+  let best = null;
+  let bestScore = -Infinity;
+  
+  // Try every possible root
+  for(let root = 0; root < 12; root++){
+    const rel = pcs.map(p => (p - root + 12) % 12).sort((a,b) => a-b);
+    
+    for(const [re, ints, qn, extended, weight] of QUALITIES){
+      // Compare normalised pitch classes so extensions such as 9ths (14 -> 2)
+      // are not incorrectly treated as extra notes.
+      const qualityPcs = [...new Set(ints.map(i => i % 12))];
+      const allPresent = qualityPcs.every(pc => rel.includes(pc));
+      if(!allPresent) continue;
+      
+      // Check for extra pitch classes
+      const extra = rel.filter(pc => !qualityPcs.includes(pc));
+      
+      // Calculate score with weighted components
+      let score = 0;
+      
+      // Base score from weight
+      score += weight;
+      
+      // Bonus for exact match (no extra notes)
+      if(extra.length === 0) score += 30;
+      
+      // Bonus for root position
+      if(root === bass) score += 15;
+      
+      // Bonus for minor quality when minor third is present
+      const hasMinorThird = rel.includes(3);
+      const isMinorQuality = qn.includes('m') || qn === 'm';
+      if(hasMinorThird && isMinorQuality) score += 10;
+      if(!hasMinorThird && !isMinorQuality) score += 5;
+      
+      // Penalty for extra notes
+      score -= extra.length * 8;
+      
+      // Penalty for missing notes in extended chords
+      if(extended){
+        const missing = qualityPcs.filter(pc => !rel.includes(pc));
+        score -= missing.length * 3;
+      }
+      
+      // Prefer simpler chords when all else is equal
+      if(extra.length === 0 && ints.length < 5) score += 2;
+      
+      if(score > bestScore){
+        bestScore = score;
+        best = { root, quality: qn, extra: extra.length };
+      }
+    }
+  }
+  
+  if(!best) {
+    // Fallback: name by lowest note
+    return PC_NAMES[bass];
+  }
+  
+  let name = PC_NAMES[best.root];
+  if(best.quality && best.quality !== "") {
+    name += best.quality;
+  }
+  if(bass !== best.root){
+    name += "/" + PC_NAMES[bass];
+  }
+  return name;
+}
+
+// ============================================================
+// TYPED CHORD PARSER
+// ============================================================
+
+function parseTyped(){
+  const raw = $("typedInput").value.trim();
+  const defaultBars = Math.max(.25, Number($("typedDefaultBars").value) || 1);
+  const octave = Number($("typedOctave").value) || 4;
+  if(!raw) throw new Error("Enter at least one chord.");
+  
+  const tokens = [];
+  const parts = raw.split(/[\n,|]+/);
+  for(const part of parts){
+    const trimmed = part.trim();
+    if(!trimmed) continue;
+    const subs = trimmed.match(/\S+\([^)]+\)|\S+/g);
+    if(subs) tokens.push(...subs);
+    else tokens.push(trimmed);
+  }
+  
+  return tokens.map(token => {
+    let symbol = token, bars = defaultBars;
+    let m = token.match(/^(.*?)(?:\((\d*\.?\d+)\)|:(\d*\.?\d+))$/);
+    if(m){ symbol = m[1].trim(); bars = Number(m[2] || m[3]); }
+    if(!symbol) throw new Error(`Empty chord token: ${token}`);
+    if(!Number.isFinite(bars) || bars <= 0) throw new Error(`Invalid bar value: ${token}`);
+    const notes = chordToNotes(symbol, octave);
+    return { name: symbol, bars, notes };
+  });
+}
+
+function renderTyped(){
+  $("typedPreviewCard").classList.toggle("hidden", !state.typed.length);
+  $("typedExportXml").disabled = !state.typed.length;
+  $("typedExportMidi").disabled = !state.typed.length;
+  $("typedPreview").innerHTML = state.typed.map((c,i) => `
+    <div class="chord"><b>${i+1}. ${esc(c.name)}</b>
+    <small>${c.bars} bar${c.bars===1?"":"s"}<br>${c.notes.map(midiName).join(" · ")}</small></div>`).join("");
+}
+
+$("typedParse").addEventListener("click", () => {
+  try{
+    state.typed = parseTyped(); renderTyped();
+    $("typedStatus").textContent = `${state.typed.length} chords ready.`;
+    $("typedStatus").className = "status ok";
+  }catch(e){
+    state.typed = []; renderTyped();
+    $("typedStatus").textContent = e.message;
+    $("typedStatus").className = "status error";
+  }
+});
+
+function invalidateTyped(){
+  state.typed = [];
+  renderTyped();
+  $("typedStatus").textContent = "Changes detected. Preview the progression again.";
+  $("typedStatus").className = "status";
+}
+["typedInput","typedDefaultBars","typedOctave"].forEach(id => {
+  $(id).addEventListener(id === "typedInput" ? "input" : "change", invalidateTyped);
+});
+
+// ============================================================
+// SCALER XML GENERATION
+// ============================================================
+
+function scalerXml(chords){
+  const out = ['<?xml version="1.0" encoding="UTF-8"?>', '',
+    `<CHORDSET version="2" uuid="${uuid()}">`];
+  chords.forEach(c => {
+    out.push("  <CHORD>");
+    c.notes.forEach(n => out.push(`    <NOTE MIDI="${n}"/>`));
+    out.push("  </CHORD>");
+  });
+  out.push("</CHORDSET>", "");
+  return out.join("\n");
+}
+
+$("typedExportXml").addEventListener("click", () => {
+  try{
+    state.typed = parseTyped(); renderTyped();
+    saveBlob(scalerXml(state.typed), "application/xml;charset=utf-8", "Typed_Progression_Scaler3.xml");
+  }catch(e){
+    state.typed = []; renderTyped();
+    $("typedStatus").textContent = e.message;
+    $("typedStatus").className = "status error";
+  }
+});
+
+// ============================================================
+// MIDI WRITER
+// ============================================================
+
+function makeMidi(chords, tempo, velocity){
+  const ppq = 480, barTicks = ppq*4, events = [];
+  const mpqn = Math.round(60000000/tempo);
+  events.push({tick:0, data:[0xff, 0x51, 0x03, (mpqn>>16)&255, (mpqn>>8)&255, mpqn&255]});
+  events.push({tick:0, data:[0xff, 0x58, 0x04, 4, 2, 24, 8]});
+  let tick = 0;
+  chords.forEach(c => {
+    const dur = Math.max(1, Math.round(c.bars * barTicks));
+    c.notes.forEach(n => events.push({tick, data:[0x90, n&127, velocity]}));
+    c.notes.forEach(n => events.push({tick: tick+dur, data:[0x80, n&127, 0]}));
+    tick += dur;
+  });
+  events.sort((a,b) => {
+    if(a.tick !== b.tick) return a.tick - b.tick;
+    const pa = ((a.data[0] & 0xf0) === 0x80) ? 0 : 1;
+    const pb = ((b.data[0] & 0xf0) === 0x80) ? 0 : 1;
+    return pa - pb;
+  });
+  const track = []; let prev = 0;
+  events.forEach(e => { track.push(...vlq(e.tick - prev), ...e.data); prev = e.tick; });
+  track.push(0, 0xff, 0x2f, 0);
+  return new Uint8Array([
+    ...strBytes("MThd"), ...u32(6), ...u16(0), ...u16(1), ...u16(ppq),
+    ...strBytes("MTrk"), ...u32(track.length), ...track
+  ]);
+}
+
+function vlq(n){
+  let bytes = [n & 0x7f]; while(n >>= 7) bytes.unshift((n & 0x7f) | 0x80);
+  return bytes;
+}
+function u32(n){ return [(n>>>24)&255, (n>>>16)&255, (n>>>8)&255, n&255]; }
+function u16(n){ return [(n>>>8)&255, n&255]; }
+function strBytes(s){ return [...s].map(c => c.charCodeAt(0) & 255); }
+
+$("typedExportMidi").addEventListener("click", () => {
+  try{
+    state.typed = parseTyped(); renderTyped();
+    const tempo = Math.min(300, Math.max(30, Number($("typedTempo").value) || 120));
+    const velocity = Math.min(127, Math.max(1, Number($("typedVelocity").value) || 90));
+    saveBlob(makeMidi(state.typed, tempo, velocity), "audio/midi", "Typed_Progression.mid");
+  }catch(e){
+    state.typed = []; renderTyped();
+    $("typedStatus").textContent = e.message;
+    $("typedStatus").className = "status error";
+  }
+});
+
+// ============================================================
+// MIDI PARSER
+// ============================================================
+
+function readU32(v,o){ return v.getUint32(o,false); }
+function readU16(v,o){ return v.getUint16(o,false); }
+
+function readVar(data,pos){
+  let value = 0, b, count = 0;
+  do{
+    if(pos.i >= data.length) throw new Error("Unexpected end of MIDI data.");
+    b = data[pos.i++];
+    value = (value << 7) | (b & 0x7f);
+    if(++count > 4) throw new Error("Invalid MIDI data.");
+  }while(b & 0x80);
+  return value;
+}
+
+function parseMidi(buffer){
+  const data = new Uint8Array(buffer);
+  const view = new DataView(buffer);
+  const text = (a,b) => String.fromCharCode(...data.slice(a,b));
+  
+  if(text(0,4) !== "MThd") throw new Error("Not a Standard MIDI file.");
+  const headerLength = readU32(view,4);
+  const format = readU16(view,8);
+  const trackCount = readU16(view,10);
+  const division = readU16(view,12);
+  if(division & 0x8000) throw new Error("SMPTE timing is not supported.");
+  const ppq = division;
+  let p = 8 + headerLength;
+  const tracks = [];
+  
+  for(let ti = 0; ti < trackCount; ti++){
+    if(text(p, p+4) !== "MTrk") throw new Error("Invalid MIDI track.");
+    const len = readU32(view, p+4);
+    const end = p + 8 + len;
+    const bytes = data.slice(p+8, end);
+    const pos = {i: 0};
+    let tick = 0, running = 0;
+    let name = `Track ${ti+1}`;
+    const notes = [];
+    const active = new Map();
+    
+    while(pos.i < bytes.length){
+      tick += readVar(bytes, pos);
+      let status = bytes[pos.i++];
+      if(status < 0x80){
+        if(!running) throw new Error("Invalid running status.");
+        pos.i--; status = running;
+      } else if(status < 0xf0) running = status;
+      
+      if(status === 0xff){
+        const type = bytes[pos.i++];
+        const n = readVar(bytes, pos);
+        const payload = bytes.slice(pos.i, pos.i + n);
+        pos.i += n;
+        if(type === 3) name = new TextDecoder().decode(payload).replace(/\0/g, "").trim() || name;
+        continue;
+      }
+      if(status === 0xf0 || status === 0xf7){ pos.i += readVar(bytes,pos); continue; }
+      
+      const type = status & 0xf0;
+      const ch = status & 15;
+      const one = (type === 0xc0 || type === 0xd0);
+      const a = bytes[pos.i++];
+      const b = one ? 0 : bytes[pos.i++];
+      
+      if(type === 0x90 && b > 0){
+        const key = `${ch}:${a}`;
+        if(!active.has(key)) active.set(key, []);
+        active.get(key).push({ tick, velocity: b });
+      } else if(type === 0x80 || (type === 0x90 && b === 0)){
+        const key = `${ch}:${a}`;
+        const queue = active.get(key);
+        if(queue && queue.length){
+          const old = queue.shift();
+          notes.push({ pitch: a, start: old.tick, end: Math.max(tick, old.tick+1), channel: ch, velocity: old.velocity });
+          if(queue.length === 0) active.delete(key);
+        }
+      }
+    }
+    // Close remaining notes
+    for(const [key, queue] of active){
+      const [ch, pitch] = key.split(":").map(Number);
+      for(const old of queue){
+        notes.push({ pitch, start: old.tick, end: tick+1, channel: ch, velocity: old.velocity });
+      }
+    }
+    notes.sort((a,b) => a.start - b.start || a.pitch - b.pitch);
+    tracks.push({ index: ti, name, notes });
+    p = end;
+  }
+  return { format, ppq, tracks };
+}
+
+// ============================================================
+// IMPROVED CHORD DETECTION - TRUE SOUNDING NOTES
+// ============================================================
+
+function detectMidiChords(track, ppq, windowBeats, minNotes){
+  if(!track.notes.length) return [];
+  
+  const windowTicks = Math.max(1, Math.round(ppq * windowBeats));
+  const allNotes = track.notes.filter(n => n.channel !== 9);
+  if(!allNotes.length) return [];
+  
+  // Group all note events by tick so note-offs can be processed before
+  // note-ons at the same musical position.
+  const byTick = new Map();
+  allNotes.forEach(n => {
+    if(!byTick.has(n.start)) byTick.set(n.start, {starts:[], ends:[]});
+    if(!byTick.has(n.end)) byTick.set(n.end, {starts:[], ends:[]});
+    byTick.get(n.start).starts.push(n);
+    byTick.get(n.end).ends.push(n);
+  });
+  
+  const ticks = [...byTick.keys()].sort((a,b) => a-b);
+  const sounding = new Map(); // pitch -> array of overlapping active notes
+  const snapshots = [];
+  let lastSnapshotTick = -Infinity;
+  
+  const addSounding = note => {
+    if(!sounding.has(note.pitch)) sounding.set(note.pitch, []);
+    sounding.get(note.pitch).push(note);
+  };
+  const removeSounding = note => {
+    const queue = sounding.get(note.pitch);
+    if(!queue) return;
+    const i = queue.indexOf(note);
+    if(i >= 0) queue.splice(i, 1);
+    else queue.shift();
+    if(!queue.length) sounding.delete(note.pitch);
+  };
+  
+  for(const tick of ticks){
+    const group = byTick.get(tick);
+    
+    // Remove outgoing notes first to avoid merging adjacent chords.
+    group.ends.forEach(removeSounding);
+    group.starts.forEach(addSounding);
+    
+    const pitches = [...sounding.keys()].sort((a,b) => a-b);
+    if(pitches.length < minNotes) continue;
+    
+    // Keep snapshots separated by the selected grouping window. If a richer
+    // snapshot appears inside the same window, replace the earlier one.
+    const candidate = { tick, notes: pitches };
+    const prev = snapshots[snapshots.length - 1];
+    if(!prev || tick - lastSnapshotTick > windowTicks){
+      snapshots.push(candidate);
+      lastSnapshotTick = tick;
+    } else if(pitches.length > prev.notes.length){
+      snapshots[snapshots.length - 1] = candidate;
+    }
+  }
+  
+  return snapshots.map(snap => {
+    const pitches = snap.notes.slice(0,10);
+    return { notes: pitches, name: nameChord(pitches) };
+  });
+}
+
+function bestTrack(m){
+  let bi = 0, bs = -1;
+  m.tracks.forEach((t, i) => {
+    const nonDrums = t.notes.filter(n => n.channel !== 9).length;
+    const score = nonDrums;
+    if(score > bs){ bs = score; bi = i; }
+  });
+  return bi;
+}
+
+// ============================================================
+// MIDI FILE LOADING
+// ============================================================
+
+async function loadMidi(file){
+  try{
+    if(!/\.(mid|midi)$/i.test(file.name)) throw new Error("Choose a .mid or .midi file.");
+    const m = parseMidi(await file.arrayBuffer());
+    state.midi = m;
+    state.midiName = file.name.replace(/\.(mid|midi)$/i, "");
+    $("midiSettings").classList.remove("hidden");
+    $("midiTrack").innerHTML = m.tracks.map((t,i) => 
+      `<option value="${i}">${esc(t.name)} — ${t.notes.filter(n=>n.channel!==9).length} notes</option>`
+    ).join("");
+    $("midiTrack").value = bestTrack(m);
+    $("midiMeta").innerHTML = `<span><b>Format:</b> ${m.format}</span><span><b>Tracks:</b> ${m.tracks.length}</span><span><b>PPQ:</b> ${m.ppq}</span>`;
+    $("midiStatus").textContent = `${file.name} loaded.`;
+    $("midiStatus").className = "status ok";
+    runMidiDetection();
+  }catch(e){
+    state.midi = null;
+    state.midiName = "";
+    state.midiChords = [];
+    $("midiSettings").classList.add("hidden");
+    $("midiResults").classList.add("hidden");
+    $("midiExport").disabled = true;
+    $("midiStatus").textContent = e.message;
+    $("midiStatus").className = "status error";
+  }
+}
+
+function runMidiDetection(){
+  if(!state.midi) return;
+  const t = state.midi.tracks[Number($("midiTrack").value)];
+  state.midiChords = detectMidiChords(
+    t, 
+    state.midi.ppq, 
+    Number($("midiWindow").value), 
+    Number($("midiMinimum").value)
+  );
+  $("midiResults").classList.toggle("hidden", !state.midiChords.length);
+  $("midiExport").disabled = !state.midiChords.length;
+  $("midiSummary").textContent = `${state.midiChords.length} chords detected.`;
+  $("midiChords").innerHTML = state.midiChords.map((c,i) => `
+    <div class="chord"><b>${i+1}. ${esc(c.name)}</b>
+    <small>${c.notes.map(midiName).join(" · ")}</small></div>
+  `).join("");
+}
+
+function setupDrop(dropId, inputId, loader){
+  const d = $(dropId), f = $(inputId);
+  d.addEventListener("click", () => f.click());
+  f.addEventListener("change", e => loader(e.target.files[0]));
+  ["dragenter","dragover"].forEach(x => d.addEventListener(x, e => { e.preventDefault(); d.classList.add("drag"); }));
+  ["dragleave","drop"].forEach(x => d.addEventListener(x, e => { e.preventDefault(); d.classList.remove("drag"); }));
+  d.addEventListener("drop", e => loader(e.dataTransfer.files[0]));
+}
+
+setupDrop("midiDrop", "midiFile", loadMidi);
+["midiTrack","midiWindow","midiMinimum"].forEach(id => $(id).addEventListener("change", runMidiDetection));
+$("midiDetect").addEventListener("click", runMidiDetection);
+$("midiExport").addEventListener("click", () => 
+  saveBlob(scalerXml(state.midiChords), "application/xml;charset=utf-8", `${state.midiName}_Scaler3.xml`)
+);
+$("midiClear").addEventListener("click", () => {
+  state.midi = null;
+  state.midiChords = [];
+  $("midiSettings").classList.add("hidden");
+  $("midiResults").classList.add("hidden");
+  $("midiStatus").textContent = "Cleared.";
+  $("midiStatus").className = "status";
+  $("midiFile").value = "";
+});
+
+// ============================================================
+// SCALER XML PARSER
+// ============================================================
+
+function parseScalerXml(text){
+  const doc = new DOMParser().parseFromString(text, "application/xml");
+  if(doc.querySelector("parsererror")) throw new Error("Invalid XML file.");
+  const root = doc.documentElement;
+  if(root.tagName !== "CHORDSET") throw new Error("Not a Scaler CHORDSET file.");
+  if(!root.hasAttribute("version")) throw new Error("Missing CHORDSET version attribute.");
+  const version = root.getAttribute("version");
+  if(version !== "1" && version !== "2") throw new Error(`Unsupported CHORDSET version: ${version}. Only versions 1 and 2 are supported.`);
+  
+  const chordNodes = [...root.children].filter(el => el.tagName === "CHORD");
+  if(!chordNodes.length) throw new Error("No Scaler CHORD entries found.");
+  
+  return chordNodes.map((node, i) => {
+    const noteNodes = [...node.children].filter(el => el.tagName === "NOTE");
+    if(!noteNodes.length) throw new Error(`Chord ${i+1} contains no MIDI notes.`);
+    const notes = noteNodes.map(n => {
+      const val = Number(n.getAttribute("MIDI"));
+      if(!Number.isFinite(val) || val < 0 || val > 127 || !Number.isInteger(val)){
+        throw new Error(`Chord ${i+1} has invalid MIDI note value: ${n.getAttribute("MIDI")}`);
+      }
+      return val;
+    });
+    return { name: nameChord(notes), notes: notes.sort((a,b) => a-b), bars: 1 };
+  });
+}
+
+async function loadXml(file){
+  try{
+    if(!/\.xml$/i.test(file.name)) throw new Error("Choose a Scaler .xml file.");
+    state.xmlName = file.name.replace(/\.xml$/i, "");
+    state.xmlChords = parseScalerXml(await file.text());
+    renderXmlRows();
+    $("xmlSettings").classList.remove("hidden");
+    $("xmlTableCard").classList.remove("hidden");
+    $("xmlStatus").textContent = `${state.xmlChords.length} chords loaded.`;
+    $("xmlStatus").className = "status ok";
+  }catch(e){
+    state.xmlName = "";
+    state.xmlChords = [];
+    $("xmlSettings").classList.add("hidden");
+    $("xmlTableCard").classList.add("hidden");
+    $("xmlStatus").textContent = e.message;
+    $("xmlStatus").className = "status error";
+  }
+}
+
+setupDrop("xmlDrop", "xmlFile", loadXml);
+
+function renderXmlRows(){
+  $("xmlRows").innerHTML = state.xmlChords.map((c,i) => `
+    <tr><td>${i+1}</td><td><b>${esc(c.name)}</b></td>
+    <td>${c.notes.map(midiName).join(" · ")}</td>
+    <td><input class="barsInput" data-i="${i}" type="number" min="0.25" step="0.25" value="${c.bars}"></td></tr>
+  `).join("");
+}
+
+$("xmlRows").addEventListener("input", e => {
+  if(e.target.classList.contains("barsInput")){
+    state.xmlChords[Number(e.target.dataset.i)].bars = Math.max(.25, Number(e.target.value) || 1);
+  }
+});
+
+$("xmlApplyBars").addEventListener("click", () => {
+  const b = Math.max(.25, Number($("xmlDefaultBars").value) || 1);
+  state.xmlChords.forEach(c => c.bars = b);
+  renderXmlRows();
+});
+
+$("xmlClear").addEventListener("click", () => {
+  state.xmlChords = [];
+  state.xmlName = "";
+  $("xmlSettings").classList.add("hidden");
+  $("xmlTableCard").classList.add("hidden");
+  $("xmlStatus").textContent = "Cleared.";
+  $("xmlStatus").className = "status";
+  $("xmlFile").value = "";
+});
+
+$("xmlExportMidi").addEventListener("click", () => {
+  if(!state.xmlChords.length) return;
+  const tempo = Math.min(300, Math.max(30, Number($("xmlTempo").value) || 120));
+  const velocity = Math.min(127, Math.max(1, Number($("xmlVelocity").value) || 90));
+  saveBlob(makeMidi(state.xmlChords, tempo, velocity), "audio/midi", `${state.xmlName}_Chords.mid`);
+});
+
+// Auto-parse on load
+$("typedParse").click();
+</script>
+</body>
+</html>

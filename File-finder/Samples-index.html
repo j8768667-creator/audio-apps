@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>VibeStash Lite</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+
+    body {
+      background: #0d0914;
+      color: #f5f5f7;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      padding: 20px;
+      padding-bottom: 80px;
+    }
+
+    h1 {
+      font-size: 24px;
+      margin-bottom: 12px;
+      color: #ff2a85;
+    }
+
+    /* Import Box */
+    .import-btn {
+      display: block;
+      width: 100%;
+      background: #191226;
+      border: 2px dashed #ff2a85;
+      padding: 18px;
+      border-radius: 12px;
+      color: #fff;
+      font-size: 16px;
+      font-weight: bold;
+      text-align: center;
+      margin-bottom: 20px;
+      cursor: pointer;
+    }
+
+    /* Cue List */
+    .cue-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .cue-card {
+      background: #191226;
+      border: 1px solid #2b2042;
+      border-radius: 10px;
+      padding: 14px;
+      cursor: pointer;
+    }
+
+    .cue-card:active {
+      border-color: #ff2a85;
+    }
+
+    .cue-title {
+      font-size: 15px;
+      font-weight: bold;
+      margin-bottom: 4px;
+      word-break: break-all;
+    }
+
+    .cue-type {
+      font-size: 12px;
+      color: #00e5ff;
+      text-transform: uppercase;
+    }
+
+    #file-input {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>VibeStash</h1>
+
+  <input 
+    type="file" 
+    id="file-input" 
+    multiple 
+    accept="audio/*,.wav,.mid,.midi,audio/wav,audio/midi"
+  >
+
+  <label for="file-input" class="import-btn">
+    Tap to Import WAV / MIDI Files
+  </label>
+
+  <div class="cue-grid" id="cue-list">
+    </div>
+
+  <script>
+    let audioCtx = null;
+
+    function getAudioContext() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      return audioCtx;
+    }
+
+    const fileInput = document.getElementById('file-input');
+    const cueList = document.getElementById('cue-list');
+
+    fileInput.addEventListener('change', async (e) => {
+      const files = Array.from(e.target.files);
+      const ctx = getAudioContext();
+
+      for (const file of files) {
+        const isMidi = file.name.match(/\.(mid|midi)$/i);
+        const card = document.createElement('div');
+        card.className = 'cue-card';
+
+        card.innerHTML = `
+          <div class="cue-title">${file.name}</div>
+          <div class="cue-type">${isMidi ? 'MIDI Sequence' : 'WAV Audio'}</div>
+        `;
+
+        const arrayBuffer = await file.arrayBuffer();
+
+        if (isMidi) {
+          // Fallback tone for MIDI
+          card.onclick = () => {
+            const c = getAudioContext();
+            const osc = c.createOscillator();
+            const gain = c.createGain();
+            osc.connect(gain);
+            gain.connect(c.destination);
+            osc.frequency.setValueAtTime(440, c.currentTime);
+            gain.gain.setValueAtTime(0.2, c.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.5);
+            osc.start();
+            osc.stop(c.currentTime + 0.5);
+          };
+        } else {
+          // Decode Audio Data
+          try {
+            const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+            card.onclick = () => {
+              const c = getAudioContext();
+              const source = c.createBufferSource();
+              source.buffer = audioBuffer;
+              source.connect(c.destination);
+              source.start(0);
+            };
+          } catch (err) {
+            card.querySelector('.cue-type').innerText = 'Error decoding audio';
+          }
+        }
+
+        cueList.appendChild(card);
+      }
+    });
+  </script>
+</body>
+</html>

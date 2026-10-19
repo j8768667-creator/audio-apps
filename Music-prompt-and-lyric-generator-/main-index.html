@@ -1,0 +1,1537 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <!-- iPad & iOS Optimization: prevent pinch zoom, double-tap zoom delay, and status bar translucency -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>PromptWeaver - Music Prompt Workbench</title>
+  <meta name="description" content="Precision music AI prompt workbench and lyric studio for Suno, Udio, MusicGen, and audio generators.">
+  <meta property="og:title" content="PromptWeaver - Music Prompt Workbench">
+  <meta property="og:description" content="Precision music AI prompt workbench and lyric studio for Suno, Udio, MusicGen, and audio generators.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            studio: {
+              950: '#0b0e14', 900: '#121721', 850: '#181f2c',
+              800: '#212a3b', 700: '#334155', 400: '#94a3b8',
+              300: '#cbd5e1', 200: '#e2e8f0', 100: '#f8fafc'
+            },
+            amber: { 450: '#F59E0B', 550: '#D97706' },
+            teal: { 450: '#10B981', 550: '#059669' }
+          },
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+            mono: ['ui-monospace', 'SF Mono', 'Menlo', 'Consolas', 'monospace']
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    /* Global iPad & iOS Touch Optimization */
+    *, *::before, *::after {
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Prevent text selection and long-press callouts on all interactive elements */
+    button, select, label, .no-select, header, .preset-btn, .engine-card, .metatag-btn, .insert-cue, nav {
+      -webkit-touch-callout: none !important;
+      -webkit-user-select: none !important;
+      user-select: none !important;
+      touch-action: manipulation !important;
+    }
+
+    /* Ensure textareas and text inputs allow fluid text selection */
+    input[type="text"], textarea {
+      -webkit-user-select: text !important;
+      user-select: text !important;
+      touch-action: manipulation;
+    }
+
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0b0e14; }
+    ::-webkit-scrollbar-thumb { background: #212a3b; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+    /* Tag styles */
+    .tag-active { background-color: rgba(16, 185, 129, 0.15); border-color: rgba(16, 185, 129, 0.5); color: #34d399; }
+    .tag-inactive { opacity: 0.45; text-decoration: line-through; border-color: #212a3b; color: #94a3b8; }
+  </style>
+</head>
+<body class="bg-studio-950 text-studio-100 min-h-screen font-sans selection:bg-amber-500/30 selection:text-amber-200 overscroll-none">
+  <!-- HEADER -->
+  <header class="border-b border-studio-800 bg-studio-900/90 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3 min-h-[60px]">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-450 to-amber-600 flex items-center justify-center text-studio-950 font-bold text-lg shadow-sm shrink-0">
+          PW
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base font-semibold tracking-tight text-white">PromptWeaver</h1>
+            <span class="text-xs px-2 py-0.5 rounded bg-studio-800 text-amber-400 font-mono">v2.6 iPad</span>
+          </div>
+          <p class="text-xs text-studio-400">Precision Music Prompt &amp; Lyric Studio</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <div class="flex bg-studio-850 p-1 rounded-lg border border-studio-800 text-xs">
+          <button id="tapTempoBtn" aria-label="Tap to set BPM" class="min-h-[44px] px-3.5 py-1 rounded hover:bg-studio-800 text-studio-200 font-mono transition-colors flex items-center gap-1.5 active:bg-studio-700">
+            <span>⏱</span> <span id="tapTempoText">Tap Tempo</span>
+          </button>
+          <button id="toneBtn" aria-label="Play reference drone" class="min-h-[44px] px-3.5 py-1 rounded hover:bg-studio-800 text-studio-200 font-mono transition-colors flex items-center gap-1.5 active:bg-studio-700">
+            <span id="toneIcon">🎵</span> <span id="toneText">Pitch Drone</span>
+          </button>
+        </div>
+        <button id="quickBundleBtn" class="min-h-[44px] px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-450 active:bg-amber-600 text-studio-950 font-semibold text-sm transition-colors flex items-center gap-1.5 shadow-sm">
+          <span>📋</span> Copy Full Bundle
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN WORKSPACE -->
+  <main class="max-w-7xl mx-auto px-4 py-6">
+    <!-- PRESETS BAR -->
+    <div class="mb-6 flex items-center gap-2 overflow-x-auto pb-2" style="-webkit-overflow-scrolling: touch;">
+      <span class="text-xs font-semibold text-studio-400 uppercase tracking-wider shrink-0 mr-1">Presets:</span>
+      <button class="preset-btn min-h-[40px] px-4 py-1.5 rounded-full bg-studio-900 border border-studio-800 hover:border-amber-500 active:bg-amber-500/20 text-sm text-studio-200 whitespace-nowrap transition-colors" data-preset="synthwave-noir">Synthwave Noir</button>
+      <button class="preset-btn min-h-[40px] px-4 py-1.5 rounded-full bg-studio-900 border border-studio-800 hover:border-amber-500 active:bg-amber-500/20 text-sm text-studio-200 whitespace-nowrap transition-colors" data-preset="deep-focus-ambient">Deep Work (432Hz)</button>
+      <button class="preset-btn min-h-[40px] px-4 py-1.5 rounded-full bg-studio-900 border border-studio-800 hover:border-amber-500 active:bg-amber-500/20 text-sm text-studio-200 whitespace-nowrap transition-colors" data-preset="french-house-groove">French Touch Disco</button>
+      <button class="preset-btn min-h-[40px] px-4 py-1.5 rounded-full bg-studio-900 border border-studio-800 hover:border-amber-500 active:bg-amber-500/20 text-sm text-studio-200 whitespace-nowrap transition-colors" data-preset="monumental-score">Monumental Cinematic</button>
+      <button class="preset-btn min-h-[40px] px-4 py-1.5 rounded-full bg-studio-900 border border-studio-800 hover:border-amber-500 active:bg-amber-500/20 text-sm text-studio-200 whitespace-nowrap transition-colors" data-preset="lofi-hiphop">Warm Lo-Fi Tape</button>
+      <button class="preset-btn min-h-[40px] px-4 py-1.5 rounded-full bg-studio-900 border border-studio-800 hover:border-amber-500 active:bg-amber-500/20 text-sm text-studio-200 whitespace-nowrap transition-colors" data-preset="alt-rnb">Late-Night Alt R&amp;B</button>
+      <button class="preset-btn min-h-[40px] px-4 py-1.5 rounded-full bg-studio-900 border border-studio-800 hover:border-amber-500 active:bg-amber-500/20 text-sm text-studio-200 whitespace-nowrap transition-colors" data-preset="modern-metalcore">Modern Metalcore</button>
+      <button class="preset-btn min-h-[40px] px-4 py-1.5 rounded-full bg-studio-900 border border-studio-800 hover:border-amber-500 active:bg-amber-500/20 text-sm text-studio-200 whitespace-nowrap transition-colors" data-preset="afrobeats-summer">Afrobeats Sunset</button>
+    </div>
+
+    <!-- 2-COLUMN STUDIO GRID -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <!-- LEFT COLUMN: CONTROLS & TRAITS -->
+      <div class="lg:col-span-5 space-y-6">
+        <div class="bg-studio-900 border border-studio-800 rounded-xl p-5 shadow-sm">
+          <div class="flex items-center justify-between pb-3 border-b border-studio-800 mb-4">
+            <h2 class="text-base font-semibold text-white flex items-center gap-2">
+              <span class="w-6 h-6 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center text-xs font-bold">1</span>
+              Sound &amp; Sonic Signature
+            </h2>
+            <button id="clearAllBtn" aria-label="Reset form" class="min-h-[44px] px-3 -mr-2 text-sm text-studio-400 hover:text-rose-400 active:text-rose-300 transition-colors">Reset</button>
+          </div>
+
+          <div class="space-y-4">
+            <div>
+              <label for="genreSelect" class="block text-sm font-medium text-studio-400 mb-1.5">Primary Genre / Base Sound</label>
+              <select id="genreSelect" class="w-full min-h-[44px] bg-studio-950 border border-studio-800 focus:border-amber-500 rounded-lg px-4 py-2.5 text-sm text-studio-100 outline-none">
+                <option value="">Select a sound or genre...</option>
+                <optgroup label="Pop &amp; Contemporary">
+                  <option value="Pop">Pop</option>
+                  <option value="Dance-Pop">Dance-Pop</option>
+                  <option value="Electropop">Electropop</option>
+                  <option value="Synth-Pop">Synth-Pop</option>
+                  <option value="Indie Pop">Indie Pop</option>
+                  <option value="Bedroom Pop">Bedroom Pop</option>
+                  <option value="Dream Pop">Dream Pop</option>
+                  <option value="Art Pop">Art Pop</option>
+                  <option value="Hyperpop">Hyperpop</option>
+                  <option value="K-Pop">K-Pop</option>
+                  <option value="J-Pop">J-Pop</option>
+                  <option value="Afrobeats">Afrobeats</option>
+                </optgroup>
+                <optgroup label="R&amp;B, Soul &amp; Funk">
+                  <option value="Contemporary R&B">Contemporary R&B</option>
+                  <option value="Alternative R&B">Alternative R&B</option>
+                  <option value="Neo-Soul">Neo-Soul</option>
+                  <option value="Soul">Soul</option>
+                  <option value="Motown Soul">Motown Soul</option>
+                  <option value="Gospel">Gospel</option>
+                  <option value="Funk">Funk</option>
+                  <option value="Disco">Disco</option>
+                  <option value="Nu-Disco">Nu-Disco</option>
+                  <option value="Funk-Pop">Funk-Pop</option>
+                </optgroup>
+                <optgroup label="Hip-Hop &amp; Rap">
+                  <option value="Hip-Hop">Hip-Hop</option>
+                  <option value="Boom-Bap">Boom-Bap</option>
+                  <option value="Trap">Trap</option>
+                  <option value="Melodic Trap">Melodic Trap</option>
+                  <option value="Drill">Drill</option>
+                  <option value="UK Drill">UK Drill</option>
+                  <option value="Grime">Grime</option>
+                  <option value="Cloud Rap">Cloud Rap</option>
+                  <option value="Lo-Fi Hip-Hop">Lo-Fi Hip-Hop</option>
+                  <option value="Jazz Rap">Jazz Rap</option>
+                  <option value="Conscious Hip-Hop">Conscious Hip-Hop</option>
+                  <option value="Phonk">Phonk</option>
+                </optgroup>
+                <optgroup label="Electronic &amp; Dance">
+                  <option value="House">House</option>
+                  <option value="Deep House">Deep House</option>
+                  <option value="Tech House">Tech House</option>
+                  <option value="Progressive House">Progressive House</option>
+                  <option value="Techno">Techno</option>
+                  <option value="Melodic Techno">Melodic Techno</option>
+                  <option value="Trance">Trance</option>
+                  <option value="Drum & Bass">Drum &amp; Bass</option>
+                  <option value="Jungle">Jungle</option>
+                  <option value="Dubstep">Dubstep</option>
+                  <option value="UK Garage">UK Garage</option>
+                  <option value="Breakbeat">Breakbeat</option>
+                  <option value="Future Bass">Future Bass</option>
+                  <option value="EDM">EDM</option>
+                  <option value="Electro">Electro</option>
+                  <option value="Downtempo">Downtempo</option>
+                  <option value="Ambient">Ambient</option>
+                  <option value="Chillwave">Chillwave</option>
+                  <option value="Vaporwave">Vaporwave</option>
+                  <option value="Industrial">Industrial</option>
+                  <option value="Synthwave">Synthwave</option>
+                  <option value="French House">French House</option>
+                </optgroup>
+                <optgroup label="Rock &amp; Alternative">
+                  <option value="Rock">Rock</option>
+                  <option value="Alternative Rock">Alternative Rock</option>
+                  <option value="Indie Rock">Indie Rock</option>
+                  <option value="Hard Rock">Hard Rock</option>
+                  <option value="Classic Rock">Classic Rock</option>
+                  <option value="Pop Rock">Pop Rock</option>
+                  <option value="Post-Rock">Post-Rock</option>
+                  <option value="Progressive Rock">Progressive Rock</option>
+                  <option value="Punk Rock">Punk Rock</option>
+                  <option value="Pop Punk">Pop Punk</option>
+                  <option value="Emo">Emo</option>
+                  <option value="Grunge">Grunge</option>
+                  <option value="Shoegaze">Shoegaze</option>
+                  <option value="Garage Rock">Garage Rock</option>
+                  <option value="Post-Punk">Post-Punk</option>
+                  <option value="Glam Rock">Glam Rock</option>
+                </optgroup>
+                <optgroup label="Metal">
+                  <option value="Heavy Metal">Heavy Metal</option>
+                  <option value="Thrash Metal">Thrash Metal</option>
+                  <option value="Death Metal">Death Metal</option>
+                  <option value="Black Metal">Black Metal</option>
+                  <option value="Metalcore">Metalcore</option>
+                  <option value="Nu Metal">Nu Metal</option>
+                  <option value="Progressive Metal">Progressive Metal</option>
+                  <option value="Doom Metal">Doom Metal</option>
+                  <option value="Alternative Metal">Alternative Metal</option>
+                </optgroup>
+                <optgroup label="Country, Folk &amp; Roots">
+                  <option value="Country">Country</option>
+                  <option value="Modern Country">Modern Country</option>
+                  <option value="Country Pop">Country Pop</option>
+                  <option value="Outlaw Country">Outlaw Country</option>
+                  <option value="Americana">Americana</option>
+                  <option value="Folk">Folk</option>
+                  <option value="Indie Folk">Indie Folk</option>
+                  <option value="Bluegrass">Bluegrass</option>
+                  <option value="Blues">Blues</option>
+                  <option value="Southern Rock">Southern Rock</option>
+                </optgroup>
+                <optgroup label="Jazz &amp; Latin">
+                  <option value="Jazz">Jazz</option>
+                  <option value="Cool Jazz">Cool Jazz</option>
+                  <option value="Modal Jazz">Modal Jazz</option>
+                  <option value="Jazz Fusion">Jazz Fusion</option>
+                  <option value="Latin Pop">Latin Pop</option>
+                  <option value="Reggaeton">Reggaeton</option>
+                  <option value="Salsa">Salsa</option>
+                  <option value="Bossa Nova">Bossa Nova</option>
+                  <option value="Afro-Cuban">Afro-Cuban</option>
+                </optgroup>
+                <optgroup label="Reggae &amp; Global">
+                  <option value="Reggae">Reggae</option>
+                  <option value="Roots Reggae">Roots Reggae</option>
+                  <option value="Dub">Dub</option>
+                  <option value="Dancehall">Dancehall</option>
+                  <option value="Afrobeat">Afrobeat</option>
+                  <option value="Highlife">Highlife</option>
+                  <option value="Reggae Fusion">Reggae Fusion</option>
+                </optgroup>
+                <optgroup label="Cinematic &amp; Instrumental">
+                  <option value="Cinematic">Cinematic</option>
+                  <option value="Orchestral">Orchestral</option>
+                  <option value="Film Score">Film Score</option>
+                  <option value="Trailer Music">Trailer Music</option>
+                  <option value="Neoclassical">Neoclassical</option>
+                  <option value="Minimalism">Minimalism</option>
+                  <option value="Post-Classical">Post-Classical</option>
+                  <option value="Video Game Music">Video Game Music</option>
+                  <option value="Lo-Fi">Lo-Fi</option>
+                  <option value="Piano Ballad">Piano Ballad</option>
+                  <option value="Deep Focus Flow">Deep Focus Flow</option>
+                </optgroup>
+                <option value="custom">Custom description...</option>
+              </select>
+              <input type="text" id="customSoundInput" placeholder="e.g. vintage 80s tape synths, ethereal vocal pads..." class="hidden w-full mt-2 min-h-[44px] bg-studio-950 border border-studio-800 focus:border-amber-500 rounded-lg px-4 py-2.5 text-sm text-studio-100 outline-none">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label for="styleInput" class="block text-sm font-medium text-studio-400 mb-1">Subgenres &amp; Style</label>
+                <input type="text" id="styleInput" placeholder="e.g. Nu-Disco, French Touch" class="w-full min-h-[44px] bg-studio-950 border border-studio-800 focus:border-amber-500 rounded-lg px-3 py-2 text-sm text-studio-100 outline-none">
+              </div>
+              <div>
+                <label for="moodInput" class="block text-sm font-medium text-studio-400 mb-1">Vibe &amp; Mood</label>
+                <input type="text" id="moodInput" placeholder="e.g. Euphoric, Nostalgic" class="w-full min-h-[44px] bg-studio-950 border border-studio-800 focus:border-amber-500 rounded-lg px-3 py-2 text-sm text-studio-100 outline-none">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label for="tempoInput" class="block text-sm font-medium text-studio-400 mb-1">Tempo &amp; Key</label>
+                <input type="text" id="tempoInput" placeholder="124 BPM, D Minor" class="w-full min-h-[44px] bg-studio-950 border border-studio-800 focus:border-amber-500 rounded-lg px-3 py-2 text-sm text-studio-100 font-mono outline-none">
+              </div>
+              <div>
+                <label for="vocalSelect" class="block text-sm font-medium text-studio-400 mb-1">Vocal Treatment</label>
+                <select id="vocalSelect" class="w-full min-h-[44px] bg-studio-950 border border-studio-800 focus:border-amber-500 rounded-lg px-3 py-2 text-sm text-studio-100 outline-none">
+                  <option value="auto">Auto-detect from style</option>
+                  <option value="female">Female Lead</option>
+                  <option value="male">Male Lead</option>
+                  <option value="vocoder">Vocoder / Talkbox</option>
+                  <option value="duet">Duet &amp; Harmonies</option>
+                  <option value="whispered">Intimate Whispered</option>
+                  <option value="belting">Power Belting</option>
+                  <option value="instrumental">Pure Instrumental (No Vocals)</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-studio-400 mb-2">Target AI Music Engine</label>
+              <div class="grid grid-cols-4 gap-2" id="engineGrid">
+                <button type="button" class="engine-card active p-2.5 rounded-lg border border-amber-500 bg-amber-500/10 text-center transition-all min-h-[50px] flex flex-col justify-center items-center" data-engine="suno">
+                  <div class="text-sm font-semibold text-amber-400">Suno</div>
+                  <div class="text-[10px] text-studio-400">v3.5 / v4</div>
+                </button>
+                <button type="button" class="engine-card p-2.5 rounded-lg border border-studio-800 bg-studio-950 text-center transition-all min-h-[50px] flex flex-col justify-center items-center" data-engine="udio">
+                  <div class="text-sm font-semibold text-studio-200">Udio</div>
+                  <div class="text-[10px] text-studio-400">v1.5</div>
+                </button>
+                <button type="button" class="engine-card p-2.5 rounded-lg border border-studio-800 bg-studio-950 text-center transition-all min-h-[50px] flex flex-col justify-center items-center" data-engine="musicgen">
+                  <div class="text-sm font-semibold text-studio-200">MusicGen</div>
+                  <div class="text-[10px] text-studio-400">Natural</div>
+                </button>
+                <button type="button" class="engine-card p-2.5 rounded-lg border border-studio-800 bg-studio-950 text-center transition-all min-h-[50px] flex flex-col justify-center items-center" data-engine="flow">
+                  <div class="text-sm font-semibold text-studio-200">Flow</div>
+                  <div class="text-[10px] text-studio-400">Focus Loop</div>
+                </button>
+              </div>
+            </div>
+
+            <!-- Flow Mode Settings -->
+            <div id="flowSettings" class="hidden p-4 rounded-lg border border-studio-800 bg-studio-950 space-y-3">
+              <div class="text-sm font-semibold text-amber-400">Flow State Parameters</div>
+              <div class="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <label for="flowTuning" class="text-xs text-studio-400 block mb-1">Pitch Tuning</label>
+                  <select id="flowTuning" class="w-full min-h-[44px] bg-studio-900 border border-studio-800 rounded px-3 py-2 text-studio-200">
+                    <option value="432hz">432 Hz Solfeggio</option>
+                    <option value="440hz">440 Hz Standard</option>
+                    <option value="528hz">528 Hz Transformation</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="flowLoop" class="text-xs text-studio-400 block mb-1">Cycle Progression</label>
+                  <select id="flowLoop" class="w-full min-h-[44px] bg-studio-900 border border-studio-800 rounded px-3 py-2 text-studio-200">
+                    <option value="seamless">Seamless Infinite Loop</option>
+                    <option value="evolving">Evolving 16-Bar Waves</option>
+                    <option value="locked">Metronomic Pulse</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3 pt-1">
+              <div>
+                <label for="charLimit" class="block text-sm font-medium text-studio-400 mb-1">Max Character Budget</label>
+                <select id="charLimit" class="w-full min-h-[44px] bg-studio-950 border border-studio-800 rounded-lg px-3 py-2 text-sm text-studio-200 outline-none">
+                  <option value="120">120 chars (Strict)</option>
+                  <option value="200">200 chars (Compact)</option>
+                  <option value="500" selected>500 chars (Standard)</option>
+                  <option value="1000">1,000 chars (Expanded)</option>
+                  <option value="0">Unlimited</option>
+                </select>
+              </div>
+              <div>
+                <label for="tagBudget" class="block text-sm font-medium text-studio-400 mb-1">Trait Count</label>
+                <select id="tagBudget" class="w-full min-h-[44px] bg-studio-950 border border-studio-800 rounded-lg px-3 py-2 text-sm text-studio-200 outline-none">
+                  <option value="4">4 traits</option>
+                  <option value="6" selected>6 traits</option>
+                  <option value="8">8 traits</option>
+                  <option value="12">12 traits</option>
+                </select>
+              </div>
+            </div>
+
+            <button id="generateBtn" class="w-full mt-3 min-h-[50px] py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-450 hover:to-amber-550 active:scale-[0.98] text-studio-950 font-bold text-base shadow-sm transition-all flex items-center justify-center gap-2">
+              <span>✨</span> Generate Engine Prompt &amp; Lyrics
+            </button>
+          </div>
+        </div>
+
+        <!-- TRAITS INSPECTOR -->
+        <div class="bg-studio-900 border border-studio-800 rounded-xl p-5 shadow-sm">
+          <div class="flex items-center justify-between pb-3 border-b border-studio-800 mb-3">
+            <h2 class="text-base font-semibold text-white flex items-center gap-2">
+              <span class="w-6 h-6 rounded-full bg-teal-500/20 text-teal-400 flex items-center justify-center text-xs font-bold">2</span>
+              Sonic Traits &amp; Textures
+            </h2>
+            <div class="flex items-center gap-3">
+              <button id="toggleAllTraitsBtn" class="min-h-[44px] px-2 text-xs text-studio-400 hover:text-studio-200 underline">Toggle All</button>
+              <span id="activeTraitCount" class="text-sm font-mono text-teal-400">0 active</span>
+            </div>
+          </div>
+
+          <div class="space-y-4" id="traitsCategories">
+            <div>
+              <div class="text-xs font-semibold text-studio-400 uppercase tracking-wider mb-2">Vocals &amp; Phrasing</div>
+              <div class="flex flex-wrap gap-2" id="vocalChips"></div>
+            </div>
+            <div>
+              <div class="text-xs font-semibold text-studio-400 uppercase tracking-wider mb-2">Instrumentation &amp; Synthesis</div>
+              <div class="flex flex-wrap gap-2" id="instChips"></div>
+            </div>
+            <div>
+              <div class="text-xs font-semibold text-studio-400 uppercase tracking-wider mb-2">Mix &amp; Production Depth</div>
+              <div class="flex flex-wrap gap-2" id="prodChips"></div>
+            </div>
+            <div>
+              <div class="text-xs font-semibold text-studio-400 uppercase tracking-wider mb-2">Rhythm Pocket &amp; Percussion</div>
+              <div class="flex flex-wrap gap-2" id="rhythmChips"></div>
+            </div>
+          </div>
+
+          <div class="mt-4 pt-4 border-t border-studio-800 flex gap-2">
+            <input type="text" id="newTraitInput" placeholder="Add custom tag (e.g. Leslie speaker rotary)..." class="flex-1 min-h-[44px] bg-studio-950 border border-studio-800 focus:border-teal-500 rounded-lg px-4 py-2 text-sm text-studio-100 outline-none">
+            <button id="addTraitBtn" class="min-h-[44px] px-5 py-2 rounded-lg bg-studio-800 hover:bg-studio-700 active:bg-studio-600 text-sm font-medium text-studio-200 transition-colors">Add</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT COLUMN: OUTPUT ENGINE & LYRICS STUDIO -->
+      <div class="lg:col-span-7 space-y-6">
+        <!-- TABS -->
+        <div class="flex items-center gap-2 border-b border-studio-800 pb-2">
+          <button id="tabPromptBtn" class="min-h-[44px] px-5 py-2.5 rounded-lg bg-studio-850 text-amber-400 font-semibold text-sm border border-amber-500/30 flex items-center gap-2">
+            <span>⚙️</span> Engine Prompt
+          </button>
+          <button id="tabLyricsBtn" class="min-h-[44px] px-5 py-2.5 rounded-lg text-studio-400 hover:bg-studio-800 font-semibold text-sm transition-colors flex items-center gap-2">
+            <span>📝</span> Lyrics Studio
+          </button>
+        </div>
+
+        <!-- ENGINE PROMPT PANE -->
+        <div id="promptPane" class="space-y-4">
+          <div class="bg-studio-900 border border-studio-800 rounded-xl p-5 shadow-sm">
+            <div class="flex flex-wrap items-center justify-between pb-3 border-b border-studio-800 mb-3 gap-2">
+              <div>
+                <h3 id="enginePromptTitle" class="text-base font-semibold text-white">Suno Style Prompt</h3>
+                <span class="text-xs text-studio-400">Ready to paste into the music generator style box</span>
+              </div>
+              <div class="flex items-center gap-3">
+                <span id="charCounter" class="text-sm font-mono text-studio-400">0 chars</span>
+                <button id="copyPromptBtn" class="min-h-[44px] px-4 py-2 rounded-lg bg-teal-500 hover:bg-teal-450 active:bg-teal-600 text-studio-950 font-bold text-sm transition-colors flex items-center gap-1 shadow-sm">
+                  <span>📋</span> Copy Prompt
+                </button>
+              </div>
+            </div>
+
+            <textarea id="promptOutput" rows="6" class="w-full bg-studio-950 border border-studio-800 focus:border-amber-500 rounded-lg p-4 text-base font-mono text-amber-200/95 leading-relaxed outline-none resize-y" placeholder="Select a preset or click Generate..."></textarea>
+
+            <div class="mt-4 pt-3 border-t border-studio-800">
+              <label class="block text-xs font-semibold text-studio-400 uppercase tracking-wider mb-2">Quick Metatags (Click to append)</label>
+              <div class="flex flex-wrap gap-2" id="quickMetatags">
+                <button class="metatag-btn min-h-[40px] px-3.5 py-1.5 rounded-lg bg-studio-950 border border-studio-800 hover:border-amber-500 active:bg-amber-500/10 text-xs font-mono text-studio-300 transition-colors" data-meta="[Master Quality]">[Master Quality]</button>
+                <button class="metatag-btn min-h-[40px] px-3.5 py-1.5 rounded-lg bg-studio-950 border border-studio-800 hover:border-amber-500 active:bg-amber-500/10 text-xs font-mono text-studio-300 transition-colors" data-meta="[Wide Stereo]">[Wide Stereo]</button>
+                <button class="metatag-btn min-h-[40px] px-3.5 py-1.5 rounded-lg bg-studio-950 border border-studio-800 hover:border-amber-500 active:bg-amber-500/10 text-xs font-mono text-studio-300 transition-colors" data-meta="[Analog Warmth]">[Analog Warmth]</button>
+                <button class="metatag-btn min-h-[40px] px-3.5 py-1.5 rounded-lg bg-studio-950 border border-studio-800 hover:border-amber-500 active:bg-amber-500/10 text-xs font-mono text-studio-300 transition-colors" data-meta="[Heavy Bass]">[Heavy Bass]</button>
+                <button class="metatag-btn min-h-[40px] px-3.5 py-1.5 rounded-lg bg-studio-950 border border-studio-800 hover:border-amber-500 active:bg-amber-500/10 text-xs font-mono text-studio-300 transition-colors" data-meta="[Fade Out]">[Fade Out]</button>
+                <button class="metatag-btn min-h-[40px] px-3.5 py-1.5 rounded-lg bg-studio-950 border border-studio-800 hover:border-amber-500 active:bg-amber-500/10 text-xs font-mono text-studio-300 transition-colors" data-meta="[Clean Vocals]">[Clean Vocals]</button>
+              </div>
+            </div>
+
+            <div class="mt-4 pt-4 border-t border-studio-800">
+              <div class="flex items-center justify-between mb-2">
+                <label for="negOutput" class="text-sm font-semibold text-rose-400">Negative Prompt (Avoidances)</label>
+                <button id="copyNegBtn" class="min-h-[44px] px-2 text-xs text-studio-400 hover:text-white transition-colors">Copy Negative</button>
+              </div>
+              <input type="text" id="negOutput" readonly class="w-full min-h-[44px] bg-studio-950 border border-studio-800 rounded-lg px-4 py-2.5 text-xs font-mono text-rose-300/80 outline-none">
+            </div>
+          </div>
+        </div>
+
+        <!-- LYRICS PANE -->
+        <div id="lyricsPane" class="hidden space-y-4">
+          <div class="bg-studio-900 border border-studio-800 rounded-xl p-5 shadow-sm">
+            <div class="flex flex-wrap items-center justify-between pb-3 border-b border-studio-800 mb-3 gap-2">
+              <div>
+                <h3 class="text-base font-semibold text-white">Original Lyric Studio</h3>
+                <span class="text-xs text-studio-400">Arranged with audio cues for Suno / Udio verse tags</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <button id="rerollLyricsBtn" class="min-h-[44px] px-4 py-2 rounded-lg bg-studio-800 hover:bg-studio-700 active:bg-studio-600 text-studio-200 text-sm font-medium transition-colors flex items-center gap-1.5">
+                  <span>🎲</span> Re-Roll Fresh
+                </button>
+                <button id="copyLyricsBtn" class="min-h-[44px] px-4 py-2 rounded-lg bg-teal-500 hover:bg-teal-450 active:bg-teal-600 text-studio-950 font-bold text-sm transition-colors flex items-center gap-1.5">
+                  <span>📋</span> Copy Lyrics
+                </button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label for="topicInput" class="block text-sm font-medium text-studio-400 mb-1">Story Concept &amp; Subject</label>
+                <input type="text" id="topicInput" placeholder="e.g. Midnight highway drive, Neon reflections..." class="w-full min-h-[44px] bg-studio-950 border border-studio-800 focus:border-amber-500 rounded-lg px-4 py-2 text-sm text-studio-100 outline-none">
+              </div>
+              <div>
+                <label for="structureSelect" class="block text-sm font-medium text-studio-400 mb-1">Song Architecture</label>
+                <select id="structureSelect" class="w-full min-h-[44px] bg-studio-950 border border-studio-800 focus:border-amber-500 rounded-lg px-4 py-2 text-sm text-studio-100 outline-none">
+                  <option value="pop-standard">Pop Standard (Verse-Chorus-Bridge)</option>
+                  <option value="club-anthem">EDM / Club Anthem (Buildup &amp; Drop)</option>
+                  <option value="rap-bars">Hip-Hop / 16 Bars &amp; Hook</option>
+                  <option value="cinematic-epic">Cinematic Orchestral Overture</option>
+                  <option value="flow-hypnotic">Flow State Hypnotic Cadence</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between mb-3 text-sm">
+              <label class="flex items-center gap-2 text-studio-300 cursor-pointer min-h-[44px]">
+                <input type="checkbox" id="includeCues" checked class="w-5 h-5 rounded border-studio-800 bg-studio-950 text-amber-500">
+                <span class="text-xs">Include arrangement metatags ([Verse], [Drop])</span>
+              </label>
+              <div id="lyricMetrics" class="text-studio-400 font-mono text-xs">0 lines | ~0 words</div>
+            </div>
+
+            <textarea id="lyricsOutput" rows="12" class="w-full bg-studio-950 border border-studio-800 focus:border-amber-500 rounded-lg p-4 text-sm font-mono text-studio-100 leading-relaxed outline-none resize-y" placeholder="Lyrics will be formatted here..."></textarea>
+
+            <div class="mt-4 pt-4 border-t border-studio-800 flex flex-wrap items-center justify-between gap-3">
+              <div class="flex flex-wrap gap-1.5">
+                <button class="insert-cue min-h-[40px] px-3 py-1.5 rounded bg-studio-800 hover:bg-studio-700 active:bg-studio-600 text-studio-300 font-mono text-xs" data-cue="[Verse]">+ [Verse]</button>
+                <button class="insert-cue min-h-[40px] px-3 py-1.5 rounded bg-studio-800 hover:bg-studio-700 active:bg-studio-600 text-studio-300 font-mono text-xs" data-cue="[Pre-Chorus]">+ [Pre-Chorus]</button>
+                <button class="insert-cue min-h-[40px] px-3 py-1.5 rounded bg-studio-800 hover:bg-studio-700 active:bg-studio-600 text-studio-300 font-mono text-xs" data-cue="[Chorus]">+ [Chorus]</button>
+                <button class="insert-cue min-h-[40px] px-3 py-1.5 rounded bg-studio-800 hover:bg-studio-700 active:bg-studio-600 text-studio-300 font-mono text-xs" data-cue="[Drop]">+ [Drop]</button>
+                <button class="insert-cue min-h-[40px] px-3 py-1.5 rounded bg-studio-800 hover:bg-studio-700 active:bg-studio-600 text-studio-300 font-mono text-xs" data-cue="[Bridge]">+ [Bridge]</button>
+                <button class="insert-cue min-h-[40px] px-3 py-1.5 rounded bg-studio-800 hover:bg-studio-700 active:bg-studio-600 text-studio-300 font-mono text-xs" data-cue="[Guitar Solo]">+ [Guitar Solo]</button>
+                <button class="insert-cue min-h-[40px] px-3 py-1.5 rounded bg-studio-800 hover:bg-studio-700 active:bg-studio-600 text-studio-300 font-mono text-xs" data-cue="[Outro: Fade Out]">+ [Outro]</button>
+              </div>
+              <button id="downloadLyricsBtn" class="min-h-[44px] px-4 py-2 rounded bg-studio-800 hover:bg-studio-700 active:bg-studio-600 text-studio-200 text-xs font-semibold transition-colors flex items-center gap-1.5">
+                <span>⬇️</span> Export .txt
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- GENERATION HISTORY -->
+        <div class="bg-studio-900 border border-studio-800 rounded-xl p-5 shadow-sm">
+          <div class="flex items-center justify-between pb-3 border-b border-studio-800 mb-3">
+            <h3 class="text-base font-semibold text-white">Recent Generations</h3>
+            <button id="clearHistoryBtn" class="min-h-[44px] px-2 text-xs text-studio-400 hover:text-rose-400 transition-colors">Clear History</button>
+          </div>
+          <div id="historyContainer" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- NOTIFICATION TOAST -->
+  <div id="toast" aria-live="polite" class="fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-2.5 rounded-xl bg-studio-800 border border-amber-500/40 text-studio-100 text-sm font-medium shadow-2xl transition-all duration-300 opacity-0 translate-y-4 pointer-events-none z-50 flex items-center gap-2">
+    <span id="toastIcon">✨</span> <span id="toastMessage">Done</span>
+  </div>
+
+  <!-- SCRIPT -->
+  <script>
+  (function(){
+    'use strict';
+
+    // Curated Archetype Subset
+    const ARCHETYPES = {
+      'Contemporary Pop': {
+        label: 'Contemporary Pop',
+        style: 'Pop, Dance-Pop, Radio Hit',
+        mood: 'Catchy, Polished, Upbeat',
+        tempo: '120 BPM, C Major',
+        vocalType: 'female',
+        vocals: ['Crystal clear lead vocal', 'Stacked radio pop harmonies', 'Punchy rhythmic vocal chops'],
+        instruments: ['Bright polysynth chords', 'Live bass guitar with synth layer', 'Modern hybrid acoustic/electronic drums'],
+        production: ['Glossy high-end sparkle', 'Multiband radio-ready master', 'Tight center lead vocal'],
+        rhythm: ['Driving four-on-the-floor pop pulse', 'Clap-stacked snare', 'Energetic shaker groove'],
+        topic: 'Letting go of doubt and living fearlessly tonight'
+      },
+      'Synthwave': {
+        label: 'Synthwave',
+        style: 'Synthwave, Darksynth, Outrun',
+        mood: 'Nostalgic, Midnight, Neon',
+        tempo: '118 BPM, F Minor',
+        vocalType: 'male',
+        vocals: ['Emotive falsetto lead', 'Reverb-gated vocal doubles', 'Warm vocoder undertones'],
+        instruments: ['Analog saw-wave synth lead', 'Gated snare drum', 'Pulsing arpeggiator bassline', 'LinnDrum rhythm', 'Warm Prophet pads'],
+        production: ['80s gated reverb chamber', 'Analog tape saturation', 'Lush chorus on synths', 'Sidechain compression pump'],
+        rhythm: ['Driving four-on-the-floor kick', '16th-note synth arpeggio pulse', 'Crisp 80s tom fills'],
+        topic: 'Speeding through an empty neon city after midnight'
+      },
+      'French House': {
+        label: 'French House',
+        style: 'French House, Nu-Disco, Filter House',
+        mood: 'Euphoric, Groovy, Luxurious',
+        tempo: '124 BPM, D Minor',
+        vocalType: 'vocoder',
+        vocals: ['Vocoder robotic hooks', 'Talkbox harmonies', 'Soulful chopped sample hook'],
+        instruments: ['Funky slap bass guitar', 'Filtered vinyl disco sample loops', 'Analog synth brass', 'Crisp 909 open hi-hat'],
+        production: ['Heavy sidechain compression pump', 'Resonant low-pass filter sweeps', 'Phaser on electric rhythm guitar'],
+        rhythm: ['Four-on-the-floor kick punch', 'Swung syncopated funk pocket', 'Driving tambourine groove'],
+        topic: 'Glittering lights on a Parisian club dancefloor'
+      },
+      'Deep House': {
+        label: 'Deep House',
+        style: 'Deep House, Melodic Club',
+        mood: 'Smooth, Hypnotic, Late-Night',
+        tempo: '122 BPM, G Minor',
+        vocalType: 'female',
+        vocals: ['Breathy soulful lead', 'Soft pitched-down vocal chops', 'Reverberant ad-libs'],
+        instruments: ['Round subby M1 organ bass', 'Fender Rhodes electric piano', 'Crisp 909 percussion', 'Subtle atmospheric pad'],
+        production: ['Sub-bass focus below 60Hz', 'Spacious club reverb', 'Warm analog console modeling'],
+        rhythm: ['Gentle four-on-the-floor pulse', 'Swung 16th-note shaker groove', 'Syncopated rimshot'],
+        topic: 'Floating through late-night ocean waves'
+      },
+      'Melodic Techno': {
+        label: 'Melodic Techno',
+        style: 'Melodic Techno, Progressive Techno',
+        mood: 'Hypnotic, Cinematic, Tense',
+        tempo: '126 BPM, C Minor',
+        vocalType: 'instrumental',
+        vocals: ['Wordless ethereal vocal pad', 'Granular delayed vocal snippet'],
+        instruments: ['Rolling modular bass', 'Hypnotic pluck arpeggio', 'Massive reverb snare', 'Dark analog drone'],
+        production: ['Long automation filter sweeps', 'Ultra-wide stereo panning', 'Dark room reverberation'],
+        rhythm: ['Relentless four-on-the-floor drive', 'Rolling bassline syncopation', 'Offbeat open hi-hat sizzle'],
+        topic: 'A journey through deep interstellar frequencies'
+      },
+      'Drum & Bass': {
+        label: 'Drum & Bass',
+        style: 'Liquid Drum & Bass, Jungle',
+        mood: 'Energetic, Soaring, Futuristic',
+        tempo: '174 BPM, F Minor',
+        vocalType: 'female',
+        vocals: ['Soulful high-register soprano', 'Pitched-up vocal chops', 'Reverb-soaked vocal reflections'],
+        instruments: ['Modulated Reese sub-bass', 'Crisp chopped Amen breakbeat', 'Rhodes piano chords', 'Airy pad swells'],
+        production: ['Sub-bass mono isolation', 'Fast stereo delay ping-pong', 'Pristine high-end sheen'],
+        rhythm: ['Lightning 174 BPM breakbeat pattern', 'Syncopated rolling snare shuffle', 'Ghost note percussion'],
+        topic: 'High-speed glide through digital horizons'
+      },
+      'EDM Festival': {
+        label: 'EDM Festival',
+        style: 'Festival Progressive House, Big Room',
+        mood: 'Euphoric, Anthemic, Massive',
+        tempo: '128 BPM, B Minor',
+        vocalType: 'female',
+        vocals: ['Anthemic soaring lead belting', 'Festival crowd choir chant', 'Vocal pitch rise'],
+        instruments: ['Layered supersaw synth chords', 'Acoustic grand piano melody', 'Sub-frequency kick', 'White noise riser'],
+        production: ['Extreme sidechain ducking', 'Massive stadium reverb wash', 'Dynamic multiband punch'],
+        rhythm: ['Pounding 128 BPM four-on-the-floor', 'Snare roll crescendo riser', 'Huge downbeat explosion'],
+        topic: 'Celebrating with ten thousand voices under fireworks'
+      },
+      'Ambient Chillwave': {
+        label: 'Ambient Chillwave',
+        style: 'Ambient, Chillwave, Downtempo',
+        mood: 'Serene, Meditative, Weightless',
+        tempo: '75 BPM, D Major',
+        vocalType: 'instrumental',
+        vocals: ['Soft wordless vocal breath', 'Ethereal ambient choir wash'],
+        instruments: ['Warm prophet synth pads', 'Clean delayed electric guitar arpeggios', 'Upright piano', 'Subtle tape hiss'],
+        production: ['Infinite reverb decay tails', 'Binaural panning spatial field', 'Low-pass warmth'],
+        rhythm: ['Slow drifting ambient pulse', 'Unquantized brush percussion', 'Gentle heartbeat kick'],
+        topic: 'Stillness at dawn on a quiet mountain ridge'
+      },
+      'Melodic Trap': {
+        label: 'Melodic Trap',
+        style: 'Melodic Trap, R&B Rap, Drill',
+        mood: 'Moody, Introspective, Heavy',
+        tempo: '140 BPM, C# Minor',
+        vocalType: 'male',
+        vocals: ['Autotuned melodic sing-rap', 'Breathy falsetto ad-libs', 'Pitched octave doubles'],
+        instruments: ['Deep sliding 808 sub bass', 'Minor key bell plucks', 'Fast rolling hi-hats', 'Distorted electric piano'],
+        production: ['Sub-bass soft clipping saturation', 'Dark low-pass filter on chords', 'Spatial vocal slap delay'],
+        rhythm: ['Half-time snare on beat 3', 'Triplet 32nd-note hi-hat rolls', 'Syncopated 808 glide patterns'],
+        topic: 'Reflecting on the climb, isolation, and late nights'
+      },
+      'Boom-Bap': {
+        label: 'Boom-Bap',
+        style: 'Boom-Bap, Jazz Rap, 90s East Coast',
+        mood: 'Grounded, Gritty, Thoughtful',
+        tempo: '90 BPM, Bb Minor',
+        vocalType: 'male',
+        vocals: ['Crisp articulate delivery', 'Soulful sampled hook', 'Ad-lib vocal scratches'],
+        instruments: ['Dusty upright bassline', 'Warm jazz guitar loop', 'Punchy acoustic kick and snare', 'Turntable vinyl scratch'],
+        production: ['SP-1200 12-bit sampler crunch', 'Warm vinyl crackle and hiss', 'Authentic room acoustic bleed'],
+        rhythm: ['Swung unquantized head-nod rhythm', 'Laid-back pocket', 'Crisp wood snare clap'],
+        topic: 'Chronicles of city life, hustle, and staying genuine'
+      },
+      'Lo-Fi Hip-Hop': {
+        label: 'Lo-Fi Hip-Hop',
+        style: 'Lo-Fi Hip Hop, Chillhop, Study Beats',
+        mood: 'Cozy, Nostalgic, Relaxed',
+        tempo: '82 BPM, Eb Major',
+        vocalType: 'instrumental',
+        vocals: ['None - pure instrumental focus'],
+        instruments: ['Detuned Rhodes electric piano', 'Felt upright piano', 'Muted electric bass', 'Acoustic guitar loop'],
+        production: ['Cassette tape wow and flutter', 'Low-pass filter at 8kHz', 'Vinyl surface dust', 'Analog warmth'],
+        rhythm: ['Drunk lazy swung drum groove', 'Gentle muted kick drum', 'Sidechained vinyl noise'],
+        topic: 'Rain falling gently against the library window'
+      },
+      'Alternative R&B': {
+        label: 'Alternative R&B',
+        style: 'Alternative R&B, Dark Soul, PBR&B',
+        mood: 'Seductive, Moody, Intimate',
+        tempo: '88 BPM, F# Minor',
+        vocalType: 'female',
+        vocals: ['Silky multi-octave range', 'Breathy intimate falsetto runs', 'Harmonized low octave'],
+        instruments: ['Warm electric piano with tremolo', 'Deep subby 808 bass', 'Atmospheric guitar swells', 'Crisp rimshot'],
+        production: ['Lush plate reverb space', 'Warm low-end saturation', 'Stereo vocal widening'],
+        rhythm: ['Slow sensual half-time groove', 'Syncopated neo-soul hi-hats', 'Gentle sub thump'],
+        topic: 'Late-night confessions and undeniable attraction'
+      },
+      'Neo-Soul': {
+        label: 'Neo-Soul',
+        style: 'Neo-Soul, Soul, Jazz-Funk',
+        mood: 'Warm, Organic, Earthy',
+        tempo: '86 BPM, E Minor',
+        vocalType: 'female',
+        vocals: ['Rich chest voice belt', 'Gospel-trained layered harmonies', 'Spontaneous soulful riffs'],
+        instruments: ['Vintage Rhodes Mark I', 'Groovy fingerstyle electric bass', 'Warm live drum kit', 'Brass horn section'],
+        production: ['Natural room tone acoustics', 'Analog tube warmth', 'Subtle tape compression'],
+        rhythm: ['Behind-the-beat Dilla pocket', 'Swung unquantized live drumming', 'Tight hi-hat accents'],
+        topic: 'Healing, self-love, and the sweet rhythm of life'
+      },
+      'Afrobeats': {
+        label: 'Afrobeats',
+        style: 'Afrobeats, Afro-Fusion, Amapiano cues',
+        mood: 'Vibrant, Uplifting, Sensual',
+        tempo: '102 BPM, G Major',
+        vocalType: 'male',
+        vocals: ['Melodic pidgin English cadence', 'Catchy call-and-response choir', 'Silky vocal tone'],
+        instruments: ['Syncopated log drum bass', 'Bright acoustic guitar plucks', 'Warm brass horns', 'Shaker percussion'],
+        production: ['Lush open mix', 'Tight sub punch', 'Stereo percussion spread'],
+        rhythm: ['Signature 3-over-2 syncopated polyrhythm', 'Crisp woodblock accents', 'Bouncy rim groove'],
+        topic: 'Sunset celebration, dancing barefoot by the water'
+      },
+      'K-Pop': {
+        label: 'K-Pop',
+        style: 'K-Pop, Electro-Pop, Trap-Pop',
+        mood: 'Dynamic, Confident, High-Energy',
+        tempo: '125 BPM, A Minor',
+        vocalType: 'female',
+        vocals: ['Multi-member vocal interplay', 'Rapid rap bridge flow', 'Soaring high-note belt'],
+        instruments: ['Heavy distorted synth bass', 'Orchestral brass stabs', 'Catchy marimba hook', 'Trap hi-hats'],
+        production: ['Ultra-dynamic genre switches', 'Crisp upfront vocal compression', 'Laser synth sound effects'],
+        rhythm: ['Bouncy pop beat shifting to half-time trap', 'Pounding kick accents'],
+        topic: 'Standing in the spotlight and breaking expectations'
+      },
+      'Alternative Rock': {
+        label: 'Alternative Rock',
+        style: 'Alternative Rock, Grunge, 90s Indie',
+        mood: 'Raw, Angsty, Cathartic',
+        tempo: '116 BPM, E Minor',
+        vocalType: 'belting',
+        vocals: ['Raspy strained lead vocal', 'Cracked emotional falsetto', 'Raw unpolished doubles'],
+        instruments: ['Distorted heavy guitars', 'Pounding acoustic drum kit', 'Overdriven melodic bass guitar'],
+        production: ['Quiet-to-loud dynamic contrasts', 'Vintage tape console grit', 'Room microphone bleed'],
+        rhythm: ['Heavy backbeat rock groove', 'Hard-hitting crash cymbals', 'Driving eighth-note bass'],
+        topic: 'Breaking through inner turmoil and finding truth'
+      },
+      'Modern Metalcore': {
+        label: 'Modern Metalcore',
+        style: 'Modern Metalcore, Djent, Post-Hardcore',
+        mood: 'Aggressive, Massive, Cathartic',
+        tempo: '150 BPM, Drop D',
+        vocalType: 'belting',
+        vocals: ['Guttural aggressive screams', 'Soaring anthemic clean melodic chorus', 'Gang vocal shouts'],
+        instruments: ['Down-tuned 7-string palm-muted guitars', 'Thunderous double-kick drum blasts', 'Sub-frequency bass drops'],
+        production: ['Ultra-tight gate on rhythm guitars', 'Massive low-end impact', 'Polished stereo wall of sound'],
+        rhythm: ['Syncopated polyrhythmic djent riffs', 'Crushing half-time breakdown', 'Double-bass bursts'],
+        topic: 'Rising from ashes when everything was meant to break you'
+      },
+      'Country Roots': {
+        label: 'Country Roots',
+        style: 'Modern Country, Americana, Folk Roots',
+        mood: 'Heartfelt, Honest, Earthy',
+        tempo: '96 BPM, G Major',
+        vocalType: 'male',
+        vocals: ['Twangy emotive lead vocal', 'Rich acoustic vocal harmonies'],
+        instruments: ['Acoustic dreadnought guitar', 'Pedal steel guitar swells', 'Fiddle', 'Telecaster clean twang', 'Punchy kick and tambourine'],
+        production: ['Natural warm wood acoustic reverb', 'Clear organic presence', 'Dynamic acoustic staging'],
+        rhythm: ['Steady country shuffle beat', 'Train-beat snare brush pattern', 'Acoustic guitar strum rhythm'],
+        topic: 'Open highway roads, memories of home, and honest moments'
+      },
+      'Latin Groove': {
+        label: 'Latin Groove',
+        style: 'Latin Pop, Reggaeton, Bossa Nova, Salsa',
+        mood: 'Sensual, Sun-Drenched, Irresistible',
+        tempo: '98 BPM, A Minor',
+        vocalType: 'female',
+        vocals: ['Passionate expressive phrasing', 'Melodic Spanish hooks', 'Rhythmic ad-libs'],
+        instruments: ['Nylon string acoustic guitar', 'Dembow rhythm percussion', 'Brass stabs', 'Sub 808 bass', 'Congas and timbales'],
+        production: ['Crisp percussion balance', 'Warm low-end punch', 'Lush spatial ambiance'],
+        rhythm: ['Syncopated Dembow pulse', 'Clave rhythm accents', 'Dynamic conga rolls'],
+        topic: 'Summer night romance dancing under island stars'
+      },
+      'Reggae Dub': {
+        label: 'Reggae Dub',
+        style: 'Roots Reggae, Dub, Dancehall',
+        mood: 'Laid-Back, Conscious, Heavy',
+        tempo: '76 BPM, C Minor',
+        vocalType: 'male',
+        vocals: ['Soulful reggae chant', 'Echoing vocal drops', 'Harmonized backing choruses'],
+        instruments: ['Deep sub-heavy bassline', 'Offbeat guitar skank chop', 'Bubble Hammond organ', 'Melodica', 'Rimshot echo snare'],
+        production: ['Space echo tape delay throws', 'Deep spring reverb crashes', 'Massive sub-bass weight'],
+        rhythm: ['One-drop drum rhythm (kick on 3)', 'Lazy swung hi-hat', 'Syncopated percussion chimes'],
+        topic: 'Peace, resilience, and positive vibrations'
+      },
+      'Cinematic Hybrid': {
+        label: 'Cinematic Hybrid',
+        style: 'Cinematic Hybrid, Epic Trailer Score',
+        mood: 'Epic, Heroic, Monumental',
+        tempo: '90 BPM, D Minor',
+        vocalType: 'instrumental',
+        vocals: ['Wordless Gregorian choir chant', 'Dramatic soprano solo'],
+        instruments: ['80-piece symphony string section', 'Massive Japanese taiko drums', 'Synthetic sub-bass braams', 'French horns'],
+        production: ['Giant abbey scoring stage space', 'Wide panoramic stereo imaging', 'Deep sub-bass impact booms'],
+        rhythm: ['Building 12/8 ostinato rhythm', 'Monumental downbeat impacts', 'Relentless marching snare rolls'],
+        topic: 'An epic clash of civilizations across an ancient frontier'
+      },
+      'Minimalism': {
+        label: 'Minimalism',
+        style: 'Neoclassical, Modern Minimalism, Piano Ballad',
+        mood: 'Poignant, Meditative, Elegant',
+        tempo: '72 BPM, A Minor',
+        vocalType: 'instrumental',
+        vocals: ['None - instrumental acoustic focus'],
+        instruments: ['Concert grand piano with felt damping', 'Solo cello ostinato', 'Muted violin quartet'],
+        production: ['Close-mic mechanical piano pedal noises', 'Warm wooden room decay', 'Pristine acoustic fidelity'],
+        rhythm: ['Repetitive hypnotic piano arpeggio', 'Rubato expressive phrasing', 'Delicate string swells'],
+        topic: 'A single candle burning in a quiet stone chapel at dusk'
+      },
+      'Deep Focus Flow': {
+        label: 'Deep Focus Flow',
+        style: 'Binaural Focus, Ambient Drone, Deep Flow',
+        mood: 'Ultra-Focused, Tranquil, Infinite',
+        tempo: '60 BPM, C Major (432Hz)',
+        vocalType: 'instrumental',
+        vocals: ['None - pure distraction-free focus'],
+        instruments: ['Warm analog drone pad', 'Gentle singing bowl resonance', 'Subtle 10Hz binaural alpha pulse', 'Soft water stream'],
+        production: ['432 Hz warm concert pitch tuning', 'Zero sudden transients', 'Infinite seamless loop architecture'],
+        rhythm: ['Steady 60 BPM human resting pulse', 'Continuous smooth ambient drift', 'Breath-paced harmonic swells'],
+        topic: 'Entering pure uninterrupted deep work and laser focus'
+      }
+    };
+
+    // Mapping table: seamlessly maps all 70+ dropdown genres to archetype subset
+    const GENRE_MAP = {
+      'Pop': 'Contemporary Pop', 'Dance-Pop': 'Contemporary Pop', 'Electropop': 'Synthwave', 'Synth-Pop': 'Synthwave',
+      'Indie Pop': 'Contemporary Pop', 'Bedroom Pop': 'Lo-Fi Hip-Hop', 'Dream Pop': 'Ambient Chillwave', 'Art Pop': 'Contemporary Pop',
+      'Hyperpop': 'K-Pop', 'J-Pop': 'K-Pop',
+      'Soul': 'Neo-Soul', 'Motown Soul': 'Neo-Soul', 'Gospel': 'Neo-Soul', 'Funk': 'French House', 'Disco': 'French House',
+      'Nu-Disco': 'French House', 'Funk-Pop': 'French House',
+      'Hip-Hop': 'Boom-Bap', 'Trap': 'Melodic Trap', 'Drill': 'Melodic Trap', 'UK Drill': 'Melodic Trap',
+      'Grime': 'Melodic Trap', 'Cloud Rap': 'Melodic Trap', 'Jazz Rap': 'Boom-Bap', 'Conscious Hip-Hop': 'Boom-Bap', 'Phonk': 'Melodic Trap',
+      'House': 'Deep House', 'Tech House': 'Deep House', 'Progressive House': 'EDM Festival', 'Techno': 'Melodic Techno',
+      'Trance': 'Melodic Techno', 'Jungle': 'Drum & Bass', 'Dubstep': 'Melodic Trap', 'UK Garage': 'French House',
+      'Breakbeat': 'Drum & Bass', 'Future Bass': 'EDM Festival', 'EDM': 'EDM Festival', 'Electro': 'Synthwave',
+      'Downtempo': 'Ambient Chillwave', 'Ambient': 'Ambient Chillwave', 'Chillwave': 'Ambient Chillwave',
+      'Vaporwave': 'Synthwave', 'Industrial': 'Melodic Techno',
+      'Rock': 'Alternative Rock', 'Indie Rock': 'Alternative Rock', 'Hard Rock': 'Alternative Rock', 'Classic Rock': 'Alternative Rock',
+      'Pop Rock': 'Contemporary Pop', 'Post-Rock': 'Ambient Chillwave', 'Progressive Rock': 'Alternative Rock',
+      'Punk Rock': 'Alternative Rock', 'Pop Punk': 'Alternative Rock', 'Emo': 'Alternative Rock', 'Grunge': 'Alternative Rock',
+      'Shoegaze': 'Alternative Rock', 'Garage Rock': 'Alternative Rock', 'Post-Punk': 'Alternative Rock', 'Glam Rock': 'Alternative Rock',
+      'Heavy Metal': 'Modern Metalcore', 'Thrash Metal': 'Modern Metalcore', 'Death Metal': 'Modern Metalcore',
+      'Black Metal': 'Modern Metalcore', 'Metalcore': 'Modern Metalcore', 'Nu Metal': 'Modern Metalcore',
+      'Progressive Metal': 'Modern Metalcore', 'Doom Metal': 'Modern Metalcore', 'Alternative Metal': 'Modern Metalcore',
+      'Country': 'Country Roots', 'Modern Country': 'Country Roots', 'Country Pop': 'Country Roots', 'Outlaw Country': 'Country Roots',
+      'Americana': 'Country Roots', 'Folk': 'Country Roots', 'Indie Folk': 'Country Roots', 'Bluegrass': 'Country Roots',
+      'Blues': 'Neo-Soul', 'Southern Rock': 'Alternative Rock',
+      'Jazz': 'Boom-Bap', 'Cool Jazz': 'Boom-Bap', 'Modal Jazz': 'Boom-Bap', 'Jazz Fusion': 'Neo-Soul',
+      'Latin Pop': 'Latin Groove', 'Reggaeton': 'Latin Groove', 'Salsa': 'Latin Groove', 'Bossa Nova': 'Latin Groove', 'Afro-Cuban': 'Latin Groove',
+      'Reggae': 'Reggae Dub', 'Roots Reggae': 'Reggae Dub', 'Dub': 'Reggae Dub', 'Dancehall': 'Reggae Dub',
+      'Afrobeat': 'Afrobeats', 'Highlife': 'Afrobeats', 'Reggae Fusion': 'Reggae Dub',
+      'Cinematic': 'Cinematic Hybrid', 'Orchestral': 'Cinematic Hybrid', 'Film Score': 'Cinematic Hybrid',
+      'Trailer Music': 'Cinematic Hybrid', 'Neoclassical': 'Minimalism', 'Post-Classical': 'Minimalism',
+      'Video Game Music': 'Synthwave', 'Lo-Fi': 'Lo-Fi Hip-Hop', 'Piano Ballad': 'Minimalism'
+    };
+
+    function getGenreProfile(name) {
+      if (!name) return null;
+      if (ARCHETYPES[name]) return ARCHETYPES[name];
+      const target = GENRE_MAP[name];
+      if (target && ARCHETYPES[target]) return ARCHETYPES[target];
+      const lower = name.toLowerCase().trim();
+      for (const k in ARCHETYPES) {
+        if (k.toLowerCase() === lower || lower.includes(k.toLowerCase()) || k.toLowerCase().includes(lower)) {
+          return ARCHETYPES[k];
+        }
+      }
+      return ARCHETYPES['Contemporary Pop'];
+    }
+
+    const PRESETS = {
+      'synthwave-noir': { genre: 'Synthwave', style: 'Synthwave, Darksynth', mood: 'Driving, Cinematic, Midnight', tempo: '118 BPM, F Minor', vocal: 'male', topic: 'Speeding through neon metropolis' },
+      'deep-focus-ambient': { genre: 'Deep Focus Flow', style: 'Ambient Drone, 432Hz', mood: 'Focused, Tranquil', tempo: '60 BPM, C Major', vocal: 'instrumental', engine: 'flow', topic: 'Pure uninterrupted concentration' },
+      'french-house-groove': { genre: 'French House', style: 'French House, Nu-Disco', mood: 'Euphoric, Groovy', tempo: '124 BPM, D Minor', vocal: 'vocoder', topic: 'Golden reflections on Paris dancefloors' },
+      'monumental-score': { genre: 'Cinematic Hybrid', style: 'Cinematic Hybrid, Epic Trailer', mood: 'Awe-Inspiring, Heroic', tempo: '90 BPM, D Minor', vocal: 'instrumental', topic: 'Heroic march across ancient mountains' },
+      'lofi-hiphop': { genre: 'Lo-Fi Hip-Hop', style: 'Lo-Fi Chillhop, Tape Beats', mood: 'Cozy, Nostalgic', tempo: '82 BPM, Eb Major', vocal: 'instrumental', topic: 'Raindrops on a coffee shop window' },
+      'alt-rnb': { genre: 'Alternative R&B', style: 'Alternative R&B, Trap Soul', mood: 'Seductive, Late-Night', tempo: '88 BPM, F# Minor', vocal: 'female', topic: 'Late night messages and echoes' },
+      'modern-metalcore': { genre: 'Modern Metalcore', style: 'Metalcore, Djent', mood: 'Aggressive, Massive', tempo: '150 BPM, Drop D', vocal: 'belting', topic: 'Rising when the walls collapsed' },
+      'afrobeats-summer': { genre: 'Afrobeats', style: 'Afrobeats, Afro-Fusion', mood: 'Vibrant, Warm, Uplifting', tempo: '102 BPM, G Major', vocal: 'male', topic: 'Golden hour dance on the beach' }
+    };
+
+    const $ = id => document.getElementById(id);
+    let currentEngine = 'suno';
+    let activeTags = { vocals: [], instruments: [], production: [], rhythm: [] };
+    let tagStatus = {};
+    let history = [];
+    try { history = JSON.parse(localStorage.getItem('pw_history_v2') || '[]'); } catch(e) {}
+
+    // Toast UI
+    let toastTimer = null;
+    function showToast(msg, icon) {
+      icon = icon || '✨';
+      const toast = $('toast');
+      $('toastIcon').textContent = icon;
+      $('toastMessage').textContent = msg;
+      toast.classList.remove('opacity-0', 'translate-y-4', 'pointer-events-none');
+      toast.classList.add('opacity-100', 'translate-y-0');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.remove('opacity-100', 'translate-y-0');
+        toast.classList.add('opacity-0', 'translate-y-4', 'pointer-events-none');
+      }, 2500);
+    }
+
+    function copyText(text, successMsg) {
+      if (!text) return;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => showToast(successMsg, '📋')).catch(() => fallbackCopy(text, successMsg));
+      } else {
+        fallbackCopy(text, successMsg);
+      }
+    }
+
+    function fallbackCopy(text, successMsg) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        showToast(successMsg, '📋');
+      } catch(e) {
+        showToast('Copy failed', '❌');
+      }
+      document.body.removeChild(ta);
+    }
+
+    function renderChips() {
+      const renderCat = (containerId, list) => {
+        const container = $(containerId);
+        container.textContent = '';
+        if (!list || !list.length) {
+          container.innerHTML = '<span class="text-xs text-studio-400 italic">None selected</span>';
+          return;
+        }
+        list.forEach(tag => {
+          const isActive = tagStatus[tag] !== false;
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'min-h-[40px] px-3 py-1.5 rounded-lg text-xs font-mono border transition-all active:scale-95 ' + (isActive ? 'tag-active' : 'tag-inactive');
+          btn.textContent = tag;
+          btn.setAttribute('aria-pressed', isActive.toString());
+          btn.setAttribute('aria-label', 'Toggle tag ' + tag);
+          btn.onclick = () => {
+            tagStatus[tag] = !isActive;
+            renderChips();
+            compilePrompt();
+          };
+          container.appendChild(btn);
+        });
+      };
+
+      renderCat('vocalChips', activeTags.vocals);
+      renderCat('instChips', activeTags.instruments);
+      renderCat('prodChips', activeTags.production);
+      renderCat('rhythmChips', activeTags.rhythm);
+
+      const allTags = [...activeTags.vocals, ...activeTags.instruments, ...activeTags.production, ...activeTags.rhythm];
+      const activeCount = allTags.filter(k => tagStatus[k] !== false).length;
+      $('activeTraitCount').textContent = activeCount + ' active';
+    }
+
+    function compilePrompt() {
+      const genre = $('genreSelect').value === 'custom' ? $('customSoundInput').value.trim() : $('genreSelect').value.trim();
+      const style = $('styleInput').value.trim();
+      const mood = $('moodInput').value.trim();
+      const tempo = $('tempoInput').value.trim();
+      const vocalPref = $('vocalSelect').value;
+      const maxChars = parseInt($('charLimit').value, 10) || 0;
+      const budget = parseInt($('tagBudget').value, 10) || 6;
+
+      const getActive = list => (list || []).filter(t => tagStatus[t] !== false);
+      const chosenTags = [];
+      let rem = budget;
+      [getActive(activeTags.instruments), getActive(activeTags.vocals), getActive(activeTags.production), getActive(activeTags.rhythm)].forEach(catList => {
+        const take = Math.min(Math.ceil(rem / 2) || 1, catList.length);
+        for (let i = 0; i < take && rem > 0; i++) {
+          if (!chosenTags.includes(catList[i])) { chosenTags.push(catList[i]); rem--; }
+        }
+      });
+
+      let promptStr = '';
+      if (currentEngine === 'suno') {
+        $('enginePromptTitle').textContent = 'Suno Style Prompt (v3.5 / v4)';
+        const parts = [
+          style,
+          genre && (!style || !style.toLowerCase().includes(genre.toLowerCase())) ? genre : '',
+          mood ? mood + ' vibe' : '',
+          tempo
+        ];
+        if (vocalPref === 'instrumental') parts.push('instrumental, no vocals');
+        else if (vocalPref === 'vocoder') parts.push('vocoder / talkbox vocals');
+        else if (vocalPref !== 'auto') parts.push(vocalPref + ' vocals');
+        parts.push(...chosenTags);
+        promptStr = parts.filter(Boolean).join(' | ');
+      } else if (currentEngine === 'udio') {
+        $('enginePromptTitle').textContent = 'Udio Prompt (v1.5)';
+        const vocalDesc = vocalPref === 'instrumental' ? 'instrumental' : (vocalPref !== 'auto' ? vocalPref + ' vocalist' : '');
+        const parts = [style, vocalDesc, mood, tempo, ...chosenTags];
+        promptStr = parts.filter(Boolean).join(', ');
+      } else if (currentEngine === 'musicgen') {
+        $('enginePromptTitle').textContent = 'MusicGen / AudioCraft';
+        let intro = 'A ' + (mood ? mood.toLowerCase() + ' ' : '') + (style || genre || 'music track');
+        const details = [];
+        if (chosenTags.length) details.push('featuring ' + chosenTags.slice(0, 4).join(', '));
+        if (tempo) details.push('at ' + tempo);
+        if (vocalPref === 'instrumental') details.push('pure instrumental');
+        else if (vocalPref !== 'auto') details.push('with ' + vocalPref + ' vocals');
+        promptStr = intro + ' ' + details.join(', ') + '. High fidelity master recording.';
+      } else if (currentEngine === 'flow') {
+        $('enginePromptTitle').textContent = 'Flow Mode / Ambient Drone';
+        const tuningStr = $('flowTuning').value === '432hz' ? '432 Hz warm solfeggio tuning' : '440 Hz standard';
+        const loopStr = $('flowLoop').value === 'seamless' ? 'seamless infinite loop' : 'evolving waves';
+        const parts = ['Continuous focus flow', tuningStr, loopStr, style || genre, mood, tempo, ...chosenTags];
+        promptStr = parts.filter(Boolean).join(' | ');
+      }
+
+      if (maxChars > 0 && promptStr.length > maxChars) {
+        promptStr = promptStr.slice(0, maxChars).replace(/[,|]\s*$/, '');
+      }
+
+      $('promptOutput').value = promptStr;
+      $('charCounter').textContent = promptStr.length + ' chars';
+
+      const neg = ['distorted vocals', 'muddy bass', 'harsh digital clipping', 'abrupt cutoff'];
+      if (vocalPref === 'instrumental') {
+        neg.unshift('vocals', 'singing', 'voice', 'spoken word', 'vocal chops');
+      }
+      $('negOutput').value = neg.join(', ');
+    }
+
+    // Helper: Pick random item from an array
+    function pick(arr) {
+      return arr[Math.floor(Math.random() * arr.length)];
+    }
+
+    // DYNAMIC & FRESH LYRICS ENGINE
+    // Every call generates brand-new varied verses, rhyming lines, choruses, and hooks
+    const LYRIC_BUILDERS = {
+      'pop-standard': function(topic) {
+        const v1_openers = [
+          'Headlights cutting through the midnight haze\nChasing the ghost of our yesterday days',
+          'Neon reflections glowing on the glass\nWatching the shadows of the skyline pass',
+          'Static on the radio, turning up the sound\nLooking for the spark we never found',
+          'Clock ticking quietly against the wall\nWaiting for the courage to surrender and fall'
+        ];
+        const v1_closers = [
+          'Holding on to every breath before the morning light\nNothing else matters in the heart of the night',
+          'Thinking about ' + topic + ' and everything we knew\nEvery step I take is pulling me to you',
+          'Leaving all the doubts behind in the rearview mirror\nNow the whole horizon is burning crystal clearer',
+          'Walking through the echoes where the memories stay\nReady to wash all the wreckage away'
+        ];
+        const pre_choruses = [
+          '[Pre-Chorus]\nAnd I feel the temperature starting to rise\nSee the whole universe reflected in your eyes\nGive me one more second before we jump the wire',
+          '[Pre-Chorus]\nPressure is building, heartbeat accelerating fast\nWe knew this quiet moment was never gonna last\nThree, two, one - step into the glow',
+          '[Pre-Chorus]\nCan you hear the bassline shaking the floor?\nWe are not afraid of the dark anymore\nBreathe it in deep, let the current pull us in'
+        ];
+        const choruses = [
+          '[Chorus]\nWe are dancing on the edge of the fire\nTurning every heartache into burning desire\nOh we are golden, electric and free\nEverything you dreamed of is waiting for me!',
+          '[Chorus]\nUnderneath the starlight, breaking every mold\nTurning simple ashes into solid gold\nSing it loud, let the whole room shake\nThis is the promise that we never gonna break!',
+          '[Chorus]\nTake the leap now, never look back down\nWe are the rulers of an empty neon town\nShining in the dark like a diamond in the sand\nRunning till the sunrise with the future in our hands!'
+        ];
+        const v2_lines = [
+          '[Verse 2]\nGlass towers blurring into ribbons of blue\nEvery road I follow brings me closer to you\nNo more second guessing what tomorrow will bring\nWe already survived every storm and every sting.',
+          '[Verse 2]\nWhispers in the alleyway fade into the breeze\nCity at our feet, bringing trouble to its knees\nFinding the melody inside the hurricane\nWashing off the rust and the memory of pain.',
+          '[Verse 2]\nFrequencies aligning on a stereo wave\nFinding all the treasures that we thought we couldn\'t save\nWith ' + topic + ' etched into my chest\nFinally putting all the ghosts to rest.'
+        ];
+        const bridges = [
+          '[Bridge]\nIf we stumble, if we fall\nAt least we dared to risk it all\nNo apologies, no regrets tonight\nWe were born to conquer the light!',
+          '[Bridge]\nLet the thunder roll, let the waters rise\nWe got the fire burning deep in our eyes\nNothing can tear this moment apart\nTwo wild beats in a single heart!'
+        ];
+        const outros = [
+          '[Outro: Fade Out]\nJust keep the lights on...\nDancing till the break of day\nNever gonna fade away\n(Echoing vocal ad-libs fade)',
+          '[Outro: Fade Out]\nElectric night, hold it tight\nGold in our hands, walking into the light\nFade to silence.'
+        ];
+
+        return '[Verse 1]\n' + pick(v1_openers) + '\n' + pick(v1_closers) + '\n\n' +
+               pick(pre_choruses) + '\n\n' +
+               pick(choruses) + '\n\n' +
+               pick(v2_lines) + '\n\n' +
+               pick(bridges) + '\n\n' +
+               pick(choruses) + '\n\n' +
+               pick(outros);
+      },
+
+      'club-anthem': function(topic) {
+        const buildups = [
+          '[Buildup]\nSub-frequencies rising through the floor\nCannot hold back the flood anymore\nPulse climbing up: 128, 130, 135\nFeel the voltage keeping you alive!\nThree! Two! One! IGNITE!',
+          '[Buildup]\nAtmospheric white noise riser climbing high\nHands reaching up to touch the stadium sky\nRelease the tension, release the strain\nAre you ready for the drop in the pouring rain?!\nDROP IT!',
+          '[Buildup]\nSnare roll accelerating double-time\nEvery single soul moving on the dime\nCan you feel the pressure? Can you feel the heat?\nTen thousand voices lock into the beat!'
+        ];
+        const verses = [
+          '[Verse]\nLost inside the rhythm of ' + topic + '\nLocked into the groove, no one can stop it\nLaser beams cutting through the haze\nLost in an endless euphoric maze.',
+          '[Verse]\nStrobe flashes freeze each frame in time\nSweat and bassline blending into pure sublime\nNo past, no future, just the 4x4 kick\nHypnotic groove moving double-quick.'
+        ];
+        return '[Intro]\nFrequencies humming in the dark\nWaiting for the lightning spark\n\n' +
+               pick(buildups) + '\n\n' +
+               '[Drop: Massive Supersaw Festival Melody]\n\n' +
+               pick(verses) + '\n\n' +
+               pick(buildups) + '\n\n' +
+               '[Drop: Peak Energy Anthem]\n\n' +
+               '[Outro: Fade Out]\nReverb decay, low-pass filter sweeps out into silence.';
+      },
+
+      'rap-bars': function(topic) {
+        const verse1_sets = [
+          'Started with a quiet whisper in the back of the room\nTraded every midnight hour just to watch the vision bloom\nConcrete jungle, shadows longer than the towers\nTurning quiet persistence into architectural powers\nNever took the shortcut, paved it with the heavy stone\nNow the frequency resonates straight to the bone.',
+          'Pen on the legal pad, bleeding out truth\nSharpening the focus like I had something to prove\nThey wanted flash, but I built the foundation\nTurning my scars into global vibration\nMidnight hustle when the city goes cold\nStories that the history books never told.',
+          'Back against the brick wall, study every angle\nUntangling the knots that they left in the tangle\nHeavyweight cadence, every syllable counted\nLook at the obstacles we climbed and surmounted\nTopic on my mind is ' + topic + '\nNever watered down, authentic and bespoke.'
+        ];
+        const hooks = [
+          '[Hook]\nCrown heavy, but the shoulders stay strong\nCarrying the heartbeat of the city along\nFrom the ground to the stars, never counting the cost\nEvery lesson is a trophy, nothing was lost!',
+          '[Hook]\nThey see the glow, but they didn\'t see the grind\nLeaving all the doubt and the static behind\nUnbreakable spirit, certified real\nCarved out of granite and tempered in steel.'
+        ];
+        const verse2_sets = [
+          '[Verse 2]\nBack in the pocket, measure every bar clean\nRazor-sharp focus moving through the widescreen\nThey were looking for a glitch, found an ironclad scheme\nAwake in the daytime, living out the night dream\nMic check, one-two, keep the balance pristine.',
+          '[Verse 2]\nNo silver spoons, just a hunger that stayed\nEvery royalty check earned and every toll paid\nMoving through the chess board, knight to E4\nOpening the lock on the penthouse door\nKeep the circle tight, honor over fame.'
+        ];
+        return '[Intro]\nYeah. Lights low, frequencies aligned.\nChecking the pulse on ' + topic + '.\n\n' +
+               '[Verse 1]\n' + pick(verse1_sets) + '\n\n' +
+               pick(hooks) + '\n\n' +
+               pick(verse2_sets) + '\n\n' +
+               pick(hooks) + '\n\n' +
+               '[Outro: Fade Out]\nMic drop. Real ones know. Peace.';
+      },
+
+      'cinematic-epic': function(topic) {
+        const overtures = [
+          'Before the first light crossed the silent sea\nA distant promise called out to me\nEchoes of ' + topic + ' carried on the wind.',
+          'Beneath the shadows of the ancient stone\nA kingdom stood unbroken and alone\nWaiting for the banners to arise once more.',
+          'From the embers of a forgotten age\nA hero steps upon the sacred stage\nThe heralds blow their horns across the vale.'
+        ];
+        const climaxes = [
+          '[Climax: Orchestral Brass Fanfare]\nHold the horizon! Stand where the brave have bled!\nEven when the stars fall into the deep\nThis is the oath that we swore to keep!\nNo retreat! The dawn is breaking!',
+          '[Climax: Full Symphony & Taiko Drums]\nRise from the ashes! Let the thunder roar!\nWe conquer the tempest and shatter the door!\nFor honor, for glory, through eternal night\nWe claim the stars with blinding light!'
+        ];
+        return '[Atmospheric Overture]\n' + pick(overtures) + '\n\n' +
+               '[Crescendo: Strings Ostinato 12/8]\nThe clouds divide, the ancient skies ignite\nWe rise above the shadow of the night\nChoir chants swelling in the sacred hall\n\n' +
+               pick(climaxes) + '\n\n' +
+               '[Resolution & Epilogue: Solo Cello]\nThe storm clears. Peace upon the mountain crest.';
+      },
+
+      'flow-hypnotic': function(topic) {
+        const mantras = [
+          'Breathe into stillness\nLock into the signal\nLeave the static behind',
+          'Inhale focus, exhale noise\nResting in quiet, anchored in poise\nOne uninterrupted stream',
+          'Center of gravity, clear and serene\nNothing exists beyond the screen\nInfinite horizon opening wide'
+        ];
+        const cadences = [
+          'Following the rhythm, quiet with the motion\nLet every wandering thought dissolve in the ocean\nStep after step, moving with the stream\nFocus anchored in ' + topic + '.',
+          'Gentle harmonic waves rolling through the mind\nLeaving all the clutter and distraction behind\nFlowing effortless like water over stone\nIn this focused space, fully in the zone.'
+        ];
+        return '[Intro: 432Hz Resonance]\n' + pick(mantras) + '\n\n' +
+               '[Flow Cadence]\n' + pick(cadences) + '\n\n' +
+               '[Center]\nZero hesitation, laser beam locked\nContinuous frequency\n\n' +
+               '[Seamless Infinite Loop]';
+      }
+    };
+
+    function updateLyricMetrics() {
+      const text = $('lyricsOutput').value;
+      const lines = text.split('\n').filter(l => l.trim().length > 0 && !l.trim().startsWith('[')).length;
+      const words = (text.match(/\b\w+\b/g) || []).length;
+      $('lyricMetrics').textContent = lines + ' lines | ~' + words + ' words';
+    }
+
+    function generateLyrics() {
+      if ($('vocalSelect').value === 'instrumental') {
+        $('lyricsOutput').value = '[Instrumental Arrangement - No Vocals]\nTheme: ' + ($('topicInput').value || 'Sonic journey') + '\n\n[Intro: Atmospheric Ambience]\n\n[Movement I: Rhythmic Pulse Enters]\n\n[Movement II: Harmonic Swell & Melody]\n\n[Movement III: Dynamic Peak]\n\n[Outro: Extended Decay & Reverb Tail]';
+      } else {
+        const struct = $('structureSelect').value;
+        const builder = LYRIC_BUILDERS[struct] || LYRIC_BUILDERS['pop-standard'];
+        const topic = $('topicInput').value.trim() || 'midnight city lights';
+        let lyr = builder(topic);
+        if (!$('includeCues').checked) {
+          lyr = lyr.replace(/^\[.*?\]\n?/gm, '').trim();
+        }
+        $('lyricsOutput').value = lyr;
+      }
+      updateLyricMetrics();
+      showToast('Fresh lyrics generated!', '✨');
+    }
+
+    // Audio & Web Audio API
+    let audioCtx = null;
+    let droneOsc = null;
+
+    function ensureAudioContext() {
+      if (!audioCtx) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContext();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    $('toneBtn').addEventListener('click', function(e) {
+      e.preventDefault();
+      ensureAudioContext();
+
+      if (droneOsc) {
+        droneOsc.stop();
+        droneOsc.disconnect();
+        droneOsc = null;
+        $('toneIcon').textContent = '🎵';
+        $('toneText').textContent = 'Pitch Drone';
+        showToast('Pitch drone stopped');
+      } else {
+        droneOsc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        droneOsc.type = 'sine';
+        const freq = $('flowTuning').value === '432hz' ? 432 : ($('flowTuning').value === '528hz' ? 528 : 440);
+        droneOsc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.04, audioCtx.currentTime);
+        droneOsc.connect(gain);
+        gain.connect(audioCtx.destination);
+        droneOsc.start();
+        $('toneIcon').textContent = '🔊';
+        $('toneText').textContent = freq + 'Hz Active';
+        showToast('Playing ' + freq + 'Hz reference drone');
+      }
+    });
+
+    let taps = [];
+    $('tapTempoBtn').addEventListener('click', function(e) {
+      e.preventDefault();
+      ensureAudioContext();
+
+      const now = performance.now();
+      taps.push(now);
+      if (taps.length > 5) taps.shift();
+
+      if (taps.length >= 2) {
+        const diffs = [];
+        for (let i = 1; i < taps.length; i++) diffs.push(taps[i] - taps[i - 1]);
+        const avg = diffs.reduce((a, b) => a + b, 0) / diffs.length;
+        const bpm = Math.round(60000 / avg);
+        if (bpm >= 40 && bpm <= 260) {
+          $('tapTempoText').textContent = bpm + ' BPM';
+          $('tempoInput').value = bpm + ' BPM';
+          compilePrompt();
+        }
+      }
+
+      // Audio click blip
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.frequency.value = 880;
+        gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.04);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.05);
+      } catch(err) {}
+    });
+
+    // History
+    function saveHistory() {
+      const p = $('promptOutput').value;
+      if (!p) return;
+      history.unshift({
+        prompt: p,
+        engine: currentEngine,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      });
+      if (history.length > 8) history.pop();
+      try { localStorage.setItem('pw_history_v2', JSON.stringify(history)); } catch(e) {}
+      renderHistory();
+    }
+
+    function renderHistory() {
+      const container = $('historyContainer');
+      container.textContent = '';
+      if (!history.length) {
+        container.innerHTML = '<div class="text-xs text-studio-400 italic py-2 col-span-2">No saved generations yet. Everything is stored in local browser state.</div>';
+        return;
+      }
+      history.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'p-3 rounded-lg bg-studio-950 border border-studio-800 hover:border-amber-500/50 active:scale-[0.99] transition-all cursor-pointer';
+        card.innerHTML = '<div class="flex justify-between text-[10px] text-studio-400 mb-1"><span class="uppercase font-bold text-amber-400">' + item.engine + '</span><span>' + item.time + '</span></div><div class="text-xs font-mono text-studio-200 line-clamp-2">' + item.prompt + '</div>';
+        card.onclick = () => {
+          $('promptOutput').value = item.prompt;
+          $('charCounter').textContent = item.prompt.length + ' chars';
+          showToast('Loaded prompt from history');
+        };
+        container.appendChild(card);
+      });
+    }
+
+    // Export .txt
+    $('downloadLyricsBtn').addEventListener('click', function(e) {
+      e.preventDefault();
+      const content = $('lyricsOutput').value;
+      if (!content) return showToast('No lyrics to download', '❌');
+      const filename = ($('styleInput').value || 'song_lyrics').toLowerCase().replace(/[^a-z0-9]/g, '_') + '.txt';
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      showToast('Exported ' + filename);
+    });
+
+    // Preset Buttons
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('border-amber-500', 'bg-amber-500/10', 'text-amber-400'));
+        btn.classList.add('border-amber-500', 'bg-amber-500/10', 'text-amber-400');
+
+        const pKey = btn.getAttribute('data-preset');
+        const pData = PRESETS[pKey];
+        if (!pData) return;
+
+        const profile = ARCHETYPES[pData.genre] || {};
+        $('genreSelect').value = pData.genre;
+        $('styleInput').value = pData.style || profile.style || '';
+        $('moodInput').value = pData.mood || profile.mood || '';
+        $('tempoInput').value = pData.tempo || profile.tempo || '';
+        $('vocalSelect').value = pData.vocal || profile.vocalType || 'auto';
+        $('topicInput').value = pData.topic || profile.topic || '';
+
+        if (pData.engine) {
+          currentEngine = pData.engine;
+          document.querySelectorAll('.engine-card').forEach(c => {
+            const isMatch = c.getAttribute('data-engine') === currentEngine;
+            c.classList.toggle('active', isMatch);
+            c.classList.toggle('border-amber-500', isMatch);
+            c.classList.toggle('bg-amber-500/10', isMatch);
+            c.classList.toggle('border-studio-800', !isMatch);
+          });
+          $('flowSettings').classList.toggle('hidden', currentEngine !== 'flow');
+        }
+
+        activeTags = {
+          vocals: profile.vocals ? [...profile.vocals] : [],
+          instruments: profile.instruments ? [...profile.instruments] : [],
+          production: profile.production ? [...profile.production] : [],
+          rhythm: profile.rhythm ? [...profile.rhythm] : []
+        };
+        tagStatus = {};
+        [...activeTags.vocals, ...activeTags.instruments, ...activeTags.production, ...activeTags.rhythm].forEach(t => tagStatus[t] = true);
+
+        renderChips();
+        compilePrompt();
+        generateLyrics();
+      });
+    });
+
+    // Genre Select (Maps all 70+ dropdown genres to archetype subset)
+    $('genreSelect').addEventListener('change', () => {
+      const val = $('genreSelect').value;
+      if (val === 'custom') {
+        $('customSoundInput').classList.remove('hidden');
+        return;
+      }
+      $('customSoundInput').classList.add('hidden');
+      if (!val) return;
+
+      const profile = getGenreProfile(val);
+      if (profile) {
+        $('styleInput').value = val !== profile.label ? val + ', ' + profile.style : profile.style;
+        $('moodInput').value = profile.mood;
+        $('tempoInput').value = profile.tempo;
+        $('vocalSelect').value = profile.vocalType;
+        $('topicInput').value = profile.topic;
+        activeTags = {
+          vocals: [...profile.vocals],
+          instruments: [...profile.instruments],
+          production: [...profile.production],
+          rhythm: [...profile.rhythm]
+        };
+        tagStatus = {};
+        [...profile.vocals, ...profile.instruments, ...profile.production, ...profile.rhythm].forEach(t => tagStatus[t] = true);
+        renderChips();
+        compilePrompt();
+        generateLyrics();
+        showToast('Loaded ' + val + ' profile');
+      }
+    });
+
+    // Engine Selection
+    document.querySelectorAll('.engine-card').forEach(card => {
+      card.addEventListener('click', () => {
+        currentEngine = card.getAttribute('data-engine');
+        document.querySelectorAll('.engine-card').forEach(c => {
+          c.classList.toggle('active', c === card);
+          c.classList.toggle('border-amber-500', c === card);
+          c.classList.toggle('bg-amber-500/10', c === card);
+          c.classList.toggle('border-studio-800', c !== card);
+        });
+        $('flowSettings').classList.toggle('hidden', currentEngine !== 'flow');
+        compilePrompt();
+      });
+    });
+
+    // Tabs
+    $('tabPromptBtn').onclick = () => {
+      $('promptPane').classList.remove('hidden');
+      $('lyricsPane').classList.add('hidden');
+      $('tabPromptBtn').classList.add('text-amber-400', 'bg-studio-850', 'border-amber-500/30');
+      $('tabLyricsBtn').classList.remove('text-amber-400', 'bg-studio-850', 'border-amber-500/30');
+    };
+
+    $('tabLyricsBtn').onclick = () => {
+      $('lyricsPane').classList.remove('hidden');
+      $('promptPane').classList.add('hidden');
+      $('tabLyricsBtn').classList.add('text-amber-400', 'bg-studio-850', 'border-amber-500/30');
+      $('tabPromptBtn').classList.remove('text-amber-400', 'bg-studio-850', 'border-amber-500/30');
+    };
+
+    // Add Custom Trait
+    $('addTraitBtn').onclick = () => {
+      const val = $('newTraitInput').value.trim();
+      if (!val) return;
+      activeTags.production.push(val);
+      tagStatus[val] = true;
+      $('newTraitInput').value = '';
+      renderChips();
+      compilePrompt();
+      showToast('Trait "' + val + '" added');
+    };
+
+    $('toggleAllTraitsBtn').onclick = () => {
+      const allTags = [...activeTags.vocals, ...activeTags.instruments, ...activeTags.production, ...activeTags.rhythm];
+      const hasActive = allTags.some(t => tagStatus[t] !== false);
+      allTags.forEach(t => tagStatus[t] = !hasActive);
+      renderChips();
+      compilePrompt();
+    };
+
+    // Quick Metatags
+    document.querySelectorAll('.metatag-btn').forEach(btn => {
+      btn.onclick = () => {
+        const tag = btn.getAttribute('data-meta');
+        const val = $('promptOutput').value;
+        $('promptOutput').value = val ? val + ' | ' + tag : tag;
+        $('charCounter').textContent = $('promptOutput').value.length + ' chars';
+        showToast('Appended ' + tag);
+      };
+    });
+
+    // Insert Lyric Cues
+    document.querySelectorAll('.insert-cue').forEach(btn => {
+      btn.onclick = () => {
+        const cue = btn.getAttribute('data-cue');
+        $('lyricsOutput').value += '\n\n' + cue + '\n';
+        updateLyricMetrics();
+        $('lyricsOutput').scrollTop = $('lyricsOutput').scrollHeight;
+      };
+    });
+
+    // Input change listeners
+    ['styleInput', 'moodInput', 'tempoInput', 'customSoundInput'].forEach(id => {
+      $(id).addEventListener('input', compilePrompt);
+    });
+
+    ['vocalSelect', 'charLimit', 'tagBudget', 'flowTuning', 'flowLoop'].forEach(id => {
+      $(id).addEventListener('change', compilePrompt);
+    });
+
+    $('includeCues').addEventListener('change', generateLyrics);
+    $('structureSelect').addEventListener('change', generateLyrics);
+
+    // Action buttons
+    $('generateBtn').onclick = () => {
+      compilePrompt();
+      generateLyrics();
+      saveHistory();
+      showToast('Generated prompt & lyrics!', '✨');
+    };
+
+    $('clearAllBtn').onclick = () => {
+      $('genreSelect').value = '';
+      $('customSoundInput').value = '';
+      $('styleInput').value = '';
+      $('moodInput').value = '';
+      $('tempoInput').value = '';
+      $('topicInput').value = '';
+      $('promptOutput').value = '';
+      $('lyricsOutput').value = '';
+      activeTags = { vocals: [], instruments: [], production: [], rhythm: [] };
+      tagStatus = {};
+      renderChips();
+      compilePrompt();
+      showToast('Reset all fields', '🧹');
+    };
+
+    $('clearHistoryBtn').onclick = () => {
+      history = [];
+      try { localStorage.removeItem('pw_history_v2'); } catch(e) {}
+      renderHistory();
+      showToast('History cleared');
+    };
+
+    $('rerollLyricsBtn').onclick = () => {
+      generateLyrics();
+    };
+
+    $('copyPromptBtn').onclick = () => copyText($('promptOutput').value, 'Prompt copied!');
+    $('copyNegBtn').onclick = () => copyText($('negOutput').value, 'Negative prompt copied!');
+    $('copyLyricsBtn').onclick = () => copyText($('lyricsOutput').value, 'Lyrics copied!');
+    $('quickBundleBtn').onclick = () => copyText('=== STYLE PROMPT ===\n' + $('promptOutput').value + '\n\n=== NEGATIVE PROMPT ===\n' + $('negOutput').value + '\n\n=== LYRICS ===\n' + $('lyricsOutput').value, 'Full bundle copied!');
+    $('lyricsOutput').addEventListener('input', updateLyricMetrics);
+
+    // Initial boot with first preset
+    const firstPreset = document.querySelector('.preset-btn');
+    if (firstPreset) firstPreset.click();
+    renderHistory();
+  })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,576 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Audio Slicer & Sequencer</title>
+  <meta name="description" content="iPad-optimized Web Audio sequencer and slicing tool." />
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --panel: #171717;
+      --panel-hover: #262626;
+      --border: #262626;
+      --border-light: #404040;
+      --text: #f5f5f5;
+      --text-muted: #737373;
+      --blue: #3b82f6;
+      --blue-hover: #2563eb;
+      --blue-glow: rgba(59, 130, 246, 0.2);
+    }
+
+    * { box-sizing: border-box; }
+
+    body, html {
+      margin: 0; padding: 0; width: 100%; height: 100%;
+      background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none;
+    }
+
+    /* Buttons & Inputs */
+    button {
+      background: none; border: none; color: inherit; font: inherit; cursor: pointer; outline: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .btn-primary {
+      background: var(--blue); color: white; padding: 16px 24px; border-radius: 12px;
+      font-size: 18px; font-weight: 600; width: 100%; transition: background 0.2s, transform 0.1s;
+    }
+    .btn-primary:active { transform: scale(0.98); background: var(--blue-hover); }
+
+    /* Overlay */
+    #overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: var(--bg); display: flex; flex-direction: column;
+      align-items: center; justify-content: center; z-index: 100;
+    }
+    .overlay-card {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 24px; padding: 40px; text-align: center; max-width: 320px; width: 90%;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    }
+    .overlay-card svg { margin-bottom: 24px; color: var(--text-muted); }
+    .overlay-card h1 { margin: 0 0 8px 0; font-size: 24px; font-weight: 600; }
+    .overlay-card p { margin: 0 0 32px 0; color: var(--text-muted); }
+
+    /* App Layout */
+    #app {
+      display: none; flex-direction: column; height: 100%;
+    }
+    header {
+      flex: none; display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 24px; border-bottom: 1px solid var(--border); background: rgba(10,10,10,0.8);
+    }
+    .header-left { display: flex; align-items: center; gap: 12px; }
+    .header-left .logo {
+      width: 40px; height: 40px; background: var(--panel); border: 1px solid var(--border);
+      border-radius: 10px; display: flex; align-items: center; justify-content: center; color: var(--blue);
+    }
+    .header-left h1 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -0.5px; }
+    .header-left p { margin: 0; font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; font-weight: 500; }
+    
+    .header-right { display: flex; align-items: center; gap: 24px; }
+    .bpm-control {
+      display: flex; align-items: center; gap: 16px; background: var(--panel);
+      padding: 8px 16px; border-radius: 12px; border: 1px solid var(--border);
+      opacity: 0; pointer-events: none; transition: opacity 0.3s;
+    }
+    .bpm-control.visible { opacity: 1; pointer-events: auto; }
+    .bpm-label { font-size: 12px; font-weight: 600; color: var(--text-muted); width: 60px; }
+    input[type=range] { accent-color: var(--blue); width: 120px; }
+
+    .upload-btn {
+      display: flex; align-items: center; gap: 8px; background: var(--panel); border: 1px solid var(--border);
+      padding: 10px 16px; border-radius: 12px; cursor: pointer; transition: background 0.2s, transform 0.1s;
+    }
+    .upload-btn:active { transform: scale(0.96); background: var(--panel-hover); }
+    .upload-btn svg { color: var(--text-muted); }
+    .upload-btn span { font-size: 14px; font-weight: 500; }
+    #file-input { display: none; }
+
+    /* Main Content */
+    main { display: flex; flex: 1; padding: 24px; gap: 24px; min-height: 0; }
+    @media (max-width: 768px) { main { flex-direction: column; padding: 16px; gap: 16px; } }
+
+    #empty-state {
+      flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      border: 2px dashed var(--border); border-radius: 24px; color: var(--text-muted);
+    }
+    #empty-state svg { opacity: 0.5; margin-bottom: 16px; }
+
+    #workspace {
+      display: none; flex: 1; gap: 24px; width: 100%;
+    }
+    @media (max-width: 768px) { #workspace { flex-direction: column; gap: 16px; } }
+
+    .panel {
+      background: rgba(23, 23, 23, 0.5); border: 1px solid var(--border); border-radius: 24px;
+      padding: 20px; display: flex; flex-direction: column;
+    }
+    .panel-bank { flex: 1; }
+    .panel-seq { flex: 1.5; }
+
+    .panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+    .panel-title { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 2px; margin: 0; }
+    
+    .playback-controls { display: flex; gap: 8px; }
+    .ctrl-btn {
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 50px; transition: transform 0.1s, background 0.2s;
+    }
+    .ctrl-btn:active { transform: scale(0.92); }
+    .btn-stop { width: 44px; height: 44px; background: var(--panel); border: 1px solid var(--border); color: var(--text-muted); }
+    .btn-play { width: 64px; height: 44px; background: var(--text); color: var(--bg); }
+    .btn-play.playing { background: var(--blue); color: white; box-shadow: 0 0 20px var(--blue-glow); animation: pulse 2s infinite; }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 var(--blue-glow); }
+      70% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+    }
+
+    /* Grids */
+    .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; flex: 1; }
+    
+    .grid-btn {
+      position: relative; border-radius: 16px; border: 2px solid var(--border);
+      background: var(--panel); display: flex; align-items: center; justify-content: center;
+      transition: all 0.1s; overflow: hidden;
+    }
+    .grid-btn:active { transform: scale(0.92); }
+
+    /* Clip Bank specific */
+    .clip-btn { font-size: 20px; font-weight: 500; color: var(--text-muted); }
+    .clip-btn.active {
+      border-color: var(--blue); background: rgba(59, 130, 246, 0.1); color: var(--blue);
+      box-shadow: 0 0 20px var(--blue-glow);
+    }
+
+    /* Sequencer specific */
+    .seq-btn { background: #111; border-color: #1a1a1a; }
+    .seq-btn .step-num { position: absolute; top: 8px; left: 10px; font-size: 10px; font-weight: 700; color: #404040; }
+    .seq-btn .clip-val { font-size: 24px; font-weight: 700; color: #d4d4d4; }
+    
+    .seq-btn.has-clip { background: #262626; border-color: #333; }
+    .seq-btn.active-playhead {
+      border-color: var(--text); background: rgba(255,255,255,0.1); transform: scale(1.05); z-index: 10;
+      box-shadow: 0 0 30px rgba(255,255,255,0.2);
+    }
+    .seq-btn.active-playhead .clip-val { color: white; }
+  </style>
+</head>
+<body>
+
+  <!-- Unlock Audio Overlay -->
+  <div id="overlay">
+    <div class="overlay-card">
+      <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+      <h1>Chopper</h1>
+      <p>iPad-optimized Audio Sequencer</p>
+      <button class="btn-primary" id="start-btn">Tap to Start</button>
+    </div>
+  </div>
+
+  <!-- Main App -->
+  <div id="app">
+    <header>
+      <div class="header-left">
+        <div class="logo">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>
+        </div>
+        <div>
+          <h1>CHOPPER</h1>
+          <p>Web Audio Engine</p>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="bpm-control" id="bpm-control">
+          <span class="bpm-label" id="bpm-label">120 BPM</span>
+          <input type="range" id="bpm-slider" min="60" max="180" value="120">
+        </div>
+        <label class="upload-btn">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+          <span id="upload-label">Load WAV</span>
+          <input type="file" id="file-input" accept="audio/wav, audio/x-wav, audio/*, .wav">
+        </label>
+      </div>
+    </header>
+
+    <main>
+      <div id="empty-state">
+        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+        <h2>Load an audio file to begin</h2>
+        <p>Optimized for .wav files</p>
+      </div>
+
+      <div id="workspace">
+        <!-- Clip Bank -->
+        <div class="panel panel-bank">
+          <div class="panel-header">
+            <h2 class="panel-title">Clip Bank (Select & Preview)</h2>
+          </div>
+          <div class="grid" id="clip-bank"></div>
+        </div>
+
+        <!-- Sequencer -->
+        <div class="panel panel-seq">
+          <div class="panel-header">
+            <h2 class="panel-title">16-Step Sequencer</h2>
+            <div class="playback-controls">
+              <button class="ctrl-btn btn-stop" id="stop-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+              </button>
+              <button class="ctrl-btn btn-play" id="play-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+              </button>
+            </div>
+          </div>
+          <div class="grid" id="sequencer"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // --- Audio Engine ---
+    class AudioEngine {
+      constructor() {
+        this.ctx = null;
+        this.buffer = null;
+        this.slices = [];
+        this.bpm = 120;
+        this.isPlaying = false;
+        this.currentStep = 0;
+        this.nextNoteTime = 0;
+        this.timerID = null;
+        this.sequence = new Array(16).fill(null);
+        this.noteQueue = [];
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioContextClass();
+        }
+      }
+
+      async loadFile(file) {
+        this.init();
+        if (this.ctx.state === 'suspended') await this.ctx.resume();
+        const arrayBuffer = await file.arrayBuffer();
+        this.buffer = await this.ctx.decodeAudioData(arrayBuffer);
+        this.extractSlices();
+        this.sequence = Array.from({length: 16}, (_, i) => i); // Default sequential mapping
+      }
+
+      extractSlices() {
+        if (!this.buffer) return;
+        const channelData = this.buffer.getChannelData(0);
+        const sampleRate = this.buffer.sampleRate;
+        const windowSize = Math.floor(sampleRate * 0.01);
+        const energies = [];
+        
+        for (let i = 0; i < channelData.length; i += windowSize) {
+          let energy = 0;
+          for (let j = 0; j < windowSize && i + j < channelData.length; j++) {
+            energy += channelData[i + j] * channelData[i + j];
+          }
+          energies.push({ time: i / sampleRate, energy });
+        }
+        
+        const peaks = [];
+        const minDistance = Math.max(0.25, Math.min(1.0, this.buffer.duration / 16)); 
+        const sortedEnergies = [...energies].sort((a, b) => b.energy - a.energy);
+        
+        for (const { time } of sortedEnergies) {
+          if (peaks.length >= 16) break;
+          let isFarEnough = true;
+          for (const p of peaks) {
+            if (Math.abs(p - time) < minDistance) {
+              isFarEnough = false;
+              break;
+            }
+          }
+          if (isFarEnough && time + 0.1 <= this.buffer.duration) {
+            peaks.push(time);
+          }
+        }
+        
+        // Fallback: even spacing
+        if (peaks.length < 16) {
+          const interval = Math.max(0.1, (this.buffer.duration - 0.5) / 16);
+          for (let i = 0; i < 16 && peaks.length < 16; i++) {
+            const time = i * interval;
+            if (!peaks.some(p => Math.abs(p - time) < 0.1) && time < this.buffer.duration) {
+              peaks.push(time);
+            }
+          }
+        }
+        
+        this.slices = peaks.sort((a, b) => a - b).slice(0, 16);
+        while (this.slices.length < 16) {
+          this.slices.push(0);
+        }
+      }
+
+      play() {
+        if (!this.ctx) return;
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+        if (this.isPlaying) return;
+        
+        this.isPlaying = true;
+        this.currentStep = 0;
+        this.nextNoteTime = this.ctx.currentTime + 0.05;
+        this.noteQueue = [];
+        this.scheduler();
+      }
+      
+      stop() {
+        this.isPlaying = false;
+        if (this.timerID !== null) {
+          clearTimeout(this.timerID);
+          this.timerID = null;
+        }
+        this.noteQueue = [];
+      }
+
+      scheduler() {
+        if (!this.isPlaying) return;
+        while (this.nextNoteTime < this.ctx.currentTime + 0.1) {
+          this.scheduleNote(this.currentStep, this.nextNoteTime);
+          this.nextNote();
+        }
+        this.timerID = window.setTimeout(() => this.scheduler(), 25.0);
+      }
+
+      scheduleNote(stepNumber, time) {
+        this.noteQueue.push({ note: stepNumber, time: time });
+        const sliceIndex = this.sequence[stepNumber];
+        
+        if (sliceIndex !== null && this.buffer && sliceIndex < this.slices.length) {
+          const source = this.ctx.createBufferSource();
+          source.buffer = this.buffer;
+          const gainNode = this.ctx.createGain();
+          
+          gainNode.gain.setValueAtTime(0, time);
+          gainNode.gain.linearRampToValueAtTime(1, time + 0.005);
+          
+          const startTime = this.slices[sliceIndex];
+          const maxDuration = Math.min(1.0, this.buffer.duration - startTime);
+          const releaseTime = Math.max(0.01, maxDuration - 0.05);
+          
+          gainNode.gain.setValueAtTime(1, time + releaseTime);
+          gainNode.gain.linearRampToValueAtTime(0, time + releaseTime + 0.05);
+          
+          source.connect(gainNode);
+          gainNode.connect(this.ctx.destination);
+          source.start(time, startTime, maxDuration + 0.1);
+        }
+      }
+
+      nextNote() {
+        const secondsPerBeat = 60.0 / this.bpm;
+        this.nextNoteTime += 0.25 * secondsPerBeat;
+        this.currentStep = (this.currentStep + 1) % 16;
+      }
+      
+      previewSlice(sliceIndex) {
+        if (!this.ctx || !this.buffer || sliceIndex >= this.slices.length) return;
+        if (this.ctx.state === 'suspended') this.ctx.resume();
+        
+        const source = this.ctx.createBufferSource();
+        source.buffer = this.buffer;
+        const gainNode = this.ctx.createGain();
+        gainNode.gain.setValueAtTime(0, this.ctx.currentTime);
+        gainNode.gain.linearRampToValueAtTime(1, this.ctx.currentTime + 0.005);
+        
+        const startTime = this.slices[sliceIndex];
+        const maxDuration = Math.min(1.0, this.buffer.duration - startTime);
+        const releaseTime = Math.max(0.01, maxDuration - 0.05);
+        
+        gainNode.gain.setValueAtTime(1, this.ctx.currentTime + releaseTime);
+        gainNode.gain.linearRampToValueAtTime(0, this.ctx.currentTime + releaseTime + 0.05);
+        
+        source.connect(gainNode);
+        gainNode.connect(this.ctx.destination);
+        source.start(this.ctx.currentTime, startTime, maxDuration + 0.1);
+      }
+    }
+
+    // --- UI Logic ---
+    const engine = new AudioEngine();
+    
+    // State
+    let activeClip = 0;
+    let playhead = -1;
+
+    // DOM Elements
+    const overlay = document.getElementById('overlay');
+    const app = document.getElementById('app');
+    const startBtn = document.getElementById('start-btn');
+    const fileInput = document.getElementById('file-input');
+    const bpmSlider = document.getElementById('bpm-slider');
+    const bpmLabel = document.getElementById('bpm-label');
+    const bpmControl = document.getElementById('bpm-control');
+    const uploadLabel = document.getElementById('upload-label');
+    const emptyState = document.getElementById('empty-state');
+    const workspace = document.getElementById('workspace');
+    const playBtn = document.getElementById('play-btn');
+    const stopBtn = document.getElementById('stop-btn');
+    const bankContainer = document.getElementById('clip-bank');
+    const seqContainer = document.getElementById('sequencer');
+
+    // Init UI
+    function initUI() {
+      // Create Bank Grid
+      for (let i = 0; i < 16; i++) {
+        const btn = document.createElement('button');
+        btn.className = 'grid-btn clip-btn';
+        btn.id = `clip-${i}`;
+        btn.innerText = i + 1;
+        btn.onclick = () => handleClipSelect(i);
+        bankContainer.appendChild(btn);
+      }
+
+      // Create Seq Grid
+      for (let i = 0; i < 16; i++) {
+        const btn = document.createElement('button');
+        btn.className = 'grid-btn seq-btn';
+        btn.id = `seq-${i}`;
+        btn.innerHTML = `<span class="step-num">${i + 1}</span><span class="clip-val" id="seq-val-${i}"></span>`;
+        btn.onclick = () => handleStepClick(i);
+        seqContainer.appendChild(btn);
+      }
+      
+      updateBankUI();
+      requestAnimationFrame(drawLoop);
+    }
+
+    // Handlers
+    startBtn.addEventListener('click', () => {
+      engine.init();
+      engine.ctx.resume().then(() => {
+        overlay.style.display = 'none';
+        app.style.display = 'flex';
+        initUI();
+      });
+    });
+
+    fileInput.addEventListener('change', async (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        await engine.loadFile(file);
+        
+        emptyState.style.display = 'none';
+        workspace.style.display = 'flex';
+        bpmControl.classList.add('visible');
+        uploadLabel.innerText = 'Replace WAV';
+        
+        updateSeqUI();
+      }
+    });
+
+    bpmSlider.addEventListener('input', (e) => {
+      const val = e.target.value;
+      engine.bpm = parseInt(val);
+      bpmLabel.innerText = `${val} BPM`;
+    });
+
+    playBtn.addEventListener('click', () => {
+      if (engine.isPlaying) {
+        engine.stop();
+        playBtn.classList.remove('playing');
+        updatePlayhead(-1);
+      } else {
+        engine.play();
+        playBtn.classList.add('playing');
+      }
+    });
+
+    stopBtn.addEventListener('click', () => {
+      engine.stop();
+      playBtn.classList.remove('playing');
+      updatePlayhead(-1);
+    });
+
+    function handleClipSelect(index) {
+      activeClip = index;
+      engine.previewSlice(index);
+      updateBankUI();
+    }
+
+    function handleStepClick(index) {
+      if (engine.sequence[index] === activeClip) {
+        engine.sequence[index] = null; // Clear
+      } else {
+        engine.sequence[index] = activeClip; // Assign
+      }
+      updateSeqUI();
+    }
+
+    // UI Updaters
+    function updateBankUI() {
+      for (let i = 0; i < 16; i++) {
+        const btn = document.getElementById(`clip-${i}`);
+        if (i === activeClip) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      }
+    }
+
+    function updateSeqUI() {
+      for (let i = 0; i < 16; i++) {
+        const btn = document.getElementById(`seq-${i}`);
+        const valSpan = document.getElementById(`seq-val-${i}`);
+        const clipVal = engine.sequence[i];
+        
+        if (clipVal !== null) {
+          valSpan.innerText = clipVal + 1;
+          btn.classList.add('has-clip');
+        } else {
+          valSpan.innerText = '';
+          btn.classList.remove('has-clip');
+        }
+      }
+    }
+
+    function updatePlayhead(newStep) {
+      if (playhead !== -1 && playhead !== newStep) {
+        const oldBtn = document.getElementById(`seq-${playhead}`);
+        if (oldBtn) oldBtn.classList.remove('active-playhead');
+      }
+      if (newStep !== -1 && playhead !== newStep) {
+        const newBtn = document.getElementById(`seq-${newStep}`);
+        if (newBtn) newBtn.classList.add('active-playhead');
+      }
+      playhead = newStep;
+    }
+
+    // Animation Loop
+    function drawLoop() {
+      if (engine.isPlaying && engine.ctx) {
+        const currentTime = engine.ctx.currentTime;
+        let newPlayhead = playhead;
+        let updated = false;
+        
+        while (engine.noteQueue.length && engine.noteQueue[0].time <= currentTime + 0.05) {
+          newPlayhead = engine.noteQueue[0].note;
+          engine.noteQueue.splice(0, 1);
+          updated = true;
+        }
+        
+        if (updated) {
+          updatePlayhead(newPlayhead);
+        }
+      } else if (!engine.isPlaying && playhead !== -1) {
+        updatePlayhead(-1);
+      }
+      requestAnimationFrame(drawLoop);
+    }
+  </script>
+</body>
+</html>

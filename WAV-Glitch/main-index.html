@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Glitch & Stutter Processor</title>
+    <style>
+        :root {
+            --bg-color: #0b0d12;
+            --panel-bg: #131722;
+            --panel-border: #1e2638;
+            --accent: #00e5ff;
+            --accent-dim: #007a8a;
+            --text: #ffffff;
+            --text-dim: #828a9e;
+            --danger: #ff4757;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            touch-action: manipulation;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow-x: hidden;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text);
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 920px;
+            width: 100%;
+            background: var(--panel-bg);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7);
+            border: 1px solid var(--panel-border);
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--accent-dim);
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.4rem;
+            color: var(--accent);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .subtitle {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .top-bar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .file-btn-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+
+        input[type=file], input[type=range], button {
+            font-size: 16px !important; 
+        }
+
+        .file-btn-wrapper input[type=file] {
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        button, .btn-label {
+            background: #1c2333;
+            color: var(--accent);
+            border: 1px solid var(--accent-dim);
+            font-weight: 700;
+            padding: 12px 18px;
+            border-radius: 6px;
+            cursor: pointer;
+            text-transform: uppercase;
+            font-size: 0.8rem !important;
+            letter-spacing: 0.5px;
+            transition: all 0.15s ease;
+            display: inline-block;
+        }
+
+        button:hover:not(:disabled), .btn-label:hover {
+            background: var(--accent);
+            color: #000;
+            box-shadow: 0 0 12px var(--accent-dim);
+        }
+
+        button:disabled {
+            border-color: #2a3040;
+            color: #4a5266;
+            background: #10141e;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .status-bar {
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            background: #090c12;
+            padding: 12px 16px;
+            border-radius: 6px;
+            width: 100%;
+            margin-bottom: 20px;
+            border: 1px solid #1a202c;
+            word-break: break-all;
+        }
+
+        .status-bar.error {
+            color: var(--danger);
+            border-color: var(--danger);
+        }
+
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+            background: #0d1017;
+            padding: 16px;
+            border-radius: 8px;
+            border: 1px solid #1a202c;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .label-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .label-row span.val {
+            color: var(--accent);
+            font-family: monospace;
+            font-weight: bold;
+        }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            background: #1c2333;
+            height: 8px;
+            border-radius: 4px;
+            outline: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--accent);
+            cursor: pointer;
+        }
+
+        .grid-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .canvas-container {
+            position: relative;
+        }
+
+        canvas {
+            background: #080a0f;
+            border-radius: 8px;
+            display: block;
+            width: 100%;
+            border: 1px solid #1e2638;
+            touch-action: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container" id="app-wrapper">
+    <div class="header">
+        <h1>Glitch & Stutter Processor</h1>
+        <div class="subtitle">Audio & Video</div>
+    </div>
+
+    <div class="top-bar">
+        <div class="file-btn-wrapper">
+            <span class="btn-label" id="lbl-file">Load WAV / Video</span>
+            <input type="file" id="media-file" accept="audio/*,video/*,.wav,.mp3,.mp4,.webm,.mov,.m4a">
+        </div>
+        <button id="btn-play" disabled>Play</button>
+        <button id="btn-stop" disabled>Stop</button>
+        <button id="btn-clear">Clear Grid</button>
+        <button id="btn-export" disabled>Export WAV</button>
+    </div>
+
+    <div class="status-bar" id="status">Select a WAV or Video file (.wav, .mp3, .mp4, .mov) to begin...</div>
+
+    <div class="controls-grid">
+        <div class="control-group">
+            <div class="label-row">
+                <label for="param-bpm">Tempo (BPM)</label>
+                <span class="val" id="val-bpm">120</span>
+            </div>
+            <input type="range" id="param-bpm" min="60" max="180" value="120">
+        </div>
+
+        <div class="control-group">
+            <div class="label-row">
+                <label for="param-gate">Stutter Gate</label>
+                <span class="val" id="val-gate">80%</span>
+            </div>
+            <input type="range" id="param-gate" min="10" max="100" value="80">
+        </div>
+
+        <div class="control-group">
+            <div class="label-row">
+                <label for="param-chaos">Random Chaos</label>
+                <span class="val" id="val-chaos">0%</span>
+            </div>
+            <input type="range" id="param-chaos" min="0" max="100" value="0">
+        </div>
+
+        <div class="control-group">
+            <div class="label-row">
+                <label for="param-vol">Master Volume</label>
+                <span class="val" id="val-vol">80%</span>
+            </div>
+            <input type="range" id="param-vol" min="0" max="100" value="80">
+        </div>
+    </div>
+
+    <div class="grid-header">
+        <span>Multi-Effect Stutter Matrix (Click / Drag to paint triggers)</span>
+        <span>Hold Shift to Erase</span>
+    </div>
+
+    <div class="canvas-container">
+        <canvas id="matrix-canvas" height="360"></canvas>
+    </div>
+</div>
+
+<script>
+    let audioCtx = null;
+    let audioBuffer = null;
+    let scriptNode = null;
+    let isPlaying = false;
+
+    const STEPS = 16;
+    const ROWS = [
+        { label: "1/2 Beat",    rate: 0.5, type: "rate",    color: "#00e5ff" },
+        { label: "1/4 Step",    rate: 1,   type: "rate",    color: "#00e5ff" },
+        { label: "1/8 Glitch",  rate: 2,   type: "rate",    color: "#00e5ff" },
+        { label: "1/16 Buzz",    rate: 4,   type: "rate",    color: "#00e5ff" },
+        { label: "1/32 Grain",   rate: 8,   type: "rate",    color: "#00e5ff" },
+        { label: "1/64 Micro",   rate: 16,  type: "rate",    color: "#00e5ff" },
+        { label: "Reverse FX",   rate: 0,   type: "reverse", color: "#ff0055" },
+        { label: "Pitch +7",     rate: 0,   type: "pitch",   color: "#ffaa00" },
+        { label: "Bitcrush",     rate: 0,   type: "crush",   color: "#a855f7" }
+    ];
+
+    let gridMatrix = Array(ROWS.length).fill().map(() => Array(STEPS).fill(0));
+
+    let currentStep = 0;
+    let sampleRate = 44100;
+    let samplePos = 0;
+
+    const canvas = document.getElementById('matrix-canvas');
+    const ctx = canvas.getContext('2d');
+    let isDrawing = false;
+
+    const fileInput = document.getElementById('media-file');
+    const playBtn = document.getElementById('btn-play');
+    const stopBtn = document.getElementById('btn-stop');
+    const clearBtn = document.getElementById('btn-clear');
+    const exportBtn = document.getElementById('btn-export');
+    const statusDiv = document.getElementById('status');
+    const appWrapper = document.getElementById('app-wrapper');
+
+    const config = {
+        bpm: 120,
+        gate: 0.8,
+        chaos: 0.0,
+        volume: 0.8
+    };
+
+    // Unlock Web Audio Context on early user gesture
+    async function ensureAudioContextUnlocked() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+            await audioCtx.resume();
+        }
+    }
+
+    appWrapper.addEventListener('pointerdown', ensureAudioContextUnlocked, { once: true });
+    fileInput.addEventListener('pointerdown', ensureAudioContextUnlocked);
+
+    function resizeCanvas() {
+        canvas.width = canvas.parentElement.clientWidth;
+        drawGrid();
+    }
+    window.addEventListener('resize', resizeCanvas);
+    setTimeout(resizeCanvas, 100);
+
+    function setupParam(id, key, suffix = '', transform = v => v) {
+        const el = document.getElementById(id);
+        const valEl = document.getElementById('val-' + id.split('-')[1]);
+        el.addEventListener('input', (e) => {
+            let val = parseFloat(e.target.value);
+            valEl.textContent = val + suffix;
+            config[key] = transform(val);
+        });
+    }
+    setupParam('param-bpm', 'bpm');
+    setupParam('param-gate', 'gate', '%', v => v / 100);
+    setupParam('param-chaos', 'chaos', '%', v => v / 100);
+    setupParam('param-vol', 'volume', '%', v => v / 100);
+
+    function getGridCoords(e) {
+        const rect = canvas.getBoundingClientRect();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+        const x = clientX - rect.left;
+        const y = clientY - rect.top;
+
+        const labelWidth = 100;
+        const cellWidth = (canvas.width - labelWidth) / STEPS;
+        const cellHeight = canvas.height / ROWS.length;
+
+        const col = Math.floor((x - labelWidth) / cellWidth);
+        const row = Math.floor(y / cellHeight);
+
+        return { row, col };
+    }
+
+    function handleDraw(e) {
+        if (!isDrawing) return;
+        const { row, col } = getGridCoords(e);
+        if (col >= 0 && col < STEPS && row >= 0 && row < ROWS.length) {
+            gridMatrix[row][col] = e.shiftKey ? 0 : 1;
+            drawGrid();
+        }
+    }
+
+    canvas.addEventListener('pointerdown', (e) => { isDrawing = true; handleDraw(e); });
+    canvas.addEventListener('pointermove', handleDraw);
+    window.addEventListener('pointerup', () => isDrawing = false);
+
+    clearBtn.addEventListener('click', () => {
+        gridMatrix = Array(ROWS.length).fill().map(() => Array(STEPS).fill(0));
+        drawGrid();
+    });
+
+    function drawGrid() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        const labelWidth = 100;
+        const cellWidth = (canvas.width - labelWidth) / STEPS;
+        const cellHeight = canvas.height / ROWS.length;
+
+        ctx.font = '11px monospace';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+
+        for (let r = 0; r < ROWS.length; r++) {
+            const rowData = ROWS[r];
+
+            ctx.fillStyle = rowData.color;
+            ctx.fillText(rowData.label, 8, r * cellHeight + cellHeight / 2);
+
+            for (let c = 0; c < STEPS; c++) {
+                const x = labelWidth + (c * cellWidth);
+                const y = r * cellHeight;
+
+                ctx.fillStyle = (c % 4 === 0) ? '#121622' : '#0b0e16';
+                ctx.fillRect(x + 1, y + 1, cellWidth - 2, cellHeight - 2);
+
+                if (gridMatrix[r][c] === 1) {
+                    ctx.fillStyle = rowData.color;
+                    ctx.fillRect(x + 3, y + 3, cellWidth - 6, cellHeight - 6);
+                }
+            }
+        }
+
+        if (isPlaying) {
+            const px = labelWidth + (currentStep * cellWidth);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+            ctx.fillRect(px, 0, cellWidth, canvas.height);
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(px, 0, cellWidth, canvas.height);
+        }
+    }
+
+    // --- NON-BLOCKING FAST MEDIA DECODER ---
+    fileInput.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        statusDiv.classList.remove('error');
+        statusDiv.textContent = `Reading media file "${file.name}"...`;
+
+        try {
+            await ensureAudioContextUnlocked();
+            sampleRate = audioCtx.sampleRate;
+
+            // Direct Memory Transfer
+            const arrayBuffer = await file.arrayBuffer();
+            
+            statusDiv.textContent = `Decoding audio stream from "${file.name}"...`;
+
+            // Non-blocking Promise wrapper with timeout safety
+            const decodedData = await Promise.race([
+                new Promise((resolve, reject) => {
+                    audioCtx.decodeAudioData(
+                        arrayBuffer.slice(0),
+                        decoded => resolve(decoded),
+                        err => reject(err || new Error('Format decoding failed.'))
+                    );
+                }),
+                new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('Audio decoding timed out.')), 30000)
+                )
+            ]);
+
+            audioBuffer = decodedData;
+            statusDiv.textContent = `Ready: ${file.name} (${audioBuffer.duration.toFixed(2)}s, ${audioBuffer.numberOfChannels} ch)`;
+            playBtn.disabled = false;
+            exportBtn.disabled = false;
+
+        } catch (err) {
+            console.error(err);
+            statusDiv.classList.add('error');
+            statusDiv.textContent = `Error: Unable to extract audio from file. Make sure the file contains a valid audio track.`;
+        }
+    });
+
+    function processAudio(e) {
+        const outputL = e.outputBuffer.getChannelData(0);
+        const outputR = e.outputBuffer.getChannelData(1);
+        const inputL = audioBuffer.getChannelData(0);
+        const inputR = audioBuffer.numberOfChannels > 1 ? audioBuffer.getChannelData(1) : inputL;
+
+        const bufferLen = outputL.length;
+        const totalSamples = audioBuffer.length;
+        const samplesPerStep = Math.floor((60 / config.bpm / 4) * sampleRate);
+
+        for (let i = 0; i < bufferLen; i++) {
+            currentStep = Math.floor((samplePos / samplesPerStep) % STEPS);
+
+            let activeRate = 0;
+            let isReverse = gridMatrix[6][currentStep] === 1;
+            let isPitchUp = gridMatrix[7][currentStep] === 1;
+            let isCrushed = gridMatrix[8][currentStep] === 1;
+
+            for (let r = 0; r <= 5; r++) {
+                if (gridMatrix[r][currentStep] === 1) {
+                    activeRate = ROWS[r].rate;
+                }
+            }
+
+            if (config.chaos > 0 && Math.random() < (config.chaos * 0.001)) {
+                activeRate = ROWS[Math.floor(Math.random() * 6)].rate;
+            }
+
+            let readPos = samplePos;
+            const pitchFactor = isPitchUp ? 1.498 : 1.0;
+
+            if (activeRate > 0) {
+                const sliceLength = Math.floor(samplesPerStep / activeRate);
+                const stepStartPos = samplePos - (samplePos % samplesPerStep);
+                let sliceOffset = (samplePos % sliceLength);
+
+                if (isReverse) {
+                    sliceOffset = sliceLength - sliceOffset - 1;
+                }
+
+                const gateLimit = sliceLength * config.gate;
+                const gain = (sliceOffset < gateLimit) ? config.volume : 0;
+
+                readPos = Math.floor(stepStartPos + (sliceOffset * pitchFactor));
+
+                let rawL = (inputL[readPos % totalSamples] || 0) * gain;
+                let rawR = (inputR[readPos % totalSamples] || 0) * gain;
+
+                if (isCrushed) {
+                    const stepVal = Math.pow(0.5, 4);
+                    rawL = Math.floor(rawL / stepVal) * stepVal;
+                    rawR = Math.floor(rawR / stepVal) * stepVal;
+                }
+
+                outputL[i] = rawL;
+                outputR[i] = rawR;
+            } else {
+                let rawL = (inputL[Math.floor(samplePos) % totalSamples] || 0) * config.volume;
+                let rawR = (inputR[Math.floor(samplePos) % totalSamples] || 0) * config.volume;
+
+                if (isCrushed) {
+                    const stepVal = Math.pow(0.5, 4);
+                    rawL = Math.floor(rawL / stepVal) * stepVal;
+                    rawR = Math.floor(rawR / stepVal) * stepVal;
+                }
+
+                outputL[i] = rawL;
+                outputR[i] = rawR;
+            }
+
+            samplePos = (samplePos + 1) % totalSamples;
+        }
+
+        requestAnimationFrame(drawGrid);
+    }
+
+    playBtn.addEventListener('click', async () => {
+        if (!audioBuffer) return;
+        await ensureAudioContextUnlocked();
+
+        if (isPlaying) stopAudio();
+
+        samplePos = 0;
+        scriptNode = audioCtx.createScriptProcessor(2048, 0, 2);
+        scriptNode.onaudioprocess = processAudio;
+        scriptNode.connect(audioCtx.destination);
+
+        isPlaying = true;
+        playBtn.disabled = true;
+        stopBtn.disabled = false;
+        statusDiv.textContent = 'Playback engine active...';
+    });
+
+    function stopAudio() {
+        if (scriptNode) {
+            scriptNode.disconnect();
+            scriptNode = null;
+        }
+        isPlaying = false;
+        playBtn.disabled = false;
+        stopBtn.disabled = true;
+        statusDiv.textContent = 'Playback stopped.';
+        drawGrid();
+    }
+
+    stopBtn.addEventListener('click', stopAudio);
+
+    exportBtn.addEventListener('click', async () => {
+        if (!audioBuffer) return;
+        statusDiv.textContent = 'Rendering audio export...';
+
+        const offlineCtx = new OfflineAudioContext(
+            audioBuffer.numberOfChannels,
+            audioBuffer.length,
+            audioBuffer.sampleRate
+        );
+
+        const inputL = audioBuffer.getChannelData(0);
+        const inputR = audioBuffer.numberOfChannels > 1 ? audioBuffer.getChannelData(1) : inputL;
+        const renderedBuffer = offlineCtx.createBuffer(2, audioBuffer.length, audioBuffer.sampleRate);
+        const outL = renderedBuffer.getChannelData(0);
+        const outR = renderedBuffer.getChannelData(1);
+
+        const samplesPerStep = Math.floor((60 / config.bpm / 4) * audioBuffer.sampleRate);
+
+        for (let pos = 0; pos < audioBuffer.length; pos++) {
+            const step = Math.floor((pos / samplesPerStep) % STEPS);
+            
+            let activeRate = 0;
+            let isReverse = gridMatrix[6][step] === 1;
+            let isPitchUp = gridMatrix[7][step] === 1;
+            let isCrushed = gridMatrix[8][step] === 1;
+
+            for (let r = 0; r <= 5; r++) {
+                if (gridMatrix[r][step] === 1) activeRate = ROWS[r].rate;
+            }
+
+            let readPos = pos;
+            let gain = config.volume;
+            const pitchFactor = isPitchUp ? 1.498 : 1.0;
+
+            if (activeRate > 0) {
+                const sliceLength = Math.floor(samplesPerStep / activeRate);
+                const stepStartPos = pos - (pos % samplesPerStep);
+                let sliceOffset = (pos % sliceLength);
+
+                if (isReverse) sliceOffset = sliceLength - sliceOffset - 1;
+                if (sliceOffset >= sliceLength * config.gate) gain = 0;
+
+                readPos = Math.floor(stepStartPos + (sliceOffset * pitchFactor));
+            }
+
+            let rawL = (inputL[readPos % audioBuffer.length] || 0) * gain;
+            let rawR = (inputR[readPos % audioBuffer.length] || 0) * gain;
+
+            if (isCrushed) {
+                const stepVal = Math.pow(0.5, 4);
+                rawL = Math.floor(rawL / stepVal) * stepVal;
+                rawR = Math.floor(rawR / stepVal) * stepVal;
+            }
+
+            outL[pos] = rawL;
+            outR[pos] = rawR;
+        }
+
+        const wavData = bufferToWave(renderedBuffer, audioBuffer.length);
+        const blob = new Blob([wavData], { type: 'audio/wav' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'glitch-export.wav';
+        a.click();
+        statusDiv.textContent = 'Render finished! Export downloaded.';
+    });
+
+    function bufferToWave(abuffer, len) {
+        let numOfChan = abuffer.numberOfChannels,
+            length = len * numOfChan * 2 + 44,
+            buffer = new ArrayBuffer(length),
+            view = new DataView(buffer),
+            channels = [], i, sample,
+            offset = 0, pos = 0;
+
+        function setUint16(data) { view.setUint16(pos, data, true); pos += 2; }
+        function setUint32(data) { view.setUint32(pos, data, true); pos += 4; }
+
+        setUint32(0x46464952); setUint32(length - 8); setUint32(0x45564157);
+        setUint32(0x20746d66); setUint32(16); setUint16(1); setUint16(numOfChan);
+        setUint32(abuffer.sampleRate); setUint32(abuffer.sampleRate * 2 * numOfChan);
+        setUint16(numOfChan * 2); setUint16(16); setUint32(0x61746164);
+        setUint32(length - pos - 4);
+
+        for (i = 0; i < abuffer.numberOfChannels; i++) channels.push(abuffer.getChannelData(i));
+
+        while (offset < len) {
+            for (i = 0; i < numOfChan; i++) {
+                sample = Math.max(-1, Math.min(1, channels[i][offset]));
+                sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
+                view.setInt16(pos, sample, true); pos += 2;
+            }
+            offset++;
+        }
+        return buffer;
+    }
+</script>
+</body>
+</html>

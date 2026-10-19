@@ -1,0 +1,1841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#08111f" />
+  <meta name="description" content="Analyze and seamlessly extend MIDI files entirely in your browser." />
+  <title>MIDI Continuum — Analyze & Extend MIDI</title>
+
+  <!--
+    Requested CDN dependencies.
+    Tailwind is intentionally NOT required for the critical layout below: the app ships
+    with embedded production CSS so local/iOS document previews do not collapse if the
+    Tailwind Play CDN is blocked or not executed.
+  -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/tone@14.8.49/build/Tone.js"></script>
+  <script defer src="https://unpkg.com/@tonejs/midi@2.0.28/build/Midi.js"></script>
+
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #08111f;
+      --bg-2: #0b1526;
+      --panel: rgba(16, 28, 46, 0.92);
+      --panel-2: rgba(9, 19, 33, 0.88);
+      --line: rgba(148, 163, 184, 0.16);
+      --line-strong: rgba(148, 163, 184, 0.25);
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --muted-2: #64748b;
+      --teal: #52e5d1;
+      --teal-2: #2dd4bf;
+      --indigo: #9aa8ff;
+      --success: #6ee7b7;
+      --warning: #fbbf24;
+      --danger: #fb7185;
+      --radius: 18px;
+      --shadow: 0 18px 55px rgba(0, 0, 0, 0.28);
+    }
+
+    * { box-sizing: border-box; }
+    html { min-height: 100%; background: var(--bg); }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      min-height: 100dvh;
+      background:
+        radial-gradient(circle at 18% -10%, rgba(45,212,191,.13), transparent 35%),
+        radial-gradient(circle at 85% 0%, rgba(129,140,248,.10), transparent 28%),
+        var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    button, input { font: inherit; }
+    button { -webkit-tap-highlight-color: transparent; }
+    svg { display: block; }
+    [hidden], .hidden { display: none !important; }
+
+    .shell {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      border-bottom: 1px solid var(--line);
+      background: rgba(8, 17, 31, 0.86);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+
+    .topbar-inner {
+      min-height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      min-width: 0;
+      gap: 11px;
+    }
+
+    .brand-mark {
+      width: 38px;
+      height: 38px;
+      flex: 0 0 38px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      color: #06111b;
+      background: linear-gradient(135deg, #67e8f9, #5eead4 55%, #818cf8);
+      box-shadow: 0 10px 28px rgba(45, 212, 191, 0.2);
+    }
+
+    .brand-mark svg { width: 21px; height: 21px; }
+    .brand-copy { min-width: 0; }
+    .brand-title { margin: 0; font-size: 15px; font-weight: 760; letter-spacing: -0.01em; }
+    .brand-sub { margin: 2px 0 0; color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .privacy-chip, .runtime-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 31px;
+      padding: 0 11px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.025);
+      color: var(--muted);
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--success); box-shadow: 0 0 12px rgba(110,231,183,.55); }
+    .status-dot.waiting { background: var(--warning); box-shadow: 0 0 12px rgba(251,191,36,.45); }
+    .status-dot.error { background: var(--danger); box-shadow: 0 0 12px rgba(251,113,133,.45); }
+
+    main { padding: 28px 0 42px; }
+
+    .hero {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 20px;
+    }
+
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--teal);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .13em;
+      text-transform: uppercase;
+    }
+
+    .hero h1 {
+      margin: 0;
+      max-width: 760px;
+      font-size: clamp(27px, 4vw, 42px);
+      line-height: 1.04;
+      letter-spacing: -0.035em;
+      font-weight: 790;
+    }
+
+    .hero p.description {
+      margin: 10px 0 0;
+      max-width: 760px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .hero-badge {
+      flex: 0 0 auto;
+      padding: 9px 12px;
+      border: 1px solid rgba(82, 229, 209, .23);
+      border-radius: 12px;
+      background: rgba(45,212,191,.07);
+      color: #b9fff5;
+      font-size: 11px;
+      line-height: 1.35;
+      text-align: right;
+    }
+
+    .dashboard {
+      display: grid;
+      grid-template-columns: minmax(0, 1.04fr) minmax(0, .96fr);
+      gap: 18px;
+      align-items: stretch;
+    }
+
+    .card {
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, rgba(17, 31, 50, .95), rgba(11, 23, 39, .94));
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .card-head {
+      min-height: 66px;
+      padding: 17px 19px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .card-head h2, .card-head h3 { margin: 0; font-size: 14px; font-weight: 740; }
+    .card-head p { margin: 4px 0 0; color: var(--muted); font-size: 11px; line-height: 1.35; }
+    .card-body { padding: 18px 19px; }
+
+    .step {
+      width: 25px;
+      height: 25px;
+      flex: 0 0 25px;
+      border-radius: 8px;
+      display: inline-grid;
+      place-items: center;
+      margin-right: 9px;
+      color: #07131e;
+      background: var(--teal);
+      font-size: 11px;
+      font-weight: 900;
+    }
+
+    .head-title { display: flex; align-items: center; min-width: 0; }
+    .file-badge, .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      min-height: 26px;
+      padding: 0 9px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.025);
+      color: var(--muted);
+      font-size: 10px;
+      white-space: nowrap;
+    }
+
+    .file-badge { border-color: rgba(82,229,209,.24); background: rgba(45,212,191,.08); color: #a7fff2; }
+
+    .drop-zone {
+      min-height: 188px;
+      padding: 24px 18px;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      border: 1.5px dashed rgba(148,163,184,.34);
+      border-radius: 15px;
+      background: rgba(5, 13, 25, .55);
+      cursor: pointer;
+      transition: border-color .2s ease, background .2s ease, transform .2s ease;
+      outline: none;
+    }
+
+    .drop-zone:hover, .drop-zone:focus-visible, .drop-zone.drop-active {
+      border-color: rgba(82,229,209,.75);
+      background: rgba(45,212,191,.055);
+      transform: translateY(-1px);
+    }
+
+    .upload-icon {
+      width: 46px;
+      height: 46px;
+      margin: 0 auto 12px;
+      display: grid;
+      place-items: center;
+      border-radius: 14px;
+      background: rgba(148,163,184,.1);
+      color: var(--teal);
+    }
+    .upload-icon svg { width: 23px; height: 23px; }
+    .drop-main { margin: 0; font-size: 13px; font-weight: 720; }
+    .drop-sub { margin: 5px 0 0; color: var(--muted); font-size: 11px; }
+    .drop-sub strong { color: var(--teal); font-weight: 700; }
+    .drop-foot { margin: 10px 0 0; color: var(--muted-2); font-size: 10px; }
+
+    .file-panel {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 13px 14px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(6, 14, 26, .52);
+    }
+
+    .mid-icon {
+      width: 40px;
+      height: 40px;
+      flex: 0 0 40px;
+      border-radius: 11px;
+      display: grid;
+      place-items: center;
+      background: rgba(129,140,248,.12);
+      color: #bdc5ff;
+      font-size: 10px;
+      font-weight: 850;
+      letter-spacing: .05em;
+    }
+
+    .file-copy { min-width: 0; flex: 1; }
+    .file-name { margin: 0; font-size: 12px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .file-details { margin: 3px 0 0; color: var(--muted-2); font-size: 10px; }
+
+    .text-button {
+      border: 0;
+      padding: 7px 4px;
+      color: var(--muted);
+      background: transparent;
+      cursor: pointer;
+      font-size: 11px;
+    }
+    .text-button:hover { color: white; }
+
+    .generate-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: end;
+      margin-top: 15px;
+    }
+
+    label.field-label { display: block; margin-bottom: 6px; color: #d8e2ef; font-size: 11px; font-weight: 700; }
+    .field-help { margin: 0 0 7px; color: var(--muted-2); font-size: 10px; }
+
+    .number-wrap { position: relative; }
+    .number-input {
+      width: 100%;
+      min-height: 44px;
+      padding: 9px 12px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      outline: none;
+      background: #071120;
+      color: white;
+      font-size: 13px;
+    }
+    .number-input:focus { border-color: rgba(82,229,209,.56); box-shadow: 0 0 0 3px rgba(45,212,191,.09); }
+
+    .primary-button, .download-button, .control-button, .mode-button {
+      border: 0;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: transform .12s ease, opacity .2s ease, background .2s ease;
+    }
+    .primary-button:active, .download-button:active, .control-button:active, .mode-button:active { transform: translateY(1px); }
+    button:disabled { cursor: not-allowed; opacity: .42; }
+
+    .primary-button {
+      min-height: 44px;
+      padding: 0 17px;
+      background: var(--teal);
+      color: #06121c;
+      font-size: 11px;
+      font-weight: 820;
+      white-space: nowrap;
+    }
+    .primary-button:hover:not(:disabled) { background: #8af3e5; }
+
+    .progress-box {
+      margin-top: 13px;
+      padding: 12px 13px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(5,13,24,.6);
+    }
+
+    .progress-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .progress-status { display: flex; align-items: center; gap: 8px; min-width: 0; color: #cbd5e1; font-size: 10px; }
+    .progress-status span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .spinner {
+      width: 13px; height: 13px; flex: 0 0 13px;
+      border: 2px solid rgba(82,229,209,.2); border-top-color: var(--teal); border-radius: 50%;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .progress-label { color: var(--muted-2); font-size: 10px; font-variant-numeric: tabular-nums; }
+    .progress-track { height: 6px; margin-top: 8px; overflow: hidden; border-radius: 99px; background: rgba(148,163,184,.12); }
+    .progress-fill { height: 100%; width: 0; border-radius: 99px; background: linear-gradient(90deg, var(--teal-2), #67e8f9, #818cf8); transition: width .22s ease; }
+
+    .analysis-empty {
+      min-height: 330px;
+      padding: 28px;
+      display: grid;
+      place-items: center;
+      text-align: center;
+    }
+    .analysis-empty-icon {
+      width: 48px; height: 48px; margin: 0 auto 12px; border-radius: 14px;
+      display: grid; place-items: center; background: rgba(148,163,184,.08); color: var(--muted-2);
+    }
+    .analysis-empty-icon svg { width: 24px; height: 24px; }
+    .analysis-empty h3 { margin: 0; font-size: 12px; }
+    .analysis-empty p { margin: 5px 0 0; color: var(--muted-2); font-size: 10px; line-height: 1.45; }
+
+    .analysis-content { padding: 16px 17px 17px; }
+    .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+    .metric {
+      min-width: 0;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      background: rgba(4, 12, 23, .52);
+    }
+    .metric-label { margin: 0; color: var(--muted-2); font-size: 9px; font-weight: 760; letter-spacing: .08em; text-transform: uppercase; }
+    .metric-value { margin: 5px 0 0; color: white; font-size: 18px; line-height: 1.05; font-weight: 780; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+    .section-label-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 15px 0 8px; }
+    .section-label { margin: 0; color: #d8e2ef; font-size: 10px; font-weight: 720; }
+    .section-caption { margin: 0; color: var(--muted-2); font-size: 9px; }
+
+    .density-chart { height: 63px; display: grid; grid-template-columns: repeat(8, 1fr); gap: 5px; align-items: end; }
+    .density-column { min-width: 0; height: 63px; display: flex; flex-direction: column; justify-content: flex-end; gap: 4px; }
+    .density-meter { flex: 1; min-height: 45px; display: flex; align-items: flex-end; overflow: hidden; border-radius: 6px; background: rgba(148,163,184,.08); }
+    .density-fill { width: 100%; min-height: 2px; border-radius: 6px; background: linear-gradient(180deg, #5eead4, #818cf8); }
+    .density-tag { height: 10px; color: var(--muted-2); font-size: 8px; text-align: center; }
+    .density-empty { height: 100%; border: 1px dashed rgba(148,163,184,.08); border-radius: 6px; }
+
+    .analysis-grid { margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .analysis-block { min-width: 0; padding: 10px 11px; border: 1px solid var(--line); border-radius: 11px; background: rgba(4, 12, 23, .42); }
+    .analysis-block .mini-label { margin: 0; color: var(--muted-2); font-size: 8px; font-weight: 760; letter-spacing: .08em; text-transform: uppercase; }
+    .analysis-block .mini-value { margin: 6px 0 0; color: #dbe6f3; font-size: 10px; line-height: 1.42; overflow-wrap: anywhere; }
+
+    .workspace { margin-top: 18px; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(330px, .85fr); gap: 18px; }
+    .track-scroll { max-height: 280px; overflow: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 10px 15px; border-bottom: 1px solid rgba(148,163,184,.08); text-align: left; vertical-align: middle; font-size: 10px; }
+    th { position: sticky; top: 0; z-index: 1; background: #0e1c2e; color: var(--muted-2); font-size: 8px; text-transform: uppercase; letter-spacing: .09em; }
+    td { color: #cbd5e1; }
+    td:last-child, th:last-child { text-align: right; }
+    .track-name { color: #edf4fb; font-weight: 700; }
+    .drum-tag { display: inline-block; margin-left: 4px; padding: 2px 5px; border-radius: 6px; background: rgba(251,191,36,.09); color: #fcd34d; font-size: 7px; }
+
+    .player-body { padding: 15px 16px 16px; }
+    .mode-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; border: 1px solid var(--line); border-radius: 11px; background: rgba(3, 10, 20, .7); }
+    .mode-button { min-height: 34px; padding: 0 10px; color: var(--muted); background: transparent; font-size: 10px; font-weight: 700; }
+    .mode-button.active { color: white; background: rgba(148,163,184,.13); }
+
+    .timeline { margin-top: 14px; }
+    .timeline-track { height: 6px; overflow: hidden; border-radius: 99px; background: rgba(148,163,184,.12); }
+    .timeline-fill { width: 0; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #818cf8, #5eead4); }
+    .timeline-meta { margin-top: 6px; display: flex; justify-content: space-between; color: var(--muted-2); font-size: 9px; font-variant-numeric: tabular-nums; }
+
+    .controls { margin-top: 12px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+    .control-button { min-height: 37px; border: 1px solid var(--line); background: rgba(255,255,255,.035); color: #dbe6f3; font-size: 10px; font-weight: 700; }
+    .control-button:hover:not(:disabled) { background: rgba(255,255,255,.07); }
+
+    .extension-result { margin-top: 12px; padding: 10px 11px; border: 1px solid rgba(110,231,183,.2); border-radius: 11px; background: rgba(16,185,129,.055); }
+    .extension-result strong { display: block; color: var(--success); font-size: 10px; }
+    .extension-result p { margin: 4px 0 0; color: var(--muted); font-size: 9px; line-height: 1.45; }
+
+    .download-button { width: 100%; min-height: 42px; margin-top: 12px; background: #a5b4fc; color: #08111f; font-size: 10px; font-weight: 830; }
+    .download-button:hover:not(:disabled) { background: #c7d2fe; }
+
+    .footnote {
+      margin-top: 16px;
+      padding: 12px 14px;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(10, 20, 34, .64);
+      color: var(--muted);
+      font-size: 9px;
+      line-height: 1.5;
+    }
+    .footnote-icon { width: 20px; height: 20px; flex: 0 0 20px; border-radius: 7px; display: grid; place-items: center; background: rgba(251,191,36,.08); color: #fcd34d; font-size: 10px; font-weight: 800; }
+    .footnote strong { color: #dbe6f3; }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: max(16px, env(safe-area-inset-bottom));
+      z-index: 50;
+      transform: translateX(-50%);
+      width: max-content;
+      max-width: min(520px, calc(100vw - 28px));
+      padding: 10px 13px;
+      border: 1px solid var(--line-strong);
+      border-radius: 11px;
+      background: rgba(11, 23, 39, .96);
+      box-shadow: 0 18px 55px rgba(0,0,0,.4);
+      color: #dbe6f3;
+      font-size: 10px;
+      line-height: 1.4;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    .toast.success { border-color: rgba(110,231,183,.3); color: #b8f7dc; }
+    .toast.error { border-color: rgba(251,113,133,.32); color: #fecdd3; }
+
+    @media (max-width: 900px) {
+      .dashboard, .workspace { grid-template-columns: 1fr; }
+      .workspace { margin-top: 14px; }
+      .analysis-empty { min-height: 215px; }
+      .hero-badge { display: none; }
+    }
+
+    @media (max-width: 640px) {
+      .shell { width: min(100% - 22px, 1180px); }
+      .topbar-inner { min-height: 58px; }
+      .privacy-chip { display: none; }
+      main { padding-top: 20px; }
+      .hero { margin-bottom: 15px; }
+      .hero h1 { font-size: 29px; }
+      .hero p.description { font-size: 12px; }
+      .card-head { min-height: 60px; padding: 14px; }
+      .card-body, .analysis-content { padding: 14px; }
+      .drop-zone { min-height: 160px; padding: 19px 12px; }
+      .generate-row { grid-template-columns: 1fr; }
+      .primary-button { width: 100%; }
+      .metrics { grid-template-columns: repeat(2, 1fr); }
+      .analysis-grid { grid-template-columns: 1fr; }
+      .workspace { grid-template-columns: 1fr; }
+      th, td { padding-left: 12px; padding-right: 12px; }
+      .brand-sub { max-width: 210px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="shell topbar-inner">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 18V5l10-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="16" cy="16" r="3"/>
+          </svg>
+        </div>
+        <div class="brand-copy">
+          <p class="brand-title">MIDI Continuum</p>
+          <p class="brand-sub">Structure-aware continuation, processed entirely in your browser</p>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="privacy-chip"><span class="status-dot"></span>No server upload</span>
+        <span class="runtime-chip" id="runtimeChip"><span class="status-dot waiting" id="runtimeDot"></span><span id="runtimeText">Loading engine…</span></span>
+      </div>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="hero">
+      <div>
+        <p class="eyebrow">MIDI continuation workbench</p>
+        <h1>Extend a MIDI without breaking its musical flow.</h1>
+        <p class="description">Load a MIDI, inspect its tempo, meter, key and recent phrase structure, then generate additional bars using synchronized transition modelling, key-aware melodic variation and phrase continuity across all active tracks.</p>
+      </div>
+      <div class="hero-badge">Local processing<br/>Standard MIDI export</div>
+    </section>
+
+    <section class="dashboard" aria-label="MIDI workbench">
+      <article class="card">
+        <div class="card-head">
+          <div class="head-title">
+            <span class="step">1</span>
+            <div><h2>Load & extend</h2><p>Choose a .mid or .midi file, then set the continuation length.</p></div>
+          </div>
+          <span id="fileBadge" class="file-badge hidden">Loaded</span>
+        </div>
+        <div class="card-body">
+          <div id="dropZone" class="drop-zone" role="button" tabindex="0" aria-label="Choose a MIDI file">
+            <input id="fileInput" type="file" accept=".mid,.midi,audio/midi,audio/x-midi" hidden />
+            <div>
+              <div class="upload-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 16V4"/><path d="m7.5 8.5 4.5-4.5 4.5 4.5"/><path d="M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/>
+                </svg>
+              </div>
+              <p class="drop-main">Drag & drop a MIDI file here</p>
+              <p class="drop-sub">or <strong>choose a file</strong> from your device</p>
+              <p class="drop-foot">Processed locally • up to 50 MB</p>
+            </div>
+          </div>
+
+          <div id="fileInfo" class="file-panel hidden">
+            <div class="mid-icon">MID</div>
+            <div class="file-copy">
+              <p id="fileName" class="file-name">—</p>
+              <p id="fileDetails" class="file-details">—</p>
+            </div>
+            <button id="replaceFileBtn" class="text-button" type="button">Replace</button>
+          </div>
+
+          <div class="generate-row">
+            <div>
+              <label class="field-label" for="barsInput">Additional bars</label>
+              <p class="field-help">1–128 bars. Eight is a good default for phrase continuation.</p>
+              <input id="barsInput" class="number-input" type="number" min="1" max="128" step="1" value="8" inputmode="numeric" />
+            </div>
+            <button id="generateBtn" class="primary-button" type="button" disabled>Analyze & extend</button>
+          </div>
+
+          <div id="generationPanel" class="progress-box hidden" aria-live="polite">
+            <div class="progress-row">
+              <div class="progress-status"><span id="spinner" class="spinner"></span><span id="generationStatus">Analyzing MIDI…</span></div>
+              <span id="progressLabel" class="progress-label">0%</span>
+            </div>
+            <div class="progress-track"><div id="progressBar" class="progress-fill"></div></div>
+          </div>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-head">
+          <div class="head-title">
+            <span class="step">2</span>
+            <div><h2>Musical analysis</h2><p>Metadata plus the final 4–8 bars of structure.</p></div>
+          </div>
+          <span id="analysisWindowBadge" class="pill hidden"></span>
+        </div>
+
+        <div id="emptyAnalysis" class="analysis-empty">
+          <div>
+            <div class="analysis-empty-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 19V9m5 10V5m5 14v-7m5 7V3"/></svg>
+            </div>
+            <h3>Waiting for a MIDI file</h3>
+            <p>As soon as a valid file is selected, its structure and track data will appear here.</p>
+          </div>
+        </div>
+
+        <div id="analysisContent" class="analysis-content hidden">
+          <div class="metrics">
+            <div class="metric"><p class="metric-label">BPM</p><p id="metaBpm" class="metric-value">—</p></div>
+            <div class="metric"><p class="metric-label">Bars</p><p id="metaBars" class="metric-value">—</p></div>
+            <div class="metric"><p class="metric-label">Key</p><p id="metaKey" class="metric-value">—</p></div>
+            <div class="metric"><p class="metric-label">Meter</p><p id="metaMeter" class="metric-value">—</p></div>
+          </div>
+
+          <div class="section-label-row"><p class="section-label">Recent note density</p><p id="densityCaption" class="section-caption"></p></div>
+          <div id="densityChart" class="density-chart" aria-label="Recent note density"></div>
+
+          <div class="analysis-grid">
+            <div class="analysis-block"><p class="mini-label">Chord movement</p><p id="chordProgression" class="mini-value">—</p></div>
+            <div class="analysis-block"><p class="mini-label">Interval tendencies</p><p id="intervalSummary" class="mini-value">—</p></div>
+            <div class="analysis-block"><p class="mini-label">Velocity profile</p><p id="velocitySummary" class="mini-value">—</p></div>
+            <div class="analysis-block"><p class="mini-label">Continuation model</p><p id="continuationSummary" class="mini-value">—</p></div>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section id="workspaceSection" class="workspace hidden">
+      <article class="card">
+        <div class="card-head">
+          <div><h3>Tracks & instruments</h3><p>Note-bearing tracks found in the source MIDI.</p></div>
+          <span id="trackCountBadge" class="pill">0 active</span>
+        </div>
+        <div class="track-scroll">
+          <table aria-label="MIDI tracks">
+            <thead><tr><th>Track</th><th>Instrument</th><th>Ch.</th><th>Notes</th></tr></thead>
+            <tbody id="tracksTable"></tbody>
+          </table>
+        </div>
+      </article>
+
+      <article class="card">
+        <div class="card-head"><div><h3>Preview & export</h3><p>Listen with browser synths, then download the extended MIDI.</p></div></div>
+        <div class="player-body">
+          <div class="mode-switch">
+            <button id="previewOriginalBtn" class="mode-button active" type="button">Original</button>
+            <button id="previewExtendedBtn" class="mode-button" type="button" disabled>Extended result</button>
+          </div>
+
+          <div class="timeline">
+            <div class="timeline-track"><div id="playbackProgress" class="timeline-fill"></div></div>
+            <div class="timeline-meta"><span id="playbackCurrent">0:00</span><span id="playbackTotal">0:00</span></div>
+          </div>
+
+          <div class="controls">
+            <button id="playBtn" class="control-button" type="button">▶ Play</button>
+            <button id="pauseBtn" class="control-button" type="button">Ⅱ Pause</button>
+            <button id="stopBtn" class="control-button" type="button">■ Stop</button>
+          </div>
+
+          <div id="extensionResult" class="extension-result hidden"><strong>Extension ready</strong><p id="extensionResultText"></p></div>
+          <button id="downloadBtn" class="download-button" type="button" disabled>Download extended MIDI</button>
+        </div>
+      </article>
+    </section>
+
+    <aside class="footnote">
+      <div class="footnote-icon">i</div>
+      <div><strong>How it works:</strong> the engine fingerprints the final bars using onset density, pitch classes, velocity and harmony, then searches a wider recent history for plausible musical successors. Rhythmic/harmonic source material is kept synchronized across tracks while melodic tracks receive key-aware interval variation and chordal tracks receive conservative voicing variation. End-of-track padding is ignored so the continuation begins at the final sounding note. The browser preview uses simple synths; the exported file retains MIDI note, program, controller and pitch-bend data.</div>
+    </aside>
+  </main>
+
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+  'use strict';
+
+  // ---------------------------------------------------------------------------
+  // Application constants and state
+  // ---------------------------------------------------------------------------
+  const MAX_FILE_BYTES = 50 * 1024 * 1024;
+  const MAX_PREVIEW_NOTES = 12000;
+  const MAX_CONTEXT_BARS = 8;
+  const MAX_MODEL_BARS = 48;
+  const DEFAULT_PPQ = 480;
+  const PITCH_NAMES = ['C','C♯','D','E♭','E','F','F♯','G','A♭','A','B♭','B'];
+  const MAJOR_PROFILE = [6.35,2.23,3.48,2.33,4.38,4.09,2.52,5.19,2.39,3.66,2.29,2.88];
+  const MINOR_PROFILE = [6.33,2.68,3.52,5.38,2.60,3.53,2.54,4.75,3.98,2.69,3.34,3.17];
+
+  const state = {
+    file: null,
+    originalMidi: null,
+    extendedMidi: null,
+    analysis: null,
+    extensionBars: 8,
+    extensionSequence: [],
+    previewMode: 'original',
+    playback: { scheduled: false, midi: null, synths: [], raf: null, duration: 0, noteLimitHit: false }
+  };
+
+  let MidiCtor = null;
+
+  const $ = id => document.getElementById(id);
+  const els = {};
+
+  // ---------------------------------------------------------------------------
+  // Dependency loading
+  // ---------------------------------------------------------------------------
+  function loadScript(src) {
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = src;
+      script.async = true;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error(`Could not load ${src}`));
+      document.head.appendChild(script);
+    });
+  }
+
+  async function ensureLibraries() {
+    // The official @tonejs/midi browser build exposes a global Midi constructor.
+    MidiCtor = window.Midi || window.ToneMidi?.Midi || null;
+
+    if (!window.Tone) {
+      try { await loadScript('https://unpkg.com/tone@14.8.49/build/Tone.js'); }
+      catch (_) { /* handled below */ }
+    }
+    if (!MidiCtor) {
+      try { await loadScript('https://cdn.jsdelivr.net/npm/@tonejs/midi@2.0.28/build/Midi.js'); }
+      catch (_) { /* handled below */ }
+      MidiCtor = window.Midi || window.ToneMidi?.Midi || null;
+    }
+
+    if (!window.Tone || !MidiCtor) {
+      throw new Error('The MIDI/audio libraries could not load. Open this page in Safari/Chrome with an internet connection, or host it on GitHub Pages.');
+    }
+  }
+
+  function setRuntime(status, kind = 'ready') {
+    els.runtimeText.textContent = status;
+    els.runtimeDot.className = `status-dot${kind === 'waiting' ? ' waiting' : kind === 'error' ? ' error' : ''}`;
+  }
+
+  // ---------------------------------------------------------------------------
+  // General helpers
+  // ---------------------------------------------------------------------------
+  const clamp = (n, min, max) => Math.min(max, Math.max(min, n));
+  const round = (n, digits = 1) => Number(n.toFixed(digits));
+  const nextPaint = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+  function formatBytes(bytes) {
+    if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+    const units = ['B','KB','MB','GB'];
+    const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+    return `${(bytes / Math.pow(1024, i)).toFixed(i ? 1 : 0)} ${units[i]}`;
+  }
+
+  function formatTime(seconds) {
+    const safe = Number.isFinite(seconds) && seconds > 0 ? seconds : 0;
+    const minutes = Math.floor(safe / 60);
+    const secs = Math.floor(safe % 60).toString().padStart(2, '0');
+    return `${minutes}:${secs}`;
+  }
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
+  }
+
+  function showToast(message, type = 'info', timeout = 4200) {
+    els.toast.textContent = message;
+    els.toast.className = `toast ${type === 'success' ? 'success' : type === 'error' ? 'error' : ''}`;
+    els.toast.classList.remove('hidden');
+    clearTimeout(showToast.timer);
+    showToast.timer = setTimeout(() => els.toast.classList.add('hidden'), timeout);
+  }
+
+  function getMusicalEndTick(midi) {
+    // Ignore End-of-Track meta events: many MIDI files place EOT well after the
+    // final sounding note, which previously created an audible gap before the
+    // generated continuation. @tonejs/midi's durationTicks is also note-based,
+    // but we calculate it explicitly so corrupt/partial files fail gracefully.
+    let maxTick = 0;
+    for (const track of midi.tracks || []) {
+      for (const note of track.notes || []) {
+        const start = Number(note.ticks);
+        const duration = Number(note.durationTicks);
+        if (!Number.isFinite(start)) continue;
+        maxTick = Math.max(maxTick, start + (Number.isFinite(duration) ? Math.max(0, duration) : 0));
+      }
+    }
+    return Math.max(0, Math.round(maxTick || Number(midi.durationTicks) || 0));
+  }
+
+  function getEventAtOrBefore(events, tick) {
+    if (!Array.isArray(events) || !events.length) return null;
+    let current = null;
+    for (const event of events) {
+      if ((Number(event.ticks) || 0) <= tick) current = event;
+      else break;
+    }
+    return current || events[0];
+  }
+
+  function getTerminalMeter(midi, tick) {
+    const event = getEventAtOrBefore(midi.header.timeSignatures || [], tick);
+    const signature = event?.timeSignature || [4, 4];
+    return [Number(signature[0]) || 4, Number(signature[1]) || 4];
+  }
+
+  function ticksPerBar(ppq, meter) {
+    return Math.max(1, Math.round(ppq * 4 * (meter[0] / meter[1])));
+  }
+
+  function buildBarGrid(midi, endTick) {
+    const ppq = midi.header.ppq || DEFAULT_PPQ;
+    const signatures = [...(midi.header.timeSignatures || [])].sort((a,b) => (a.ticks || 0) - (b.ticks || 0));
+    const bars = [];
+    let cursor = 0;
+    let sigIndex = 0;
+    let meter = [4, 4];
+    const safeEnd = Math.max(1, endTick);
+    let guard = 0;
+
+    while (cursor < safeEnd && guard++ < 100000) {
+      while (sigIndex < signatures.length && (signatures[sigIndex].ticks || 0) <= cursor) {
+        meter = signatures[sigIndex].timeSignature || meter;
+        sigIndex++;
+      }
+      const nominalEnd = cursor + ticksPerBar(ppq, meter);
+      const nextChange = sigIndex < signatures.length ? Number(signatures[sigIndex].ticks || 0) : Infinity;
+      const barEnd = nextChange > cursor && nextChange < nominalEnd ? nextChange : nominalEnd;
+      bars.push({ start: cursor, end: barEnd, meter: [Number(meter[0]) || 4, Number(meter[1]) || 4] });
+      cursor = barEnd;
+    }
+
+    if (!bars.length) bars.push({ start: 0, end: ticksPerBar(ppq, meter), meter });
+    return bars;
+  }
+
+  function normalizeVector(vector) {
+    const total = vector.reduce((sum, value) => sum + Math.abs(value), 0) || 1;
+    return vector.map(value => value / total);
+  }
+
+  function cosineSimilarity(a, b) {
+    let dot = 0, aa = 0, bb = 0;
+    const length = Math.min(a.length, b.length);
+    for (let i = 0; i < length; i++) {
+      dot += a[i] * b[i];
+      aa += a[i] * a[i];
+      bb += b[i] * b[i];
+    }
+    return aa && bb ? dot / Math.sqrt(aa * bb) : 0;
+  }
+
+  function isPercussionTrack(track) {
+    return Boolean(track.instrument?.percussion) || Number(track.channel) === 9;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Musical analysis
+  // ---------------------------------------------------------------------------
+  function pitchNameToPc(name) {
+    const normalized = String(name || '').trim().replace(/♯/g, '#').replace(/♭/g, 'b');
+    const map = { C:0, 'B#':0, 'C#':1, Db:1, D:2, 'D#':3, Eb:3, E:4, Fb:4, 'E#':5, F:5, 'F#':6, Gb:6, G:7, 'G#':8, Ab:8, A:9, 'A#':10, Bb:10, B:11, Cb:11 };
+    return Object.prototype.hasOwnProperty.call(map, normalized) ? map[normalized] : null;
+  }
+
+  function inferKey(midi) {
+    const explicit = midi.header.keySignatures?.length ? midi.header.keySignatures[midi.header.keySignatures.length - 1] : null;
+    if (explicit?.key) {
+      const mode = String(explicit.scale || 'major').toLowerCase() === 'minor' ? 'minor' : 'major';
+      const root = pitchNameToPc(explicit.key);
+      return {
+        label: `${explicit.key} ${mode}`,
+        source: 'MIDI key signature',
+        confidence: 1,
+        root: root == null ? 0 : root,
+        mode
+      };
+    }
+
+    const histogram = Array(12).fill(0);
+    for (const track of midi.tracks) {
+      if (isPercussionTrack(track)) continue;
+      for (const note of track.notes) {
+        const weight = Math.max(0.05, note.duration || 0.05) * Math.max(0.1, note.velocity || 0.7);
+        histogram[note.midi % 12] += weight;
+      }
+    }
+    if (!histogram.some(Boolean)) return { label: 'Unknown', source: 'insufficient pitched notes', confidence: 0, root: 0, mode: 'major' };
+
+    const normalized = normalizeVector(histogram);
+    let best = { score: -Infinity, root: 0, mode: 'major' };
+    let second = -Infinity;
+    for (let root = 0; root < 12; root++) {
+      for (const [mode, profile] of [['major', MAJOR_PROFILE], ['minor', MINOR_PROFILE]]) {
+        let score = 0;
+        for (let i = 0; i < 12; i++) score += normalized[(root + i) % 12] * profile[i];
+        if (score > best.score) { second = best.score; best = { score, root, mode }; }
+        else if (score > second) second = score;
+      }
+    }
+    const confidence = clamp(((best.score - second) / Math.max(.001, Math.abs(best.score))) * 4, .1, .95);
+    return { label: `${PITCH_NAMES[best.root]} ${best.mode}`, source: 'pitch-class estimate', confidence, root: best.root, mode: best.mode };
+  }
+
+  function estimateChord(histogram) {
+    if (!histogram.some(Boolean)) return '—';
+    let best = { label: '—', score: -Infinity };
+    const qualities = [{ suffix: '', intervals: [0,4,7] }, { suffix: 'm', intervals: [0,3,7] }];
+    for (let root = 0; root < 12; root++) {
+      for (const quality of qualities) {
+        const set = new Set(quality.intervals.map(i => (root + i) % 12));
+        let chordWeight = 0, otherWeight = 0;
+        histogram.forEach((value, pc) => set.has(pc) ? chordWeight += value : otherWeight += value);
+        const score = chordWeight - otherWeight * .12;
+        if (score > best.score) best = { score, label: `${PITCH_NAMES[root]}${quality.suffix}` };
+      }
+    }
+    return best.label;
+  }
+
+  function analyzeBar(midi, bar) {
+    const onset = Array(16).fill(0);
+    const pitch = Array(12).fill(0);
+    const length = Math.max(1, bar.end - bar.start);
+    let noteCount = 0, velocitySum = 0, firstOnset = Infinity, lastOnset = -Infinity;
+
+    for (const track of midi.tracks) {
+      for (const note of track.notes) {
+        if (note.ticks < bar.start || note.ticks >= bar.end) continue;
+        noteCount++;
+        velocitySum += note.velocity || 0;
+        firstOnset = Math.min(firstOnset, note.ticks);
+        lastOnset = Math.max(lastOnset, note.ticks);
+        onset[clamp(Math.floor(((note.ticks - bar.start) / length) * 16), 0, 15)] += 1;
+        if (!isPercussionTrack(track)) pitch[note.midi % 12] += Math.max(1, Math.min(note.durationTicks || 1, length));
+      }
+    }
+
+    const onsetNorm = normalizeVector(onset);
+    const pitchNorm = normalizeVector(pitch);
+    const avgVelocity = noteCount ? velocitySum / noteCount : 0;
+    const densityNorm = clamp(noteCount / 32, 0, 1);
+    const leadingOnset = Number.isFinite(firstOnset) ? clamp((firstOnset - bar.start) / length, 0, 1) : 1;
+    const tailActivity = Number.isFinite(lastOnset) ? clamp((bar.end - lastOnset) / length, 0, 1) : 1;
+    const feature = [...onsetNorm.map(v => v * 1.25), ...pitchNorm.map(v => v * 1.15), densityNorm * .8, avgVelocity * .6];
+    return { onset, pitch, noteCount, avgVelocity, feature, chord: estimateChord(pitch), leadingOnset, tailActivity };
+  }
+
+  function detectPhraseLength(features) {
+    let best = { lag: 0, score: 0 };
+    for (let lag = 1; lag <= Math.min(4, Math.floor(features.length / 2)); lag++) {
+      let total = 0, count = 0;
+      for (let i = lag; i < features.length; i++) {
+        total += cosineSimilarity(features[i].feature, features[i - lag].feature);
+        count++;
+      }
+      const score = count ? total / count : 0;
+      if (score > best.score) best = { lag, score };
+    }
+    return best.score >= .68 ? best : { lag: 0, score: best.score };
+  }
+
+  function mulberry32(seed) {
+    let a = seed >>> 0;
+    return () => {
+      a |= 0; a = (a + 0x6D2B79F5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function midiSeed(midi) {
+    let hash = 2166136261 >>> 0;
+    let seen = 0;
+    for (const track of midi.tracks || []) {
+      for (const note of track.notes || []) {
+        if (seen++ > 4096) break;
+        hash ^= ((note.midi & 127) << 24) ^ ((Math.round(note.ticks) & 0xffff) << 8) ^ (Math.round((note.velocity || 0) * 127) & 127);
+        hash = Math.imul(hash, 16777619) >>> 0;
+      }
+    }
+    return hash || 0x9E3779B9;
+  }
+
+  function buildContinuationSequence(features, requestedBars, phrase, seed = 1) {
+    const n = features.length;
+    if (!n) return [];
+    if (n === 1) return Array(requestedBars).fill(0);
+
+    const rng = mulberry32(seed);
+    const sequence = [];
+    let currentIndex = n - 1;
+
+    const viableSources = features.map((f, i) => ({ f, i })).filter(x => x.f.noteCount > 0).map(x => x.i);
+    if (!viableSources.length) return [];
+
+    const chooseSuccessor = (fromIndex, step) => {
+      const candidates = [];
+      for (let i = 0; i < n - 1; i++) {
+        const next = i + 1;
+        if (features[next].noteCount <= 0) continue;
+        let score = cosineSimilarity(features[fromIndex].feature, features[i].feature);
+        // Prefer a source whose successor starts promptly, especially at the join.
+        score -= features[next].leadingOnset * (step === 0 ? .55 : .16);
+        // Avoid mechanically returning to the exact final bar and discourage short loops.
+        if (next === n - 1) score -= .20;
+        if (sequence.slice(-3).includes(next)) score -= .12;
+        // A tiny seeded jitter stops ties from always resolving to the same bar.
+        score += rng() * .035;
+        candidates.push({ next, score });
+      }
+      candidates.sort((a,b) => b.score - a.score);
+      if (candidates.length) {
+        const pool = candidates.slice(0, Math.min(4, candidates.length));
+        const pick = pool[Math.min(pool.length - 1, Math.floor(rng() * Math.min(3, pool.length)))];
+        if (pick.score >= .28) return pick.next;
+      }
+
+      // Phrase recurrence is a fallback, not the primary engine. The notes are
+      // subsequently varied, so even this path is not a literal copy/paste loop.
+      if (phrase.lag > 0) return Math.max(0, n - phrase.lag + (step % phrase.lag));
+      const nonFinal = viableSources.filter(i => i !== n - 1);
+      return nonFinal.length ? nonFinal[Math.floor(rng() * nonFinal.length)] : viableSources[0];
+    };
+
+    for (let step = 0; step < requestedBars; step++) {
+      const source = chooseSuccessor(currentIndex, step);
+      sequence.push(source);
+      currentIndex = source;
+    }
+    return sequence;
+  }
+
+  function collectIntervalStats(midi, startTick) {
+    const counts = new Map();
+    for (const track of midi.tracks) {
+      if (isPercussionTrack(track)) continue;
+      const notes = track.notes.filter(note => note.ticks >= startTick).sort((a,b) => a.ticks - b.ticks || a.midi - b.midi);
+      let previous = null;
+      for (const note of notes) {
+        if (previous && note.ticks !== previous.ticks) {
+          const interval = clamp(note.midi - previous.midi, -24, 24);
+          counts.set(interval, (counts.get(interval) || 0) + 1);
+        }
+        previous = note;
+      }
+    }
+    return [...counts.entries()].sort((a,b) => b[1] - a[1]).slice(0, 5);
+  }
+
+  function collectVelocityStats(midi, startTick) {
+    const values = [];
+    midi.tracks.forEach(track => track.notes.forEach(note => { if (note.ticks >= startTick) values.push(note.velocity || 0); }));
+    if (!values.length) return { mean: 0, sd: 0, min: 0, max: 0 };
+    const mean = values.reduce((sum, v) => sum + v, 0) / values.length;
+    const variance = values.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) / values.length;
+    return { mean, sd: Math.sqrt(variance), min: Math.min(...values), max: Math.max(...values) };
+  }
+
+  function buildEventCache(midi, contextBars) {
+    return midi.tracks.map(track => contextBars.map(bar => {
+      const notes = track.notes.filter(note => note.ticks >= bar.start && note.ticks < bar.end);
+      const controlChanges = [];
+      for (const key of Object.keys(track.controlChanges || {})) {
+        if (!/^\d+$/.test(key)) continue;
+        const list = track.controlChanges[key];
+        if (!Array.isArray(list)) continue;
+        for (const cc of list) if (cc.ticks >= bar.start && cc.ticks < bar.end) controlChanges.push(cc);
+      }
+      const pitchBends = (track.pitchBends || []).filter(pb => pb.ticks >= bar.start && pb.ticks < bar.end);
+      return { notes, controlChanges, pitchBends };
+    }));
+  }
+
+  function keyScalePitchClasses(key) {
+    const intervals = key?.mode === 'minor' ? [0,2,3,5,7,8,10] : [0,2,4,5,7,9,11];
+    const root = Number.isFinite(key?.root) ? key.root : 0;
+    return new Set(intervals.map(i => (root + i) % 12));
+  }
+
+  function snapPitchToKey(pitch, key, minPitch = 0, maxPitch = 127) {
+    const scale = keyScalePitchClasses(key);
+    let best = clamp(Math.round(pitch), minPitch, maxPitch);
+    let bestDistance = Infinity;
+    for (let delta = -3; delta <= 3; delta++) {
+      const candidate = clamp(Math.round(pitch) + delta, minPitch, maxPitch);
+      if (!scale.has(((candidate % 12) + 12) % 12)) continue;
+      const distance = Math.abs(candidate - pitch);
+      if (distance < bestDistance) { best = candidate; bestDistance = distance; }
+    }
+    return clamp(best, 0, 127);
+  }
+
+  function groupNotesByOnset(notes) {
+    const groups = [];
+    let current = null;
+    for (const note of [...notes].sort((a,b) => a.ticks - b.ticks || a.midi - b.midi)) {
+      if (!current || current.tick !== note.ticks) {
+        current = { tick: note.ticks, notes: [] };
+        groups.push(current);
+      }
+      current.notes.push(note);
+    }
+    return groups;
+  }
+
+  function buildTrackModels(midi, startTick) {
+    return midi.tracks.map(track => {
+      if (isPercussionTrack(track)) return { percussion: true, melodic: false };
+      const notes = track.notes.filter(n => n.ticks >= startTick).sort((a,b) => a.ticks - b.ticks || a.midi - b.midi);
+      if (!notes.length) return { percussion: false, melodic: false, empty: true };
+      const groups = groupNotesByOnset(notes);
+      // Follow the top voice on polyphonic tracks; for monophonic tracks this
+      // is simply the melody. This lets piano/guitar tracks vary their melodic
+      // line without disturbing the lower harmonic bed.
+      const reps = groups.map(g => Math.max(...g.notes.map(n => n.midi)));
+      const intervalCounts = new Map();
+      const transitionCounts = new Map();
+      let previousInterval = null;
+      for (let i = 1; i < reps.length; i++) {
+        const interval = clamp(reps[i] - reps[i - 1], -12, 12);
+        intervalCounts.set(interval, (intervalCounts.get(interval) || 0) + 1);
+        if (previousInterval !== null) {
+          const key = String(previousInterval);
+          if (!transitionCounts.has(key)) transitionCounts.set(key, new Map());
+          const map = transitionCounts.get(key);
+          map.set(interval, (map.get(interval) || 0) + 1);
+        }
+        previousInterval = interval;
+      }
+      const pitches = notes.map(n => n.midi);
+      const avgVoices = groups.reduce((sum,g) => sum + g.notes.length, 0) / Math.max(1, groups.length);
+      return {
+        percussion: false,
+        melodic: avgVoices <= 1.35,
+        minPitch: Math.min(...pitches),
+        maxPitch: Math.max(...pitches),
+        lastPitch: reps[reps.length - 1],
+        lastInterval: previousInterval,
+        intervalCounts,
+        transitionCounts,
+        avgVoices
+      };
+    });
+  }
+
+  function weightedInterval(model, sourceInterval, rng) {
+    const transition = model.transitionCounts?.get(String(model.lastInterval));
+    const pool = transition && transition.size ? transition : model.intervalCounts;
+    if (!pool || !pool.size) return clamp(sourceInterval || 0, -7, 7);
+    const entries = [];
+    let total = 0;
+    for (const [interval, count] of pool.entries()) {
+      const similarityWeight = 1 / (1 + Math.abs(interval - (sourceInterval || 0)) * .22);
+      const motionPenalty = Math.abs(interval) > 7 ? .45 : 1;
+      const weight = Math.max(.01, count * similarityWeight * motionPenalty);
+      total += weight;
+      entries.push([interval, total]);
+    }
+    let pick = rng() * total;
+    for (const [interval, cumulative] of entries) if (pick <= cumulative) return interval;
+    return entries[entries.length - 1][0];
+  }
+
+  function fitPitchNearReference(pitch, reference, minPitch, maxPitch) {
+    let best = pitch;
+    let bestDistance = Infinity;
+    for (let octave = -4; octave <= 4; octave++) {
+      const candidate = pitch + octave * 12;
+      if (candidate < minPitch - 5 || candidate > maxPitch + 5) continue;
+      const distance = Math.abs(candidate - reference);
+      if (distance < bestDistance) { best = candidate; bestDistance = distance; }
+    }
+    return clamp(Math.round(best), Math.max(0, minPitch - 5), Math.min(127, maxPitch + 5));
+  }
+
+  function firstOnsetOffset(eventCache, contextIndex, sourceBar) {
+    let first = Infinity;
+    for (const trackBars of eventCache) {
+      const cached = trackBars?.[contextIndex];
+      for (const note of cached?.notes || []) first = Math.min(first, note.ticks - sourceBar.start);
+    }
+    return Number.isFinite(first) ? Math.max(0, first) : 0;
+  }
+
+  function analyzeMidi(midi) {
+    const maxTick = getMusicalEndTick(midi);
+    if (maxTick <= 0) throw new Error('This MIDI does not contain any complete playable note events.');
+
+    const ppq = Number(midi.header.ppq) || DEFAULT_PPQ;
+    if (!Number.isFinite(ppq) || ppq <= 0) throw new Error('This MIDI uses an unsupported timing division. Please export it using standard PPQ/metrical timing.');
+
+    const bars = buildBarGrid(midi, maxTick);
+    const terminalMeter = getTerminalMeter(midi, maxTick);
+    const terminalBarTicks = ticksPerBar(ppq, terminalMeter);
+    // Start at the end of the last sounding note, not at an End-of-Track marker
+    // or a rounded-up bar line. This removes the artificial join gap.
+    const extensionStartTick = maxTick;
+    const contextCount = Math.min(MAX_CONTEXT_BARS, bars.length);
+    const contextBars = bars.slice(-contextCount);
+    const barFeatures = contextBars.map(bar => analyzeBar(midi, bar));
+    const phrase = detectPhraseLength(barFeatures);
+    const key = inferKey(midi);
+    const tempo = getEventAtOrBefore(midi.header.tempos || [], maxTick)?.bpm || midi.header.tempos?.[0]?.bpm || 120;
+    const intervalStats = collectIntervalStats(midi, contextBars[0].start);
+    const velocity = collectVelocityStats(midi, contextBars[0].start);
+
+    // A wider model library gives the Markov transition engine somewhere to go
+    // other than simply looping the final phrase. The final 4–8 bars still drive
+    // the current-state/phrase analysis, as shown in the UI.
+    const modelBars = bars.slice(-Math.min(MAX_MODEL_BARS, bars.length));
+    const modelFeatures = modelBars.map(bar => analyzeBar(midi, bar));
+    const modelStartTick = modelBars[0]?.start || 0;
+    const eventCache = buildEventCache(midi, modelBars);
+    const trackModels = buildTrackModels(midi, modelStartTick);
+
+    const activeTracks = midi.tracks.map((track, index) => ({
+      index,
+      name: track.name?.trim() || `Track ${index + 1}`,
+      instrument: track.instrument?.name || (isPercussionTrack(track) ? 'Percussion' : 'General MIDI'),
+      channel: Number.isFinite(Number(track.channel)) ? Number(track.channel) + 1 : '—',
+      notes: track.notes.length,
+      percussion: isPercussionTrack(track)
+    })).filter(track => track.notes > 0);
+
+    return {
+      maxTick, ppq, bars, barCount: bars.length, terminalMeter, terminalBarTicks,
+      extensionStartTick, contextBars, barFeatures, phrase, key, tempo,
+      intervalStats, velocity, activeTracks, modelBars, modelFeatures,
+      eventCache, trackModels, seed: midiSeed(midi)
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Continuation generation
+  // ---------------------------------------------------------------------------
+  function extendMidi(originalMidi, analysis, requestedBars) {
+    // Re-parse the original bytes rather than building a fresh file, preserving
+    // the original header, programs, channels and existing automation.
+    const output = new MidiCtor(originalMidi.toArray());
+    const sequence = buildContinuationSequence(analysis.modelFeatures, requestedBars, analysis.phrase, analysis.seed ^ requestedBars);
+    if (!sequence.length) throw new Error('No usable musical source bars were found for continuation.');
+
+    const destinationBarLength = Math.max(1, analysis.terminalBarTicks);
+    const rng = mulberry32((analysis.seed ^ (requestedBars * 2654435761)) >>> 0);
+    const models = analysis.trackModels.map(model => ({ ...model }));
+    let timelineCursor = analysis.extensionStartTick;
+    let generatedNotes = 0;
+    let trimmedJoinTicks = 0;
+
+    sequence.forEach((modelIndex, extensionIndex) => {
+      const sourceBar = analysis.modelBars[modelIndex];
+      if (!sourceBar) return;
+      const sourceLength = Math.max(1, sourceBar.end - sourceBar.start);
+      const scale = destinationBarLength / sourceLength;
+
+      // If the selected first source bar contains a pickup/rest before its first
+      // onset, trim that silence once so the continuation touches the original.
+      const sourceLead = extensionIndex === 0 ? firstOnsetOffset(analysis.eventCache, modelIndex, sourceBar) : 0;
+      const leadTrim = extensionIndex === 0 ? Math.min(destinationBarLength * .45, Math.round(sourceLead * scale)) : 0;
+      if (extensionIndex === 0) trimmedJoinTicks = leadTrim;
+      const destinationStart = timelineCursor;
+      const destinationSpan = Math.max(1, destinationBarLength - leadTrim);
+      const destinationEnd = destinationStart + destinationSpan;
+
+      output.tracks.forEach((outTrack, trackIndex) => {
+        const cached = analysis.eventCache[trackIndex]?.[modelIndex];
+        if (!cached) return;
+        const model = models[trackIndex] || { percussion: isPercussionTrack(outTrack), melodic: false };
+        const noteGroups = groupNotesByOnset(cached.notes || []);
+        let previousSourcePitch = null;
+
+        for (const group of noteGroups) {
+          const rawRelative = Math.round((group.tick - sourceBar.start) * scale) - leadTrim;
+          const relativeTick = Math.max(0, rawRelative);
+          const newTick = destinationStart + relativeTick;
+          if (newTick >= destinationEnd + Math.round(destinationBarLength * .2)) continue;
+
+          const isChord = !model.percussion && (group.notes.length > 1 || !model.melodic);
+          let inversionLiftLowest = false;
+          if (isChord && extensionIndex > 0 && group.notes.length > 1 && rng() < .22) inversionLiftLowest = true;
+          const sortedGroup = [...group.notes].sort((a,b) => a.midi - b.midi);
+
+          for (let noteIndex = 0; noteIndex < sortedGroup.length; noteIndex++) {
+            const note = sortedGroup[noteIndex];
+            if (!Number.isFinite(note.midi) || !Number.isFinite(note.ticks)) continue;
+            let midi = clamp(Math.round(note.midi), 0, 127);
+
+            if (!model.percussion && model.melodic && group.notes.length === 1) {
+              const sourceInterval = previousSourcePitch == null ? 0 : clamp(note.midi - previousSourcePitch, -12, 12);
+              const keepSourceContour = extensionIndex === 0 ? rng() < .72 : rng() < .50;
+              if (Number.isFinite(model.lastPitch)) {
+                if (keepSourceContour) {
+                  midi = fitPitchNearReference(note.midi, model.lastPitch + sourceInterval, model.minPitch, model.maxPitch);
+                } else {
+                  const interval = weightedInterval(model, sourceInterval, rng);
+                  midi = fitPitchNearReference(model.lastPitch + interval, note.midi, model.minPitch, model.maxPitch);
+                  model.lastInterval = interval;
+                }
+                midi = snapPitchToKey(midi, analysis.key, Math.max(0, model.minPitch - 5), Math.min(127, model.maxPitch + 5));
+                model.lastInterval = clamp(midi - model.lastPitch, -12, 12);
+                model.lastPitch = midi;
+              }
+              previousSourcePitch = note.midi;
+            } else if (isChord) {
+              if (inversionLiftLowest && noteIndex === 0) {
+                // Change voicing without changing the chord's pitch classes.
+                const lifted = midi + 12;
+                if (lifted <= 127 && (!Number.isFinite(model.maxPitch) || lifted <= model.maxPitch + 12)) midi = lifted;
+              }
+
+              // On mixed piano/guitar-style tracks the highest simultaneous
+              // note usually behaves like a melodic/top voice. Vary it
+              // conservatively while leaving the lower chord tones intact.
+              if (noteIndex === sortedGroup.length - 1 && Number.isFinite(model.lastPitch)) {
+                const sourceTop = sortedGroup[sortedGroup.length - 1].midi;
+                const sourceInterval = previousSourcePitch == null ? 0 : clamp(sourceTop - previousSourcePitch, -12, 12);
+                if (extensionIndex > 0 && rng() < .28) {
+                  const interval = weightedInterval(model, sourceInterval, rng);
+                  let candidate = fitPitchNearReference(model.lastPitch + interval, sourceTop, model.minPitch, model.maxPitch);
+                  candidate = snapPitchToKey(candidate, analysis.key, Math.max(0, model.minPitch - 5), Math.min(127, model.maxPitch + 7));
+                  // Keep the top voice above the second-highest chord tone.
+                  const lowerCeiling = sortedGroup.length > 1 ? sortedGroup[sortedGroup.length - 2].midi : -Infinity;
+                  while (candidate <= lowerCeiling && candidate + 12 <= 127) candidate += 12;
+                  midi = clamp(candidate, 0, 127);
+                }
+                model.lastInterval = clamp(midi - model.lastPitch, -12, 12);
+                model.lastPitch = midi;
+                previousSourcePitch = sourceTop;
+              }
+            }
+
+            const scaledDuration = Math.max(1, Math.round((Number(note.durationTicks) || 1) * scale));
+            const durationHumanize = model.percussion ? 1 : (.97 + rng() * .06);
+            const durationTicks = Math.max(1, Math.min(
+              Math.round(scaledDuration * durationHumanize),
+              Math.max(1, destinationEnd + Math.round(destinationBarLength * .18) - newTick)
+            ));
+            const velocityJitter = model.percussion ? (rng() - .5) * .06 : (rng() - .5) * .08;
+            const velocity = clamp((Number(note.velocity) || .8) + velocityJitter, .03, 1);
+
+            try {
+              outTrack.addNote({
+                midi,
+                ticks: Math.max(0, Math.round(newTick)),
+                durationTicks,
+                velocity,
+                noteOffVelocity: clamp(Number(note.noteOffVelocity) || 0, 0, 1)
+              });
+              generatedNotes++;
+            } catch (error) {
+              console.warn('Skipped an invalid generated note', error);
+            }
+          }
+        }
+
+        // Controller/pitch-bend data is useful for musical continuity, but a
+        // malformed automation event should never make the whole MIDI fail.
+        for (const cc of cached.controlChanges || []) {
+          try {
+            const number = Number(cc.number);
+            const value = Number(cc.value);
+            if (!Number.isFinite(number) || !Number.isFinite(value)) continue;
+            outTrack.addCC({
+              number: clamp(Math.round(number), 0, 127),
+              ticks: Math.max(destinationStart, destinationStart + Math.round((cc.ticks - sourceBar.start) * scale) - leadTrim),
+              value: clamp(value, 0, 1)
+            });
+          } catch (error) { console.warn('Skipped invalid controller event', error); }
+        }
+
+        for (const bend of cached.pitchBends || []) {
+          try {
+            const value = Number(bend.value);
+            if (!Number.isFinite(value)) continue;
+            outTrack.addPitchBend({
+              ticks: Math.max(destinationStart, destinationStart + Math.round((bend.ticks - sourceBar.start) * scale) - leadTrim),
+              value: clamp(value, -1, 1)
+            });
+          } catch (error) { console.warn('Skipped invalid pitch bend', error); }
+        }
+      });
+
+      timelineCursor += destinationSpan;
+    });
+
+    if (!generatedNotes) throw new Error('The file was parsed, but no valid notes could be generated from its recent musical material.');
+
+    const finalTick = Math.max(analysis.extensionStartTick + 1, timelineCursor);
+    output.tracks.forEach(track => {
+      try { track.endOfTrackTicks = Math.max(Number(track.endOfTrackTicks) || 0, finalTick); } catch (_) {}
+    });
+
+    // Serialize and immediately parse again: this catches invalid MIDI output
+    // before the download button is enabled.
+    const bytes = output.toArray();
+    const validated = new MidiCtor(bytes);
+    if (!validated.tracks.some(track => track.notes.some(note => note.ticks >= analysis.extensionStartTick))) {
+      throw new Error('MIDI validation succeeded, but the generated section contained no playable notes.');
+    }
+    return { midi: validated, sequence, bytes, generatedNotes, trimmedJoinTicks };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Rendering
+  // ---------------------------------------------------------------------------
+  function renderAnalysis() {
+    const a = state.analysis;
+    if (!a) return;
+
+    els.emptyAnalysis.classList.add('hidden');
+    els.analysisContent.classList.remove('hidden');
+    els.analysisWindowBadge.classList.remove('hidden');
+    els.analysisWindowBadge.textContent = `Last ${a.contextBars.length} bar${a.contextBars.length === 1 ? '' : 's'}`;
+    els.metaBpm.textContent = String(Math.round(a.tempo));
+    els.metaBars.textContent = String(a.barCount);
+    els.metaKey.textContent = a.key.label;
+    els.metaKey.title = `${a.key.source}${a.key.source.includes('estimate') ? ` • confidence ${Math.round(a.key.confidence * 100)}%` : ''}`;
+    els.metaMeter.textContent = `${a.terminalMeter[0]}/${a.terminalMeter[1]}`;
+
+    const densities = a.barFeatures.map(feature => feature.noteCount);
+    const maxDensity = Math.max(...densities, 1);
+    els.densityChart.innerHTML = '';
+
+    for (let i = densities.length; i < 8; i++) {
+      const empty = document.createElement('div');
+      empty.className = 'density-column';
+      empty.innerHTML = '<div class="density-empty"></div><div class="density-tag">·</div>';
+      els.densityChart.appendChild(empty);
+    }
+
+    densities.forEach((value, index) => {
+      const col = document.createElement('div');
+      col.className = 'density-column';
+      col.title = `${value} note onset${value === 1 ? '' : 's'}`;
+      const meter = document.createElement('div');
+      meter.className = 'density-meter';
+      const fill = document.createElement('div');
+      fill.className = 'density-fill';
+      fill.style.height = `${Math.max(value ? 8 : 2, (value / maxDensity) * 100)}%`;
+      meter.appendChild(fill);
+      const tag = document.createElement('div');
+      tag.className = 'density-tag';
+      tag.textContent = `-${densities.length - index}`;
+      col.append(meter, tag);
+      els.densityChart.appendChild(col);
+    });
+
+    els.densityCaption.textContent = `${round(densities.reduce((sum, v) => sum + v, 0) / densities.length, 1)} notes/bar avg`;
+    els.chordProgression.textContent = a.barFeatures.map(feature => feature.chord).join(' → ') || 'No stable pitched harmony detected.';
+
+    if (a.intervalStats.length) {
+      const total = a.intervalStats.reduce((sum, [, count]) => sum + count, 0);
+      els.intervalSummary.textContent = a.intervalStats.map(([interval, count]) => `${interval > 0 ? '+' : ''}${interval} st (${Math.round(count / total * 100)}%)`).join(' • ');
+    } else {
+      els.intervalSummary.textContent = 'No reliable melodic interval sequence detected.';
+    }
+
+    const v = a.velocity;
+    els.velocitySummary.textContent = `Mean ${Math.round(v.mean * 127)}/127 • spread ±${Math.round(v.sd * 127)} • range ${Math.round(v.min * 127)}–${Math.round(v.max * 127)}`;
+    els.continuationSummary.textContent = a.phrase.lag
+      ? `${a.phrase.lag}-bar phrase detected (${Math.round(a.phrase.score * 100)}% similarity). The wider transition model uses that recurrence as context, then introduces controlled melodic/voicing variation.`
+      : `No dominant short phrase. Nearest-state transition matching plus key-aware note variation will drive the continuation (${Math.round(a.phrase.score * 100)}% recurrence score).`;
+
+    els.workspaceSection.classList.remove('hidden');
+    els.trackCountBadge.textContent = `${a.activeTracks.length} active`;
+    els.tracksTable.innerHTML = '';
+    for (const track of a.activeTracks) {
+      const row = document.createElement('tr');
+      row.innerHTML = `<td><span class="track-name">${escapeHtml(track.name)}</span></td><td>${escapeHtml(track.instrument)}${track.percussion ? '<span class="drum-tag">DRUMS</span>' : ''}</td><td>${track.channel}</td><td>${track.notes.toLocaleString()}</td>`;
+      els.tracksTable.appendChild(row);
+    }
+    updatePlaybackTotal();
+  }
+
+  function setGenerationProgress(percent, status, done = false) {
+    els.generationPanel.classList.remove('hidden');
+    els.progressBar.style.width = `${clamp(percent, 0, 100)}%`;
+    els.progressLabel.textContent = `${Math.round(percent)}%`;
+    els.generationStatus.textContent = status;
+    els.spinner.classList.toggle('hidden', done);
+  }
+
+  // ---------------------------------------------------------------------------
+  // File input and parse flow
+  // ---------------------------------------------------------------------------
+  async function handleFile(file) {
+    if (!file) return;
+    try {
+      await ensureLibraries();
+      if (file.size > MAX_FILE_BYTES) throw new Error('That file is larger than 50 MB. Please choose a smaller MIDI.');
+      if (!/\.(mid|midi)$/i.test(file.name || '')) throw new Error('Please select a .mid or .midi file.');
+
+      stopPlayback();
+      state.file = file;
+      state.originalMidi = null;
+      state.extendedMidi = null;
+      state.analysis = null;
+      els.generateBtn.disabled = true;
+      els.downloadBtn.disabled = true;
+      els.previewExtendedBtn.disabled = true;
+      els.extensionResult.classList.add('hidden');
+      setGenerationProgress(12, 'Reading MIDI file…');
+      await nextPaint();
+
+      const buffer = await file.arrayBuffer();
+      let midi;
+      try { midi = new MidiCtor(buffer); }
+      catch (error) {
+        console.error(error);
+        throw new Error('This file could not be parsed as a valid Standard MIDI File. It may be corrupt or unsupported.');
+      }
+      if (!midi.tracks?.length) throw new Error('The MIDI parsed, but it contains no tracks.');
+
+      setGenerationProgress(48, 'Analyzing tempo, key, tracks and recent bars…');
+      await nextPaint();
+      const analysis = analyzeMidi(midi);
+
+      state.originalMidi = midi;
+      state.analysis = analysis;
+      state.previewMode = 'original';
+
+      els.fileName.textContent = file.name;
+      els.fileDetails.textContent = `${formatBytes(file.size)} • ${midi.tracks.length} track${midi.tracks.length === 1 ? '' : 's'} • ${formatTime(midi.duration)}`;
+      els.dropZone.classList.add('hidden');
+      els.fileInfo.classList.remove('hidden');
+      els.fileBadge.classList.remove('hidden');
+      els.generateBtn.disabled = false;
+      setPreviewMode('original');
+      renderAnalysis();
+      setGenerationProgress(100, 'Analysis complete — ready to extend.', true);
+      setRuntime('Engine ready');
+      showToast('MIDI loaded and analyzed successfully.', 'success');
+    } catch (error) {
+      console.error(error);
+      setRuntime('Engine error', 'error');
+      resetLoadedFile(false, true);
+      showToast(error.message || 'Unable to load that MIDI file.', 'error', 6000);
+    }
+  }
+
+  function resetLoadedFile(showPicker = false, preserveProgress = false) {
+    stopPlayback();
+    state.file = null;
+    state.originalMidi = null;
+    state.extendedMidi = null;
+    state.analysis = null;
+    state.extensionSequence = [];
+    els.fileInput.value = '';
+    els.fileInfo.classList.add('hidden');
+    els.fileBadge.classList.add('hidden');
+    els.dropZone.classList.remove('hidden');
+    els.generateBtn.disabled = true;
+    els.downloadBtn.disabled = true;
+    els.previewExtendedBtn.disabled = true;
+    els.extensionResult.classList.add('hidden');
+    els.workspaceSection.classList.add('hidden');
+    els.analysisContent.classList.add('hidden');
+    els.emptyAnalysis.classList.remove('hidden');
+    els.analysisWindowBadge.classList.add('hidden');
+    if (!preserveProgress) els.generationPanel.classList.add('hidden');
+    if (showPicker) setTimeout(() => els.fileInput.click(), 0);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Generate and download
+  // ---------------------------------------------------------------------------
+  async function generateExtension() {
+    if (!state.originalMidi || !state.analysis) return;
+    const requested = clamp(Math.floor(Number(els.barsInput.value) || 8), 1, 128);
+    els.barsInput.value = String(requested);
+    state.extensionBars = requested;
+    els.generateBtn.disabled = true;
+    els.downloadBtn.disabled = true;
+
+    try {
+      stopPlayback();
+      setGenerationProgress(12, 'Reviewing tempo, meter and key…');
+      await nextPaint();
+      setGenerationProgress(32, `Fingerprinting the final ${state.analysis.contextBars.length} bars…`);
+      await nextPaint();
+      setGenerationProgress(54, 'Matching phrase and transition patterns…');
+      await nextPaint();
+      setGenerationProgress(72, `Extending ${requested} bar${requested === 1 ? '' : 's'} across all active tracks…`);
+      await nextPaint();
+
+      const result = extendMidi(state.originalMidi, state.analysis, requested);
+      setGenerationProgress(93, 'Validating MIDI serialization…');
+      await nextPaint();
+
+      state.extendedMidi = result.midi;
+      state.extensionSequence = result.sequence;
+      els.previewExtendedBtn.disabled = false;
+      els.downloadBtn.disabled = false;
+      els.extensionResult.classList.remove('hidden');
+      const joinNote = result.trimmedJoinTicks > 0 ? ' • pickup silence trimmed at join' : ' • joined at final sounding note';
+      els.extensionResultText.textContent = `${requested} bars generated • ${formatTime(result.midi.duration)} total • ${result.generatedNotes.toLocaleString()} new notes • ${result.midi.tracks.length} tracks preserved${joinNote}`;
+      setGenerationProgress(100, 'Extension complete.', true);
+      setPreviewMode('extended');
+      showToast('Extended MIDI generated successfully.', 'success');
+    } catch (error) {
+      console.error(error);
+      setGenerationProgress(0, 'Generation failed.', true);
+      showToast(error.message || 'Could not generate the extension.', 'error', 6000);
+    } finally {
+      els.generateBtn.disabled = false;
+    }
+  }
+
+  function downloadExtendedMidi() {
+    if (!state.extendedMidi || !state.file) return;
+    try {
+      const bytes = state.extendedMidi.toArray();
+      const blob = new Blob([bytes], { type: 'audio/midi' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const stem = state.file.name.replace(/\.(mid|midi)$/i, '');
+      link.href = url;
+      link.download = `${stem}_extended_${state.extensionBars}bars.mid`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+      showToast('Extended MIDI download started.', 'success');
+    } catch (error) {
+      console.error(error);
+      showToast('Could not package the MIDI for download.', 'error');
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Tone.js preview playback
+  // ---------------------------------------------------------------------------
+  function currentPreviewMidi() {
+    return state.previewMode === 'extended' && state.extendedMidi ? state.extendedMidi : state.originalMidi;
+  }
+
+  function setPreviewMode(mode) {
+    if (mode === 'extended' && !state.extendedMidi) return;
+    if (state.previewMode !== mode) stopPlayback();
+    state.previewMode = mode;
+    els.previewOriginalBtn.classList.toggle('active', mode === 'original');
+    els.previewExtendedBtn.classList.toggle('active', mode === 'extended');
+    updatePlaybackTotal();
+  }
+
+  function updatePlaybackTotal() {
+    const midi = currentPreviewMidi();
+    els.playbackTotal.textContent = formatTime(midi?.duration || 0);
+  }
+
+  function createTrackSynth(track, activeCount) {
+    const percussion = isPercussionTrack(track);
+    const volume = -15 - Math.min(9, Math.log2(Math.max(1, activeCount)) * 2.3);
+    const family = String(track.instrument?.family || '').toLowerCase();
+    const oscillator = percussion ? 'square' : family.includes('bass') ? 'sine' : family.includes('reed') ? 'sawtooth' : 'triangle';
+    const envelope = percussion
+      ? { attack: .001, decay: .04, sustain: .01, release: .035 }
+      : { attack: .008, decay: .12, sustain: .25, release: .18 };
+    return new Tone.PolySynth(Tone.Synth, { volume, oscillator: { type: oscillator }, envelope }).toDestination();
+  }
+
+  function disposeSynths() {
+    state.playback.synths.forEach(synth => { try { synth.dispose(); } catch (_) {} });
+    state.playback.synths = [];
+  }
+
+  async function schedulePlayback(midi) {
+    stopPlayback();
+    await Tone.start();
+    Tone.Transport.cancel(0);
+    Tone.Transport.stop();
+    Tone.Transport.seconds = 0;
+
+    const activeTracks = midi.tracks.filter(track => track.notes.length);
+    let scheduledNotes = 0;
+    state.playback.noteLimitHit = false;
+
+    for (const track of activeTracks) {
+      const synth = createTrackSynth(track, activeTracks.length);
+      state.playback.synths.push(synth);
+      for (const note of track.notes) {
+        if (scheduledNotes >= MAX_PREVIEW_NOTES) { state.playback.noteLimitHit = true; break; }
+        const start = Math.max(0, note.time || 0);
+        const duration = clamp(note.duration || .08, .025, 12);
+        const velocity = clamp((note.velocity ?? .8) * .72, .02, 1);
+        Tone.Transport.schedule(time => {
+          try { synth.triggerAttackRelease(Tone.Frequency(note.midi, 'midi'), duration, time, velocity); } catch (_) {}
+        }, start);
+        scheduledNotes++;
+      }
+      if (state.playback.noteLimitHit) break;
+    }
+
+    state.playback.scheduled = true;
+    state.playback.midi = midi;
+    state.playback.duration = midi.duration || 0;
+    if (state.playback.noteLimitHit) showToast(`Preview capped at ${MAX_PREVIEW_NOTES.toLocaleString()} notes for browser performance. Export is not capped.`, 'info', 6000);
+  }
+
+  async function playPlayback() {
+    const midi = currentPreviewMidi();
+    if (!midi) return;
+    try {
+      await ensureLibraries();
+      if (!state.playback.scheduled || state.playback.midi !== midi) await schedulePlayback(midi);
+      await Tone.start();
+      Tone.Transport.start();
+      startPlaybackRaf();
+    } catch (error) {
+      console.error(error);
+      showToast('Playback could not start. Tap Play again in Safari/Chrome if audio was initially blocked.', 'error');
+    }
+  }
+
+  function pausePlayback() {
+    if (!state.playback.scheduled) return;
+    Tone.Transport.pause();
+    cancelAnimationFrame(state.playback.raf);
+  }
+
+  function stopPlayback() {
+    if (window.Tone) {
+      try { Tone.Transport.stop(); Tone.Transport.cancel(0); Tone.Transport.seconds = 0; } catch (_) {}
+    }
+    cancelAnimationFrame(state.playback.raf);
+    disposeSynths();
+    state.playback.scheduled = false;
+    state.playback.midi = null;
+    state.playback.duration = 0;
+    if (els.playbackProgress) els.playbackProgress.style.width = '0%';
+    if (els.playbackCurrent) els.playbackCurrent.textContent = '0:00';
+  }
+
+  function startPlaybackRaf() {
+    cancelAnimationFrame(state.playback.raf);
+    const tick = () => {
+      const current = Tone.Transport.seconds || 0;
+      const duration = state.playback.duration || 1;
+      els.playbackCurrent.textContent = formatTime(current);
+      els.playbackProgress.style.width = `${clamp((current / duration) * 100, 0, 100)}%`;
+      if (current >= duration && duration > 0) {
+        stopPlayback();
+        updatePlaybackTotal();
+        return;
+      }
+      state.playback.raf = requestAnimationFrame(tick);
+    };
+    state.playback.raf = requestAnimationFrame(tick);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Initialization and event bindings
+  // ---------------------------------------------------------------------------
+  async function init() {
+    const ids = [
+      'runtimeChip','runtimeDot','runtimeText','dropZone','fileInput','fileInfo','fileName','fileDetails','fileBadge','replaceFileBtn',
+      'barsInput','generateBtn','generationPanel','generationStatus','progressBar','progressLabel','spinner','emptyAnalysis','analysisContent',
+      'analysisWindowBadge','metaBpm','metaBars','metaKey','metaMeter','densityChart','densityCaption','chordProgression','intervalSummary',
+      'velocitySummary','continuationSummary','workspaceSection','tracksTable','trackCountBadge','previewOriginalBtn','previewExtendedBtn',
+      'playbackProgress','playbackCurrent','playbackTotal','playBtn','pauseBtn','stopBtn','extensionResult','extensionResultText','downloadBtn','toast'
+    ];
+    ids.forEach(id => { els[id] = $(id); });
+
+    els.dropZone.addEventListener('click', () => els.fileInput.click());
+    els.dropZone.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); els.fileInput.click(); }
+    });
+    els.fileInput.addEventListener('change', event => handleFile(event.target.files?.[0]));
+    els.replaceFileBtn.addEventListener('click', () => resetLoadedFile(true));
+
+    ['dragenter','dragover'].forEach(type => els.dropZone.addEventListener(type, event => {
+      event.preventDefault(); event.stopPropagation(); els.dropZone.classList.add('drop-active');
+    }));
+    ['dragleave','drop'].forEach(type => els.dropZone.addEventListener(type, event => {
+      event.preventDefault(); event.stopPropagation(); els.dropZone.classList.remove('drop-active');
+    }));
+    els.dropZone.addEventListener('drop', event => handleFile(event.dataTransfer?.files?.[0]));
+    window.addEventListener('dragover', event => event.preventDefault());
+    window.addEventListener('drop', event => event.preventDefault());
+
+    els.barsInput.addEventListener('change', () => {
+      els.barsInput.value = String(clamp(Math.floor(Number(els.barsInput.value) || 8), 1, 128));
+    });
+    els.generateBtn.addEventListener('click', generateExtension);
+    els.downloadBtn.addEventListener('click', downloadExtendedMidi);
+    els.previewOriginalBtn.addEventListener('click', () => setPreviewMode('original'));
+    els.previewExtendedBtn.addEventListener('click', () => setPreviewMode('extended'));
+    els.playBtn.addEventListener('click', playPlayback);
+    els.pauseBtn.addEventListener('click', pausePlayback);
+    els.stopBtn.addEventListener('click', stopPlayback);
+    window.addEventListener('beforeunload', stopPlayback);
+
+    try {
+      setRuntime('Loading engine…', 'waiting');
+      await ensureLibraries();
+      setRuntime('Engine ready');
+    } catch (error) {
+      console.error(error);
+      setRuntime('Libraries unavailable', 'error');
+      showToast(error.message, 'error', 9000);
+    }
+
+    // Small public diagnostic hook used only for automated smoke-testing.
+    window.MidiContinuum = {
+      version: '3.0.0',
+      getState: () => ({ loaded: Boolean(state.originalMidi), extended: Boolean(state.extendedMidi), previewMode: state.previewMode }),
+      parseAndAnalyze: arrayBuffer => {
+        if (!MidiCtor) throw new Error('MIDI library unavailable');
+        const midi = new MidiCtor(arrayBuffer);
+        return analyzeMidi(midi);
+      }
+    };
+  }
+
+  document.addEventListener('DOMContentLoaded', init, { once: true });
+})();
+</script>
+</body>
+</html>

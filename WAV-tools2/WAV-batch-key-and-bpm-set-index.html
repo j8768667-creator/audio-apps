@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FFT Phase Vocoder Batch Processor</title>
+    <style>
+        body { background: #0f172a; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; padding: 30px; max-width: 900px; margin: 0 auto; }
+        h1 { color: #38bdf8; border-bottom: 2px solid #1e293b; padding-bottom: 12px; margin-bottom: 30px; font-weight: 800; }
+        .grid-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; background: #1e293b; padding: 25px; border-radius: 12px; margin-bottom: 30px; border: 1px solid #334155; }
+        .field { display: flex; flex-direction: column; }
+        label { font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; color: #94a3b8; }
+        input, select { background: #0f172a; border: 1px solid #475569; padding: 12px; border-radius: 6px; color: #fff; font-size: 1rem; outline: none; }
+        input:focus, select:focus { border-color: #38bdf8; }
+        .dropzone { border: 2px dashed #38bdf8; background: #1e293b; padding: 40px; text-align: center; border-radius: 12px; cursor: pointer; margin-bottom: 30px; font-size: 1.1rem; }
+        .dropzone:hover { background: #24344d; }
+        .btn-action { background: #38bdf8; color: #0f172a; border: none; padding: 16px; font-size: 1.1rem; font-weight: 800; border-radius: 6px; cursor: pointer; width: 100%; text-transform: uppercase; letter-spacing: 0.05em; }
+        .btn-action:hover { background: #7dd3fc; }
+        #logPanel { margin-top: 30px; background: #1e293b; border-radius: 12px; padding: 20px; border: 1px solid #334155; display: none; }
+        .track-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #334155; }
+        .track-row:last-child { border-bottom: none; }
+        .status-badge { font-weight: bold; font-size: 0.85rem; padding: 4px 8px; border-radius: 4px; text-transform: uppercase; }
+        .status-badge.wait { background: #eab30822; color: #eab308; }
+        .status-badge.run { background: #3b82f622; color: #3b82f6; }
+        .dl-link { background: #10b981; color: #fff; padding: 6px 12px; font-size: 0.85rem; text-decoration: none; border-radius: 4px; font-weight: bold; }
+        .dl-link:hover { background: #059669; }
+    </style>
+</head>
+<body>
+
+    <h1>FFT Phase Vocoder Batch Processor</h1>
+
+    <div class="grid-panel">
+        <div class="field">
+            <label for="outBpm">Target Global BPM</label>
+            <input type="number" id="outBpm" value="120" min="40" max="250">
+        </div>
+        <div class="field">
+            <label for="pitchShift">Independent Pitch Adjustment</label>
+            <select id="pitchShift">
+                <option value="-12">-12 Semitones (Octave Down)</option>
+                <option value="-5">-5 Semitones (Perfect 4th Down)</option>
+                <option value="-2">-2 Semitones (Whole Step Down)</option>
+                <option value="0" selected>0 Semitones (No Pitch Shift)</option>
+                <option value="2">+2 Semitones (Whole Step Up)</option>
+                <option value="5">+5 Semitones (Perfect 4th Up)</option>
+                <option value="12">+12 Semitones (Octave Up)</option>
+            </select>
+        </div>
+        <div class="field" style="grid-column: span 2;">
+            <label for="inBpm">Assumed Input WAV Tempo</label>
+            <input type="number" id="inBpm" value="100" min="40" max="250">
+        </div>
+    </div>
+
+    <div class="dropzone" onclick="document.getElementById('wavInput').click()">
+        📂 Drop or click to load target WAV mix files
+        <input type="file" id="wavInput" multiple accept="audio/wav" style="display:none">
+    </div>
+
+    <button class="btn-action" id="execBtn">Execute Phase Vocoder Processing</button>
+
+    <div id="logPanel">
+        <h3 style="margin-top:0; color:#94a3b8;">Vocoder Process Queue</h3>
+        <div id="queueBox"></div>
+    </div>
+        <script>
+        let audioContext = null;
+        let activeQueue = [];
+
+        document.getElementById('wavInput').addEventListener('change', (e) => {
+            const chosen = e.target.files;
+            if(!chosen.length) return;
+            
+            document.getElementById('logPanel').style.display = 'block';
+            const box = document.getElementById('queueBox');
+            box.innerHTML = '';
+            activeQueue = [];
+
+            for(let i=0; i<chosen.length; i++) {
+                activeQueue.push({ file: chosen[i], idx: i });
+                const item = document.createElement('div');
+                item.className = 'track-row';
+                item.id = `row-${i}`;
+                item.innerHTML = `
+                    <span>${chosen[i].name}</span>
+                    <span class="status-badge wait" id="badge-${i}">Waiting</span>
+                `;
+                box.appendChild(item);
+            }
+        });
+
+        document.getElementById('execBtn').addEventListener('click', async () => {
+            if(!activeQueue.length) return alert("Please populate the file queue first.");
+            if(!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+            const srcTempo = parseFloat(document.getElementById('inBpm').value);
+            const dstTempo = parseFloat(document.getElementById('outBpm').value);
+            const semiDelta = parseInt(document.getElementById('pitchShift').value);
+
+            const timeScale = srcTempo / dstTempo; 
+            const pitchScale = Math.pow(2, semiDelta / 12); 
+
+            for(let track of activeQueue) {
+                const badge = document.getElementById(`badge-${track.idx}`);
+                badge.textContent = "Processing";
+                badge.className = "status-badge run";
+
+                try {
+                    const rawArr = await track.file.arrayBuffer();
+                    const inBuf = await audioContext.decodeAudioData(rawArr);
+                    
+                    const outBuf = runPhaseVocoder(inBuf, timeScale, pitchScale);
+                    
+                    const blobOut = buildWavFormat(outBuf);
+                    const fileUrl = URL.createObjectURL(blobOut);
+
+                    document.getElementById(`row-${track.idx}`).innerHTML = `
+                        <span>${track.file.name}</span>
+                        <a class="dl-link" href="${fileUrl}" download="vocoded_${dstTempo}bpm_${track.file.name}">Download File</a>
+                    `;
+                } catch(ex) {
+                    console.error(ex);
+                    badge.textContent = "Failed";
+                }
+            }
+        });
+
+        function runPhaseVocoder(srcBuf, timeScale, pitchScale) {
+            const sr = srcBuf.sampleRate;
+            const chans = srcBuf.numberOfChannels;
+            
+            const destLength = Math.floor(srcBuf.length / timeScale);
+            const outBuf = audioContext.createBuffer(chans, destLength, sr);
+
+            const fftSize = 2048;
+            const synthesisHop = 512;
+            const analysisHop = Math.floor(synthesisHop * timeScale);
+
+            const windowArr = new Float32Array(fftSize);
+            for(let i=0; i<fftSize; i++) {
+                windowArr[i] = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (fftSize - 1)));
+            }
+
+            for(let ch=0; ch<chans; ch++) {
+                const srcData = srcBuf.getChannelData(ch);
+                const dstData = outBuf.getChannelData(ch);
+
+                let phaseAccumulator = new Float32Array(fftSize);
+                let previousPhase = new Float32Array(fftSize);
+
+                let aPos = 0; 
+                let sPos = 0; 
+
+                while(aPos + fftSize < srcData.length && sPos + fftSize < destLength) {
+                    let timeReal = new Float32Array(fftSize);
+                    let timeImag = new Float32Array(fftSize);
+                    for(let i=0; i<fftSize; i++) {
+                        timeReal[i] = srcData[aPos + i] * windowArr[i];
+                    }
+
+                    simpleFFT(timeReal, timeImag, false);
+
+                    let synthReal = new Float32Array(fftSize);
+                    let synthImag = new Float32Array(fftSize);
+
+                    for(let k=0; k<=fftSize/2; k++) {
+                        const mag = Math.sqrt(timeReal[k]*timeReal[k] + timeImag[k]*timeImag[k]);
+                        const phase = Math.atan2(timeImag[k], timeReal[k]);
+
+                        let deltaPhase = phase - previousPhase[k];
+                        previousPhase[k] = phase;
+
+                        let expectedAdvance = (k * 2 * Math.PI * analysisHop) / fftSize;
+                        deltaPhase -= expectedAdvance;
+                        let mapPhase = Math.atan2(Math.sin(deltaPhase), Math.cos(deltaPhase));
+
+                        let trueFreq = (k * 2 * Math.PI / fftSize) + (mapPhase / analysisHop);
+                        phaseAccumulator[k] += synthesisHop * trueFreq;
+
+                        let targetBin = Math.floor(k * pitchScale);
+                        if(targetBin <= fftSize/2) {
+                            synthReal[targetBin] += mag * Math.cos(phaseAccumulator[k]);
+                            synthImag[targetBin] += mag * Math.sin(phaseAccumulator[k]);
+                        }
+                    }
+
+                    simpleFFT(synthReal, synthImag, true);
+
+                    for(let i=0; i<fftSize; i++) {
+                        if(sPos + i < destLength) {
+                            dstData[sPos + i] += synthReal[i] * windowArr[i] * (synthesisHop / fftSize) * 2;
+                        }
+                    }
+
+                    aPos += analysisHop;
+                    sPos += synthesisHop;
+                }
+            }
+            return outBuf;
+        }
+
+        function simpleFFT(real, imag, inverse) {
+            const n = real.length;
+            let bits = Math.log2(n);
+            
+            for (let i = 0; i < n; i++) {
+                let j = 0;
+                for (let b = 0; b < bits; b++) {
+                    if ((i >> b) & 1) j |= (1 << (bits - 1 - b));
+                }
+                if (i < j) {
+                    let tR = real[i], tI = imag[i];
+                    real[i] = real[j]; imag[i] = imag[j];
+                    real[j] = tR; imag[j] = tI;
+                }
+            }
+
+            for (let len = 2; len <= n; len <<= 1) {
+                let ang = (2 * Math.PI / len) * (inverse ? -1 : 1);
+                let wlenR = Math.cos(ang), wlenI = Math.sin(ang);
+                for (let i = 0; i < n; i += len) {
+                    let wR = 1, wI = 0;
+                    for (let j = 0; j < len / 2; j++) {
+                        let uR = real[i + j], uI = imag[i + j];
+                        let tR = real[i + j + len / 2] * wR - imag[i + j + len / 2] * wI;
+                        let tI = real[i + j + len / 2] * wI + imag[i + j + len / 2] * wR;
+                        real[i + j] = uR + tR;
+                        imag[i + j] = uI + tI;
+                        real[i + j + len / 2] = uR - tR;
+                        imag[i + j + len / 2] = uI - tI;
+                        let nextWR = wR * wlenR - wI * wlenI;
+                        wI = wR * wlenI + wI * wlenR;
+                        wR = nextWR;
+                    }
+                }
+            }
+
+            if (inverse) {
+                for (let i = 0; i < n; i++) {
+                    real[i] /= n;
+                    imag[i] /= n;
+                }
+            }
+        }
+
+        function buildWavFormat(buffer) {
+            const numCh = buffer.numberOfChannels;
+            const fullLen = buffer.length * numCh * 2 + 44;
+            const binArr = new ArrayBuffer(fullLen);
+            const view = new DataView(binArr);
+            let p = 0;
+
+            const u32 = (v) => { view.setUint32(p, v, true); p += 4; };
+            const u16 = (v) => { view.setUint16(p, v, true); p += 2; };
+
+            u32(0x46464952); // "RIFF"
+            u32(fullLen - 8); 
+            u32(0x45564157); // "WAV"
+            u32(0x20746d66); // "fmt "
+            u32(16); u16(1); u16(numCh);
+            u32(buffer.sampleRate);
+            u32(buffer.sampleRate * 2 * numCh);
+            u16(numCh * 2); u16(16);
+            u32(0x61746164); // "data"
+            u32(fullLen - p - 4);
+
+            const dataChannels = [];
+            for (let c = 0; c < numCh; c++) dataChannels.push(buffer.getChannelData(c));
+
+            for (let s = 0; s < buffer.length; s++) {
+                for (let c = 0; c < numCh; c++) {
+                    let smp = Math.max(-1, Math.min(1, dataChannels[c][s]));
+                    smp = smp < 0 ? smp * 0x8000 : smp * 0x7FFF;
+                    view.setInt16(p, smp, true);
+                    p += 2;
+                }
+            }
+            return new Blob([binArr], { type: 'audio/wav' });
+        }
+    </script>
+</body>
+</html>

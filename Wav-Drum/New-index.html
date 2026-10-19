@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Audio Transient to MIDI Converter</title>
+  <script src="https://cdn.jsdelivr.net/npm/midi-writer-js@2.1.4/build/index.browser.min.js"></script>
+  <style>
+    :root {
+      --bg-color: #121214;
+      --card-bg: #1e1e24;
+      --accent-color: #6366f1;
+      --accent-hover: #4f46e5;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+      --border-color: #2e2e38;
+    }
+
+    * {
+      box-sizing: border-box;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      margin: 0;
+      padding: 24px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 650px;
+      background-color: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+    }
+
+    h1 {
+      margin: 0 0 8px 0;
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+
+    p.subtitle {
+      margin: 0 0 20px 0;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    .upload-box {
+      border: 2px dashed var(--border-color);
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      background-color: rgba(255, 255, 255, 0.02);
+      margin-bottom: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* Native visible file input styled directly to ensure iOS gesture registration */
+    input[type="file"] {
+      width: 100%;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      padding: 8px;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      background-color: var(--bg-color);
+    }
+
+    input[type="file"]::-webkit-file-upload-button {
+      background: var(--accent-color);
+      border: none;
+      color: white;
+      padding: 8px 16px;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-right: 12px;
+    }
+
+    .controls {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .control-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    input[type="range"], select {
+      width: 100%;
+      background-color: var(--bg-color);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 10px;
+      border-radius: 8px;
+      outline: none;
+      font-size: 1rem;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 8px;
+      border: none;
+      border-radius: 4px;
+      padding: 0;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--accent-color);
+      cursor: pointer;
+    }
+
+    .status-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: var(--bg-color);
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 0.9rem;
+    }
+
+    .status-badge {
+      font-weight: 600;
+      color: var(--accent-color);
+    }
+
+    .action-btn {
+      width: 100%;
+      padding: 14px;
+      background-color: var(--accent-color);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+
+    .action-btn:hover:not(:disabled) {
+      background-color: var(--accent-hover);
+    }
+
+    .action-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>Drum Audio to MIDI</h1>
+    <p class="subtitle">Upload a drum file (.wav, .mp3) to detect transients and generate MIDI.</p>
+
+    <div class="upload-box">
+      <!-- Direct visible input with NO restrictive accept filter to guarantee iOS native picker launches -->
+      <input type="file" id="fileInput">
+    </div>
+
+    <div class="controls">
+      <div class="control-group">
+        <div class="control-header">
+          <label for="threshold">Energy Threshold</label>
+          <span id="thresholdVal">0.10</span>
+        </div>
+        <input type="range" id="threshold" min="0.01" max="0.5" step="0.01" value="0.10">
+      </div>
+
+      <div class="control-group">
+        <div class="control-header">
+          <label for="debounce">Debounce Time</label>
+          <span id="debounceVal">50 ms</span>
+        </div>
+        <input type="range" id="debounce" min="10" max="100" step="1" value="50">
+      </div>
+
+      <div class="control-group">
+        <div class="control-header">
+          <label for="midiNote">Target MIDI Note</label>
+        </div>
+        <select id="midiNote">
+          <option value="36" selected>36 - Kick Drum (C1)</option>
+          <option value="38">38 - Snare Drum (D1)</option>
+          <option value="42">42 - Closed Hi-Hat (F#1)</option>
+          <option value="46">46 - Open Hi-Hat (A#1)</option>
+          <option value="49">49 - Crash Cymbal (C#2)</option>
+          <option value="51">51 - Ride Cymbal (D#2)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="status-container">
+      <span>Status</span>
+      <span class="status-badge" id="statusText">Ready</span>
+    </div>
+
+    <button id="downloadBtn" class="action-btn" disabled>Download MIDI</button>
+  </div>
+
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const thresholdSlider = document.getElementById('threshold');
+    const thresholdVal = document.getElementById('thresholdVal');
+    const debounceSlider = document.getElementById('debounce');
+    const debounceVal = document.getElementById('debounceVal');
+    const midiNoteSelect = document.getElementById('midiNote');
+    const statusText = document.getElementById('statusText');
+    const downloadBtn = document.getElementById('downloadBtn');
+
+    let audioCtx = null;
+    let audioBuffer = null;
+    let detectedHits = [];
+
+    function initAudioContext() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    thresholdSlider.addEventListener('input', (e) => {
+      thresholdVal.textContent = parseFloat(e.target.value).toFixed(2);
+      processAudio();
+    });
+
+    debounceSlider.addEventListener('input', (e) => {
+      debounceVal.textContent = `${e.target.value} ms`;
+      processAudio();
+    });
+
+    fileInput.addEventListener('change', (e) => {
+      initAudioContext();
+      if (e.target.files && e.target.files.length > 0) {
+        handleFile(e.target.files[0]);
+      }
+    });
+
+    function handleFile(file) {
+      statusText.textContent = 'Decoding...';
+      downloadBtn.disabled = true;
+
+      const reader = new FileReader();
+
+      reader.onload = function(e) {
+        initAudioContext();
+        const arrayBuffer = e.target.result;
+
+        audioCtx.decodeAudioData(
+          arrayBuffer,
+          (decodedData) => {
+            audioBuffer = decodedData;
+            processAudio();
+          },
+          (err) => {
+            statusText.textContent = 'Error decoding audio';
+            console.error('Audio decode error:', err);
+          }
+        );
+      };
+
+      reader.onerror = (err) => {
+        statusText.textContent = 'File read error';
+        console.error('FileReader error:', err);
+      };
+
+      reader.readAsArrayBuffer(file);
+    }
+
+    function processAudio() {
+      if (!audioBuffer) return;
+
+      statusText.textContent = 'Analyzing...';
+
+      const channelData = audioBuffer.getChannelData(0);
+      const sampleRate = audioBuffer.sampleRate;
+      const frameSize = 512;
+      const threshold = parseFloat(thresholdSlider.value);
+      const debounceSec = parseFloat(debounceSlider.value) / 1000;
+
+      detectedHits = [];
+      let lastHitTime = -debounceSec;
+
+      for (let i = 0; i < channelData.length; i += frameSize) {
+        let maxPeak = 0;
+        const limit = Math.min(i + frameSize, channelData.length);
+
+        for (let j = i; j < limit; j++) {
+          const abs = Math.abs(channelData[j]);
+          if (abs > maxPeak) maxPeak = abs;
+        }
+
+        const currentTime = i / sampleRate;
+
+        if (maxPeak >= threshold && (currentTime - lastHitTime) >= debounceSec) {
+          const velocity = Math.min(127, Math.max(1, Math.round(maxPeak * 127)));
+          detectedHits.push({
+            time: currentTime,
+            velocity: velocity
+          });
+          lastHitTime = currentTime;
+        }
+      }
+
+      statusText.textContent = `Done (${detectedHits.length} hits found)`;
+      downloadBtn.disabled = detectedHits.length === 0;
+    }
+
+    downloadBtn.addEventListener('click', () => {
+      if (detectedHits.length === 0) return;
+
+      const track = new MidiWriter.Track();
+      track.setTempo(120);
+
+      const midiNote = parseInt(midiNoteSelect.value, 10);
+      let previousTime = 0;
+
+      detectedHits.forEach(hit => {
+        const deltaSeconds = hit.time - previousTime;
+        const ticks = Math.max(1, Math.round(deltaSeconds * 128));
+
+        track.addEvent(new MidiWriter.NoteEvent({
+          pitch: [midiNote],
+          duration: 'T' + 16,
+          wait: 'T' + ticks,
+          velocity: hit.velocity
+        }));
+
+        previousTime = hit.time;
+      });
+
+      const write = new MidiWriter.Writer(track);
+
+      try {
+        const blob = new Blob([write.buildFile()], { type: 'audio/midi' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'detected_transients.mid';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } catch (err) {
+        const base64Uri = 'data:audio/midi;base64,' + write.base64();
+        window.open(base64Uri, '_blank');
+      }
+    });
+  </script>
+</body>
+</html>

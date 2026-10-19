@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<title>Granular Soundscape Studio — Grain Engine, Presets &amp; WAV Capture</title>
+<meta name="description" content="Micro-granular soundscape generator with live delay, procedural reverb, XY pad, bitcrush, grain reversal, position freeze and true lossless WAV capture." />
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  html, body, button, a, input, select, textarea {
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  html, body { margin:0; padding:0; background:#07080c; overscroll-behavior:none; }
+  .app { min-height: 100dvh; }
+  input[type=range] { -webkit-appearance:none; appearance:none; height:34px; background:transparent; }
+  input[type=range]::-webkit-slider-runnable-track { height:8px; border-radius:99px; background:#1e2431; }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance:none; width:30px; height:30px; margin-top:-11px; border-radius:50%;
+    background:#e7fb62; border:3px solid #07080c; box-shadow:0 0 16px rgba(231,251,98,.55);
+  }
+  .panel { background:linear-gradient(180deg,#11141c,#0b0d13); border:1px solid #222839; }
+  .rec-dot { animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+</style>
+</head>
+<body class="text-slate-100 antialiased">
+<main class="app w-full flex flex-col p-3 gap-3 select-none" style="padding-top:max(0.75rem,env(safe-area-inset-top));padding-bottom:max(0.75rem,env(safe-area-inset-bottom))">
+
+  <header class="panel rounded-2xl px-4 py-2 flex items-center gap-4 shrink-0">
+    <h1 class="text-lg font-black tracking-tight text-[#e7fb62]">GRANULAR<span class="text-slate-100">·SOUNDSCAPE</span></h1>
+    <span id="status" class="text-xs font-mono text-slate-400">tap ENGAGE to start audio</span>
+    <div class="ml-auto flex items-center gap-2">
+      <label for="audio-upload" class="text-xs font-bold px-3 py-2 rounded-xl bg-[#1b2130] border border-[#2b3346] active:bg-[#232b3d]">LOAD SOURCE</label>
+      <input class="hidden" type="file" id="audio-upload" accept="audio/*,.wav,.mp3,.m4a,.aac,.ogg,.flac" />
+      <button id="preview" class="text-xs font-black px-3 py-2 rounded-xl bg-[#1b2130] border border-[#2b3346] active:scale-95">PREVIEW SOURCE</button>
+      <button id="freeze" class="text-xs font-black px-3 py-2 rounded-xl bg-[#1b2130] border border-[#2b3346] active:scale-95">FREEZE</button>
+      <button id="engage" class="text-xs font-black px-4 py-2 rounded-xl bg-[#e7fb62] text-black active:scale-95">ENGAGE</button>
+    </div>
+  </header>
+
+  <section class="panel rounded-2xl px-4 py-2 flex items-center gap-2 shrink-0 flex-wrap">
+    <h2 class="text-[11px] font-bold tracking-widest text-slate-400">PRESETS</h2>
+    <select id="preset-select" class="text-xs font-mono px-3 py-2 rounded-xl bg-[#1b2130] border border-[#2b3346] text-slate-100 min-w-56"></select>
+    <button id="preset-save" class="text-xs font-black px-3 py-2 rounded-xl bg-[#e7fb62] text-black active:scale-95">SAVE CURRENT</button>
+    <button id="preset-delete" disabled class="text-xs font-black px-3 py-2 rounded-xl bg-[#1b2130] border border-[#2b3346] disabled:opacity-40 active:scale-95">DELETE</button>
+    <span class="text-[10px] font-mono text-slate-500">saved on this device — recalls every grain &amp; space setting</span>
+  </section>
+
+  <section class="flex-1 grid grid-cols-12 grid-rows-2 gap-3 min-h-0">
+
+    <article class="panel rounded-2xl col-span-5 row-span-2 p-3 flex flex-col min-h-0">
+      <h2 class="text-[11px] font-bold tracking-widest text-slate-400 mb-2">XY CLOUD — DRAG TO SCATTER GRAINS</h2>
+      <div id="xy" class="relative flex-1 rounded-xl bg-[#0a0c12] border border-[#222839] overflow-hidden touch-none">
+        <canvas id="cloud" class="absolute inset-0 w-full h-full"></canvas>
+        <div id="puck" class="absolute w-14 h-14 -ml-7 -mt-7 rounded-full bg-[#e7fb62]/20 border-2 border-[#e7fb62] pointer-events-none" style="left:50%;top:50%"></div>
+        <div class="absolute bottom-2 left-3 text-[10px] font-mono text-slate-500">X → POSITION &nbsp; Y → PITCH</div>
+      </div>
+    </article>
+
+    <article class="panel rounded-2xl col-span-4 p-3 flex flex-col gap-1 min-h-0 overflow-y-auto">
+      <h2 class="text-[11px] font-bold tracking-widest text-slate-400">GRAIN ENGINE</h2>
+      <div data-ctl><label class="text-xs font-mono flex justify-between"><span>DENSITY</span><b id="v-density">24 g/s</b></label>
+        <input id="density" type="range" min="2" max="80" step="1" value="24" class="w-full" /></div>
+      <div data-ctl><label class="text-xs font-mono flex justify-between"><span>GRAIN SIZE</span><b id="v-size">120 ms</b></label>
+        <input id="size" type="range" min="15" max="600" step="5" value="120" class="w-full" /></div>
+      <div data-ctl><label class="text-xs font-mono flex justify-between"><span>SPRAY</span><b id="v-spray">0.15</b></label>
+        <input id="spray" type="range" min="0" max="1" step="0.01" value="0.15" class="w-full" /></div>
+      <div data-ctl><label class="text-xs font-mono flex justify-between"><span>DETUNE</span><b id="v-detune">200 c</b></label>
+        <input id="detune" type="range" min="0" max="1200" step="10" value="200" class="w-full" /></div>
+      <div data-ctl><label class="text-xs font-mono flex justify-between"><span>REVERSE</span><b id="v-reverse">0.00</b></label>
+        <input id="reverse" type="range" min="0" max="1" step="0.01" value="0" class="w-full" /></div>
+      <div data-ctl><label class="text-xs font-mono flex justify-between"><span>SPEED</span><b id="v-speed">0.00x</b></label>
+        <input id="speed" type="range" min="-2" max="2" step="0.05" value="0" class="w-full" /></div>
+      <div data-ctl><label class="text-xs font-mono flex justify-between"><span>CRUSH</span><b id="v-crush">0.00</b></label>
+        <input id="crush" type="range" min="0" max="1" step="0.01" value="0" class="w-full" /></div>
+    </article>
+
+    <article class="panel rounded-2xl col-span-3 p-3 flex flex-col gap-1 min-h-0 overflow-y-auto">
+      <h2 class="text-[11px] font-bold tracking-widest text-slate-400">SPACE RACK</h2>
+      <div data-ctl><label class="text-xs font-mono flex justify-between"><span>DELAY</span><b id="v-dtime">380 ms</b></label>
+        <input id="dtime" type="range" min="20" max="1200" step="10" value="380" class="w-full" /></div>
+      <div data-ctl><label class="text-xs font-mono flex justify-between"><span>FEEDBACK</span><b id="v-fb">0.45</b></label>
+        <input id="fb" type="range" min="0" max="0.92" step="0.01" value="0.45" class="w-full" /></div>
+      <div data-ctl><label class="text-xs font-mono flex justify-between"><span>REVERB</span><b id="v-wet">0.55</b></label>
+        <input id="wet" type="range" min="0" max="1" step="0.01" value="0.55" class="w-full" /></div>
+      <div data-ctl><label class="text-xs font-mono flex justify-between"><span>SMEAR</span><b id="v-smear">0.00</b></label>
+        <input id="smear" type="range" min="0" max="1" step="0.01" value="0" class="w-full" /></div>
+      <div data-ctl><label class="text-xs font-mono flex justify-between"><span>MASTER</span><b id="v-master">0.80</b></label>
+        <input id="master" type="range" min="0" max="1" step="0.01" value="0.8" class="w-full" /></div>
+    </article>
+
+    <article class="panel rounded-2xl col-span-4 p-3 flex flex-col min-h-0">
+      <h2 class="text-[11px] font-bold tracking-widest text-slate-400 mb-2">SPECTRUM</h2>
+      <canvas id="scope" class="flex-1 w-full rounded-xl bg-[#0a0c12] border border-[#222839]"></canvas>
+    </article>
+
+    <article class="panel rounded-2xl col-span-3 p-3 flex flex-col gap-2 min-h-0">
+      <h2 class="text-[11px] font-bold tracking-widest text-slate-400">SESSION RECORDER</h2>
+      <button id="rec" class="flex-1 rounded-xl bg-[#ff3b5c] text-black font-black text-sm active:scale-95">START RECORDING</button>
+      <button id="stop" disabled class="flex-1 rounded-xl bg-[#1b2130] border border-[#2b3346] font-black text-sm disabled:opacity-40 active:scale-95">STOP &amp; SAVE</button>
+      <a id="dl" class="hidden text-center text-xs font-bold px-3 py-3 rounded-xl bg-[#e7fb62] text-black" download="soundscape-session.wav">DOWNLOAD TAKE</a>
+      <p id="rtime" class="text-[11px] font-mono text-slate-500 text-center">00:00</p>
+    </article>
+
+  </section>
+</main>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const status = $("status");
+
+  const P = { density:24, size:120, spray:0.15, detune:200, pos:0.5, pitch:1, dtime:0.38, fb:0.45, wet:0.55, master:0.8, reverse:0, crush:0, smear:0, speed:0 };
+  let ctx=null, nodes=null, buffer=null, reversedBuffer=null, running=false, timer=null, frozen=false;
+  let scanOffset=0, lastTickTime=null;
+
+  // Reversing the whole source once (rather than reversing each grain's tiny
+  // slice at spawn time) keeps spawnGrain() cheap even at high density.
+  function reverseBuffer(ac, buf){
+    const rev = ac.createBuffer(buf.numberOfChannels, buf.length, buf.sampleRate);
+    for(let c=0;c<buf.numberOfChannels;c++){
+      const src = buf.getChannelData(c), dst = rev.getChannelData(c);
+      for(let i=0;i<buf.length;i++) dst[i] = src[buf.length-1-i];
+    }
+    return rev;
+  }
+  function setBuffer(buf){
+    buffer = buf;
+    reversedBuffer = ctx ? reverseBuffer(ctx, buf) : null;
+  }
+
+  /* ---------- procedural impulse response ---------- */
+  function makeIR(ac, seconds=3.6, decay=2.6){
+    const len = Math.floor(ac.sampleRate*seconds);
+    const ir = ac.createBuffer(2, len, ac.sampleRate);
+    for(let c=0;c<2;c++){
+      const d = ir.getChannelData(c);
+      for(let i=0;i<len;i++){
+        const t = i/len;
+        d[i] = (Math.random()*2-1) * Math.pow(1-t, decay) * (1 - t*0.15);
+      }
+    }
+    return ir;
+  }
+
+  /* ---------- bitcrush curve ---------- */
+  // amount 0..1 maps to bit depth ~16 (transparent) down to ~3 (heavily crushed)
+  function makeCrushCurve(amount){
+    const bits = 16 - amount*13;
+    const steps = Math.pow(2, bits);
+    const curve = new Float32Array(1024);
+    for(let i=0;i<1024;i++){
+      const x = (i/1023)*2-1;
+      curve[i] = Math.round(x*steps)/steps;
+    }
+    return curve;
+  }
+
+  /* ---------- spectral smear ---------- */
+  // A true spectral smear (blurring magnitude/phase per FFT bin) needs an
+  // AudioWorklet doing FFT frame-by-frame — heavier than fits here. This is
+  // a real-time approximation that gets the same perceptual result: split
+  // the signal into several frequency bands, run each through its own
+  // short modulated delay with internal feedback (so transients diffuse
+  // into a blurred trail independently per band), then sum. The result
+  // smears attacks across time in a frequency-dependent way, which reads
+  // as "spectral" even without doing FFT math.
+  function makeSmearNetwork(ac){
+    const input = ac.createGain();
+    const output = ac.createGain();
+    const bandFreqs = [350, 900, 2200, 5200];
+    bandFreqs.forEach((f, i) => {
+      const bp = ac.createBiquadFilter(); bp.type = "bandpass"; bp.frequency.value = f; bp.Q.value = 1.1;
+      const del = ac.createDelay(1.0); del.delayTime.value = 0.02 + i*0.014;
+      const feedback = ac.createGain(); feedback.gain.value = 0.4;
+      const tapOut = ac.createGain(); tapOut.gain.value = 0.7;
+
+      // A slow LFO per band wobbles its delay time — this is what turns a
+      // static echo into an evolving, blurred smear instead of a repeat.
+      const lfo = ac.createOscillator();
+      lfo.frequency.value = 0.04 + i*0.035;
+      const lfoDepth = ac.createGain(); lfoDepth.gain.value = 0.007 + i*0.002;
+      lfo.connect(lfoDepth); lfoDepth.connect(del.delayTime);
+      lfo.start();
+
+      input.connect(bp);
+      bp.connect(del);
+      del.connect(feedback); feedback.connect(del);
+      del.connect(tapOut);
+      tapOut.connect(output);
+    });
+    return { input, output };
+  }
+
+  /* ---------- tone fallback source ---------- */
+  function makeDefaultBuffer(ac){
+    const len = Math.floor(ac.sampleRate*4), b = ac.createBuffer(2,len,ac.sampleRate);
+    for(let c=0;c<2;c++){
+      const d=b.getChannelData(c);
+      for(let i=0;i<len;i++){
+        const t=i/ac.sampleRate;
+        d[i] = (Math.sin(2*Math.PI*110*t)*0.35 + Math.sin(2*Math.PI*164.8*t)*0.25
+             + Math.sin(2*Math.PI*220*t)*0.2 + (Math.random()*2-1)*0.05)
+             * (0.6+0.4*Math.sin(2*Math.PI*0.25*t + c));
+      }
+    }
+    return b;
+  }
+
+  /* ---------- audio graph ---------- */
+  function initAudio(){
+    if(ctx) return ctx.resume();
+    const AC = window.AudioContext || window.webkitAudioContext;
+    ctx = new AC({ latencyHint:"interactive" });
+
+    // grainBus gain raised from the original 0.9 — the limiter below gives
+    // us headroom to actually use, so the mix doesn't have to be kept
+    // artificially conservative to dodge clipping (the root cause of the
+    // "processing makes it quieter" complaint: there was no makeup gain or
+    // limiting anywhere in the chain, so master had to sit low to be safe).
+    const grainBus = ctx.createGain();      grainBus.gain.value = 1.25;
+    const crush    = ctx.createWaveShaper(); crush.curve = makeCrushCurve(P.crush); crush.oversample = "none";
+    const delay    = ctx.createDelay(2.0);  delay.delayTime.value = P.dtime;
+    const fb       = ctx.createGain();      fb.gain.value = P.fb;
+    // Damping raised from 4200Hz to 7800Hz: the old value pulled 3-6kHz
+    // consonant energy out of every wet repeat, which made speech sources
+    // sound faint and muffled rather than merely quiet.
+    const damp     = ctx.createBiquadFilter(); damp.type="lowpass"; damp.frequency.value=7800;
+    const conv     = ctx.createConvolver(); conv.buffer = makeIR(ctx);
+    const wet      = ctx.createGain();      wet.gain.value = P.wet;
+    const dry      = ctx.createGain();      dry.gain.value = 1;
+    // Presence bell restores the clarity band the grain envelopes and the
+    // reverb tail otherwise bury; the highpass stops sub buildup eating headroom.
+    const presence = ctx.createBiquadFilter(); presence.type="peaking";
+    presence.frequency.value=3400; presence.Q.value=0.9; presence.gain.value=4;
+    const rumble   = ctx.createBiquadFilter(); rumble.type="highpass"; rumble.frequency.value=60;
+    const smear    = makeSmearNetwork(ctx);
+    const smearWet = ctx.createGain();      smearWet.gain.value = P.smear;
+    const master   = ctx.createGain();      master.gain.value = P.master;
+    const limiter  = ctx.createDynamicsCompressor();
+    limiter.threshold.value = -6; limiter.knee.value = 6; limiter.ratio.value = 12;
+    limiter.attack.value = 0.003; limiter.release.value = 0.25;
+    // Makeup after limiting so takes land at a usable level instead of -39 dBFS.
+    const makeup   = ctx.createGain();      makeup.gain.value = 1.7;
+    const analyser = ctx.createAnalyser();  analyser.fftSize = 1024;
+
+    // Bitcrush sits before the spatial fx so it colors both the dry and
+    // reverb signal — a glitch-grade texture rather than a clean cloud.
+    grainBus.connect(crush);
+    crush.connect(delay); crush.connect(dry); crush.connect(conv); crush.connect(smear.input);
+    delay.connect(damp); damp.connect(fb); fb.connect(delay);
+    delay.connect(dry); delay.connect(conv);
+    conv.connect(wet);
+    smear.output.connect(smearWet);
+    dry.connect(rumble); wet.connect(rumble); smearWet.connect(rumble);
+    rumble.connect(presence); presence.connect(master);
+    // Limiter sits after master so raising MASTER (or stacking wet effects)
+    // can't clip — it just rides right up to the ceiling instead.
+    master.connect(limiter); limiter.connect(makeup); makeup.connect(analyser);
+    analyser.connect(ctx.destination);
+
+    nodes = { grainBus, crush, delay, fb, conv, wet, smearWet, master, limiter, makeup, analyser };
+    if(!buffer) setBuffer(makeDefaultBuffer(ctx));
+    drawScope();
+    return ctx.resume();
+  }
+
+  /* ---------- granular scheduler ---------- */
+  // Grains are pre-scheduled a short window ahead of ctx.currentTime rather
+  // than fired live from setInterval — the classic Web Audio lookahead
+  // pattern. Firing live ties every grain's onset to whenever the JS timer
+  // callback happened to run, which drifts under load; for a glitch
+  // instrument that timing wobble is audible as sloppy rhythm.
+  const LOOKAHEAD = 0.12;       // seconds of grains queued ahead of "now"
+  const SCHED_INTERVAL_MS = 25; // how often the scheduler wakes to top up the queue
+  let nextGrainAt = 0;
+
+  function spawnGrain(when){
+    if(!ctx || !buffer) return;
+    const now = when != null ? when : ctx.currentTime;
+    const dur = P.size/1000;
+
+    const useReverse = reversedBuffer && Math.random() < P.reverse;
+    const src = ctx.createBufferSource();
+    src.buffer = useReverse ? reversedBuffer : buffer;
+    src.playbackRate.value = P.pitch;
+    src.detune && (src.detune.value = (Math.random()*2-1)*P.detune);
+
+    const g = ctx.createGain();
+    const pan = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+    if(pan) pan.pan.value = (Math.random()*2-1)*0.85;
+
+    src.connect(g);
+    (pan ? (g.connect(pan), pan) : g).connect(nodes.grainBus);
+
+    const peak = 0.9/Math.sqrt(Math.max(4,P.density));
+    g.gain.setValueAtTime(0.0001, now);
+    // Randomizing the envelope shape between percussive and smooth per grain
+    // keeps a dense cloud from sounding like one texture on repeat.
+    if(Math.random() < 0.5){
+      g.gain.linearRampToValueAtTime(peak, now + dur*0.12);
+      g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+    } else {
+      g.gain.linearRampToValueAtTime(peak, now + dur*0.5);
+      g.gain.linearRampToValueAtTime(0.0001, now + dur);
+    }
+
+    const span = Math.max(0.001, buffer.duration - dur);
+    // SPEED drives an auto-advancing read position (scanOffset, updated in
+    // schedulerTick) layered on top of the manual XY position — this is
+    // what decouples "how fast we move through the sample" from "what pitch
+    // grains play at" (PITCH/DETUNE below). A normal player ties both to
+    // the same playback rate; granular synthesis doesn't have to.
+    const effectivePos = ((P.pos + scanOffset) % 1 + 1) % 1;
+    let off = effectivePos*span + (Math.random()*2-1)*P.spray*span;
+    off = Math.min(span, Math.max(0, off));
+    // A reversed grain needs its offset mirrored so it plays the *same*
+    // source material backwards, not an unrelated slice.
+    const playOffset = useReverse ? Math.min(span, Math.max(0, buffer.duration - off - dur)) : off;
+
+    try { src.start(now, playOffset, dur*1.05); } catch(e){ return; }
+    src.stop(now + dur*1.1);
+    src.onended = () => { try{ src.disconnect(); g.disconnect(); pan && pan.disconnect(); }catch(e){} };
+
+    // Grains are scheduled up to LOOKAHEAD seconds in advance; delay the
+    // visual pulse to line up with when the grain is actually heard.
+    const visualDelay = Math.max(0, (now - ctx.currentTime) * 1000);
+    setTimeout(pushBlob, visualDelay);
+  }
+
+  function schedulerTick(){
+    if(!running || !ctx) return;
+    const now = ctx.currentTime;
+    if(lastTickTime != null && !frozen && buffer){
+      const dt = now - lastTickTime;
+      scanOffset += (dt * P.speed) / Math.max(0.05, buffer.duration);
+    }
+    lastTickTime = now;
+
+    const horizon = now + LOOKAHEAD;
+    while(nextGrainAt < horizon){
+      spawnGrain(nextGrainAt);
+      const period = 1 / Math.max(1, P.density);
+      // Small jitter keeps a dense cloud from sounding mechanically gridded.
+      nextGrainAt += period * (0.85 + Math.random()*0.3);
+    }
+  }
+
+  function schedule(){
+    clearInterval(timer);
+    nextGrainAt = ctx.currentTime + 0.02;
+    lastTickTime = null;
+    timer = setInterval(schedulerTick, SCHED_INTERVAL_MS);
+  }
+
+  /* ---------- XY pad ---------- */
+  const xy = $("xy"), puck = $("puck"), cloud = $("cloud"), cctx = cloud.getContext("2d");
+  const blobs = [];
+  function pushBlob(){ blobs.push({ x:P.pos, y:1-Math.min(1,Math.max(0,(P.pitch-0.25)/1.75)), r:2+Math.random()*14, a:1 }); if(blobs.length>160) blobs.shift(); }
+
+  function fromEvent(e){
+    const t = e.touches ? e.touches[0] : e;
+    const r = xy.getBoundingClientRect();
+    const nx = Math.min(1, Math.max(0, (t.clientX-r.left)/r.width));
+    const ny = Math.min(1, Math.max(0, (t.clientY-r.top)/r.height));
+    P.pos = nx; P.pitch = 0.25 + (1-ny)*1.75;
+    puck.style.left = (nx*100)+"%"; puck.style.top = (ny*100)+"%";
+  }
+  const onDown = (e) => { e.preventDefault(); initAudio().then(() => { running = true; schedule(); setStatus(); }); if(!frozen) fromEvent(e); };
+  const onMove = (e) => { if(running && !frozen){ e.preventDefault(); fromEvent(e); } };
+  xy.addEventListener("touchstart", onDown, {passive:false});
+  xy.addEventListener("touchmove", onMove, {passive:false});
+  xy.addEventListener("mousedown", onDown);
+  window.addEventListener("mousemove", (e)=>{ if(e.buttons===1) onMove(e); });
+
+  /* ---------- controls ---------- */
+  const bind = (id, fmt, apply) => {
+    const el = $(id), out = $("v-"+id);
+    const upd = () => { const v = parseFloat(el.value); out.textContent = fmt(v); apply(v); };
+    el.addEventListener("input", upd); upd();
+  };
+  bind("density", v=>v+" g/s", v=>{ P.density=v; if(running) schedule(); });
+  bind("size",    v=>v+" ms",  v=>{ P.size=v; });
+  bind("spray",   v=>v.toFixed(2), v=>{ P.spray=v; });
+  bind("detune",  v=>v+" c",   v=>{ P.detune=v; });
+  bind("dtime",   v=>v+" ms",  v=>{ P.dtime=v/1000; if(nodes) nodes.delay.delayTime.setTargetAtTime(P.dtime, ctx.currentTime, 0.05); });
+  bind("fb",      v=>v.toFixed(2), v=>{ P.fb=v; if(nodes) nodes.fb.gain.setTargetAtTime(v, ctx.currentTime, 0.05); });
+  bind("wet",     v=>v.toFixed(2), v=>{ P.wet=v; if(nodes) nodes.wet.gain.setTargetAtTime(v, ctx.currentTime, 0.05); });
+  bind("smear",   v=>v.toFixed(2), v=>{ P.smear=v; if(nodes) nodes.smearWet.gain.setTargetAtTime(v, ctx.currentTime, 0.05); });
+  bind("master",  v=>v.toFixed(2), v=>{ P.master=v; if(nodes) nodes.master.gain.setTargetAtTime(v, ctx.currentTime, 0.05); });
+  bind("reverse", v=>v.toFixed(2), v=>{ P.reverse=v; });
+  bind("crush",   v=>v.toFixed(2), v=>{ P.crush=v; if(nodes) nodes.crush.curve = makeCrushCurve(v); });
+  bind("speed",   v=>v.toFixed(2)+"x", v=>{ P.speed=v; });
+
+  $("freeze").addEventListener("click", () => {
+    frozen = !frozen;
+    $("freeze").classList.toggle("bg-[#e7fb62]", frozen);
+    $("freeze").classList.toggle("text-black", frozen);
+    $("freeze").textContent = frozen ? "FROZEN" : "FREEZE";
+  });
+
+  function setStatus(t){ status.textContent = t || (running ? "engine running — drag the cloud" : "engine idle"); }
+
+  /* ---------- source preview (bypasses every effect, always) ---------- */
+  // Plays the raw loaded buffer straight to destination on its own gain
+  // node — never routed through grainBus/crush/delay/reverb/smear/master
+  // at all, so it's a true "what am I actually about to process" reference
+  // regardless of whatever the effect knobs currently happen to be set to.
+  let previewSrc = null;
+  function stopPreview(){
+    if(previewSrc){ try{ previewSrc.stop(); }catch(e){} try{ previewSrc.disconnect(); }catch(e){} previewSrc = null; }
+    $("preview").textContent = "PREVIEW SOURCE";
+  }
+  $("preview").addEventListener("click", async () => {
+    await initAudio();
+    if(previewSrc){ stopPreview(); return; }
+    const g = ctx.createGain(); g.gain.value = 0.9;
+    previewSrc = ctx.createBufferSource();
+    previewSrc.buffer = buffer || makeDefaultBuffer(ctx);
+    previewSrc.connect(g); g.connect(ctx.destination); // deliberately bypasses the whole effects graph
+    previewSrc.onended = () => stopPreview();
+    previewSrc.start();
+    $("preview").textContent = "STOP PREVIEW";
+    setStatus("previewing raw source — dry, no effects");
+  });
+
+  $("engage").addEventListener("click", () => {
+    stopPreview();
+    initAudio().then(() => { running = !running; if(running) schedule(); else clearInterval(timer);
+      $("engage").textContent = running ? "PAUSE" : "ENGAGE"; setStatus(); });
+  });
+
+  /* ---------- source loading (audio/video/MIDI-safe input) ---------- */
+  $("audio-upload").addEventListener("change", async (e) => {
+    const f = e.target.files && e.target.files[0]; if(!f) return;
+    stopPreview();
+    await initAudio();
+    setStatus("decoding "+f.name+"…");
+    try {
+      const data = await f.arrayBuffer();
+      const decoded = await new Promise((res, rej) => {
+        const p = ctx.decodeAudioData(data.slice(0), res, rej);
+        if(p && p.then) p.then(res, rej);
+      });
+      setBuffer(decoded);
+      setStatus(f.name+" loaded ("+buffer.duration.toFixed(1)+"s) — tap PREVIEW SOURCE to audition it dry");
+    } catch(err){
+      setBuffer(makeDefaultBuffer(ctx));
+      setStatus("could not decode that file — using internal tone source");
+    }
+  });
+
+  /* ---------- recorder ---------- */
+  // Captures raw PCM straight off the master bus instead of going through
+  // MediaRecorder (webm/opus or mp4 — both lossy) and re-decoding that back
+  // to PCM to write a "WAV". That round trip bakes a lossy compression pass
+  // into every take despite the file being a WAV. Tapping the signal
+  // directly with a ScriptProcessorNode is lossless and sample-accurate.
+  // (ScriptProcessorNode is deprecated in favor of AudioWorklet, but works
+  // everywhere without needing a separate module file — a reasonable trade
+  // for a single self-contained HTML file. Worth upgrading if this becomes
+  // a longer-lived project.)
+  let capturing=false, capL=[], capR=[], capNode=null, muteGain=null, t0=0, tick=null;
+  const fmtT = (s)=> String(Math.floor(s/60)).padStart(2,"0")+":"+String(Math.floor(s%60)).padStart(2,"0");
+
+  function startCapture(){
+    capL = []; capR = [];
+    capNode = ctx.createScriptProcessor(2048, 2, 2);
+    capNode.onaudioprocess = (e) => {
+      if(!capturing) return;
+      capL.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+      capR.push(new Float32Array(e.inputBuffer.getChannelData(1)));
+    };
+    // Some browsers (notably WebKit) only fire onaudioprocess if the node's
+    // output is connected through to the destination — route it through a
+    // silent gain so nothing is audibly duplicated.
+    muteGain = ctx.createGain(); muteGain.gain.value = 0;
+    // Tap after makeup gain so the file matches what you hear.
+    nodes.makeup.connect(capNode);
+    capNode.connect(muteGain);
+    muteGain.connect(ctx.destination);
+    capturing = true;
+  }
+
+  function stopCapture(){
+    capturing = false;
+    try{ nodes.makeup.disconnect(capNode); }catch(e){}
+    try{ capNode.disconnect(); }catch(e){}
+    try{ muteGain.disconnect(); }catch(e){}
+  }
+
+  $("rec").addEventListener("click", async () => {
+    await initAudio();
+    startCapture();
+    t0 = performance.now(); clearInterval(tick);
+    tick = setInterval(()=> $("rtime").textContent = fmtT((performance.now()-t0)/1000), 250);
+    $("rec").disabled = true; $("rec").innerHTML = '<span class="rec-dot">● RECORDING</span>';
+    $("stop").disabled = false; $("dl").classList.add("hidden");
+  });
+
+  $("stop").addEventListener("click", () => {
+    stopCapture();
+    clearInterval(tick);
+    $("stop").disabled = true; $("rec").disabled = false; $("rec").textContent = "START RECORDING";
+    exportTake();
+  });
+
+  function concatChunks(chunks, totalLen){
+    const out = new Float32Array(totalLen);
+    let o = 0;
+    for(const c of chunks){ out.set(c, o); o += c.length; }
+    return out;
+  }
+
+  // Peak-normalise the take to -1 dBFS before encoding. Engine level depends
+  // entirely on where the knobs sit; without this a quiet patch writes a quiet file.
+  function normalise(L, R){
+    let peak = 0;
+    for(let i=0;i<L.length;i++){
+      const a = Math.abs(L[i]), b = Math.abs(R[i]);
+      if(a>peak) peak = a;
+      if(b>peak) peak = b;
+    }
+    if(peak < 1e-6) return 1;
+    return Math.min(8, 0.891/peak);
+  }
+
+  function exportTake(){
+    setStatus("rendering WAV…");
+    const totalLen = capL.reduce((s,c)=>s+c.length,0);
+    if(!totalLen){ setStatus("nothing captured — take was too short"); return; }
+    const L = concatChunks(capL, totalLen), R = concatChunks(capR, totalLen);
+    const ng = normalise(L, R);
+    if(ng !== 1){ for(let i=0;i<totalLen;i++){ L[i]*=ng; R[i]*=ng; } }
+    const fakeBuf = {
+      numberOfChannels: 2,
+      sampleRate: ctx.sampleRate,
+      length: totalLen,
+      getChannelData: (c) => (c === 0 ? L : R)
+    };
+    const out = encodeWAV(fakeBuf);
+    const a = $("dl");
+    a.href = URL.createObjectURL(out); a.download = "soundscape-session.wav";
+    a.classList.remove("hidden"); setStatus("take ready (normalised to -1 dBFS) — tap DOWNLOAD TAKE");
+  }
+
+  function encodeWAV(ab){
+    const ch = Math.min(2, ab.numberOfChannels), sr = ab.sampleRate, n = ab.length;
+    const data = new DataView(new ArrayBuffer(44 + n*ch*2));
+    const str = (o,s)=>{ for(let i=0;i<s.length;i++) data.setUint8(o+i, s.charCodeAt(i)); };
+    str(0,"RIFF"); data.setUint32(4, 36+n*ch*2, true); str(8,"WAVEfmt ");
+    data.setUint32(16,16,true); data.setUint16(20,1,true); data.setUint16(22,ch,true);
+    data.setUint32(24,sr,true); data.setUint32(28,sr*ch*2,true); data.setUint16(32,ch*2,true);
+    data.setUint16(34,16,true); str(36,"data"); data.setUint32(40, n*ch*2, true);
+    const chans = []; for(let c=0;c<ch;c++) chans.push(ab.getChannelData(c));
+    let off = 44;
+    for(let i=0;i<n;i++) for(let c=0;c<ch;c++){
+      const s = Math.max(-1, Math.min(1, chans[c][i]));
+      data.setInt16(off, s<0 ? s*0x8000 : s*0x7FFF, true); off += 2;
+    }
+    return new Blob([data.buffer], { type:"audio/wav" });
+  }
+
+  /* ---------- presets ---------- */
+  // A preset is just the value of every slider. Recalling one writes the
+  // values back into the inputs and dispatches "input", so a recalled patch
+  // takes exactly the same code path as moving a knob by hand.
+  const PARAM_IDS = ["density","size","spray","detune","reverse","speed","crush","dtime","fb","wet","smear","master"];
+  const FACTORY_PRESETS = [
+    { name:"\u2605 Init / Dry Clarity", params:{ density:30,size:90,spray:0.05,detune:0,reverse:0,speed:1,crush:0,dtime:240,fb:0.15,wet:0.12,smear:0,master:0.9 } },
+    { name:"\u2605 Speech Legible",     params:{ density:42,size:140,spray:0.03,detune:20,reverse:0,speed:1,crush:0,dtime:320,fb:0.2,wet:0.2,smear:0.05,master:0.95 } },
+    { name:"\u2605 Cathedral Bloom",    params:{ density:26,size:320,spray:0.25,detune:120,reverse:0.1,speed:0.15,crush:0,dtime:620,fb:0.55,wet:0.85,smear:0.3,master:0.8 } },
+    { name:"\u2605 Ice Shards",         params:{ density:64,size:35,spray:0.6,detune:900,reverse:0.3,speed:0.4,crush:0.15,dtime:180,fb:0.4,wet:0.5,smear:0.15,master:0.85 } },
+    { name:"\u2605 Tape Smear Drone",   params:{ density:18,size:520,spray:0.12,detune:60,reverse:0.15,speed:0.05,crush:0.1,dtime:900,fb:0.72,wet:0.7,smear:0.85,master:0.8 } },
+    { name:"\u2605 Glitch Ratchet",     params:{ density:78,size:25,spray:0.85,detune:400,reverse:0.5,speed:0,crush:0.65,dtime:90,fb:0.6,wet:0.25,smear:0,master:0.85 } },
+    { name:"\u2605 Reverse Ghost",      params:{ density:22,size:260,spray:0.4,detune:250,reverse:1,speed:-0.3,crush:0,dtime:480,fb:0.5,wet:0.75,smear:0.4,master:0.85 } },
+    { name:"\u2605 Sub Drift",          params:{ density:12,size:600,spray:0.2,detune:30,reverse:0.2,speed:-0.08,crush:0,dtime:1100,fb:0.8,wet:0.6,smear:0.6,master:0.75 } },
+    { name:"\u2605 Radio Debris",       params:{ density:55,size:60,spray:0.7,detune:700,reverse:0.25,speed:0.6,crush:0.85,dtime:140,fb:0.35,wet:0.35,smear:0.2,master:0.85 } }
+  ];
+  const PRESET_KEY = "granular.userPresets.v1";
+  const loadUser = () => { try { const r = JSON.parse(localStorage.getItem(PRESET_KEY) || "[]"); return Array.isArray(r) ? r : []; } catch(e){ return []; } };
+  const saveUser = (list) => { try { localStorage.setItem(PRESET_KEY, JSON.stringify(list)); } catch(e){} };
+  let userPresets = loadUser();
+
+  const selEl = $("preset-select"), delEl = $("preset-delete");
+  function getParams(){ const o = {}; for(const id of PARAM_IDS) o[id] = parseFloat($(id).value); return o; }
+  function applyParams(p){
+    for(const id of PARAM_IDS){
+      if(p[id] == null) continue;
+      const el = $(id); el.value = p[id];
+      el.dispatchEvent(new Event("input", { bubbles:true }));
+    }
+  }
+  function renderPresets(selected){
+    selEl.innerHTML = "";
+    const blank = document.createElement("option"); blank.value = ""; blank.textContent = "— select a patch —";
+    selEl.appendChild(blank);
+    const group = (label, list) => {
+      if(!list.length) return;
+      const g = document.createElement("optgroup"); g.label = label;
+      for(const p of list){ const o = document.createElement("option"); o.value = p.name; o.textContent = p.name; g.appendChild(o); }
+      selEl.appendChild(g);
+    };
+    group("Factory", FACTORY_PRESETS);
+    group("My presets", userPresets);
+    selEl.value = selected || "";
+    delEl.disabled = !selEl.value || FACTORY_PRESETS.some(p => p.name === selEl.value);
+  }
+  selEl.addEventListener("change", () => {
+    const p = FACTORY_PRESETS.concat(userPresets).find(x => x.name === selEl.value);
+    if(p){ applyParams(p.params); setStatus("preset recalled: " + p.name); }
+    delEl.disabled = !selEl.value || FACTORY_PRESETS.some(x => x.name === selEl.value);
+  });
+  $("preset-save").addEventListener("click", () => {
+    const name = prompt("Name this preset", "My patch " + (userPresets.length + 1));
+    if(!name) return;
+    userPresets = userPresets.filter(p => p.name !== name).concat([{ name, params:getParams() }]);
+    saveUser(userPresets); renderPresets(name); setStatus("preset saved: " + name);
+  });
+  delEl.addEventListener("click", () => {
+    const name = selEl.value;
+    if(!name || FACTORY_PRESETS.some(p => p.name === name)) return;
+    userPresets = userPresets.filter(p => p.name !== name);
+    saveUser(userPresets); renderPresets(""); setStatus("preset deleted: " + name);
+  });
+  renderPresets("");
+
+  /* ---------- visuals ---------- */
+  const scope = $("scope"), sctx = scope.getContext("2d");
+  function fit(c){ const r=c.getBoundingClientRect(), d=window.devicePixelRatio||1; c.width=r.width*d; c.height=r.height*d; c.getContext("2d").setTransform(d,0,0,d,0,0); }
+  const refit = () => { fit(scope); fit(cloud); };
+  window.addEventListener("resize", refit); window.addEventListener("orientationchange", ()=>setTimeout(refit,250)); refit();
+
+  function drawScope(){
+    const bins = new Uint8Array(nodes.analyser.frequencyBinCount);
+    (function loop(){
+      requestAnimationFrame(loop);
+      const w = scope.clientWidth, h = scope.clientHeight;
+      nodes.analyser.getByteFrequencyData(bins);
+      sctx.clearRect(0,0,w,h);
+      const bars = 64, bw = w/bars;
+      for(let i=0;i<bars;i++){
+        const v = bins[Math.floor(i*bins.length/bars/1.6)]/255;
+        const bh = Math.max(2, v*h);
+        sctx.fillStyle = "rgba(231,251,98,"+(0.25+v*0.75)+")";
+        sctx.fillRect(i*bw+1, h-bh, bw-2, bh);
+      }
+      const cw = cloud.clientWidth, chh = cloud.clientHeight;
+      cctx.clearRect(0,0,cw,chh);
+      for(const b of blobs){
+        b.a -= 0.012; if(b.a<=0) continue;
+        cctx.beginPath(); cctx.arc(b.x*cw, b.y*chh, b.r, 0, 6.284);
+        cctx.fillStyle = "rgba(231,251,98,"+(b.a*0.35)+")"; cctx.fill();
+      }
+      while(blobs.length && blobs[0].a<=0) blobs.shift();
+    })();
+  }
+})();
+</script>
+</body>
+</html>

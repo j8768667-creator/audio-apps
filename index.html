@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Audio Apps">
+<title>Audio Apps</title>
+<style>
+  :root { --bg:#111418; --card:#1e242c; --text:#f2f4f7; --accent:#6ea8fe; }
+  @media (prefers-color-scheme: light) {
+    :root { --bg:#f3f4f6; --card:#fff; --text:#16191d; --accent:#1d5fd1; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:max(24px, env(safe-area-inset-top)) 20px 40px;
+         background:var(--bg); color:var(--text);
+         font:17px/1.4 -apple-system, system-ui, sans-serif; }
+  h1 { font-size:28px; margin:0 0 16px; }
+  input { width:100%; padding:14px 16px; font-size:17px; border-radius:12px;
+          border:1px solid #8884; background:var(--card); color:var(--text); margin-bottom:20px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:14px; }
+  a.card { display:flex; align-items:center; justify-content:center; text-align:center;
+           min-height:110px; padding:16px; border-radius:16px; background:var(--card);
+           color:var(--text); text-decoration:none; font-weight:600;
+           box-shadow:0 1px 3px #0003; }
+  a.card:active { outline:2px solid var(--accent); }
+  .msg { opacity:.7; }
+</style>
+</head>
+<body>
+<h1>🎧 Audio Apps</h1>
+<input id="q" type="search" placeholder="Search apps…" autocomplete="off">
+<div id="grid" class="grid"></div>
+<p id="msg" class="msg">Loading…</p>
+<script>
+// Works automatically on GitHub Pages: owner/repo are read from the URL.
+// To override, set e.g. const OVERRIDE = {owner:"me", repo:"my-apps"};
+const OVERRIDE = null;
+
+const host = location.hostname;
+const owner = OVERRIDE?.owner ?? host.split(".")[0];
+const repo  = OVERRIDE?.repo  ?? (location.pathname.split("/")[1] || host);
+
+const pretty = s => decodeURIComponent(s).replace(/[-_]+/g, " ")
+  .replace(/\b\w/g, c => c.toUpperCase());
+
+let apps = [];
+const grid = document.getElementById("grid");
+const msg = document.getElementById("msg");
+
+function render() {
+  const q = document.getElementById("q").value.toLowerCase();
+  const shown = apps.filter(a => a.label.toLowerCase().includes(q));
+  grid.innerHTML = "";
+  shown.forEach(a => {
+    const el = document.createElement("a");
+    el.className = "card"; el.href = a.href; el.textContent = a.label;
+    grid.appendChild(el);
+  });
+  msg.textContent = shown.length ? "" : "No apps found.";
+}
+
+(async () => {
+  try {
+    const r = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/HEAD?recursive=1`);
+    if (!r.ok) throw new Error(r.status);
+    const data = await r.json();
+    apps = data.tree
+      .filter(t => /^[^/]+\/index\.html$/.test(t.path) && !/^[._]/.test(t.path))
+      .map(t => { const d = t.path.split("/")[0];
+                  return { label: pretty(d), href: encodeURIComponent(d) + "/" }; })
+      .sort((a, b) => a.label.localeCompare(b.label));
+    render();
+  } catch (e) {
+    msg.textContent = "Couldn't load the app list (" + e.message + "). Is the repo public and hosted on GitHub Pages?";
+  }
+})();
+document.getElementById("q").addEventListener("input", render);
+</script>
+</body>
+</html>

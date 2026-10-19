@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      background: #121214;
+      color: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      padding: 20px;
+      margin: 0;
+      text-align: center;
+      height: auto;
+      min-height: 100%;
+      overflow-y: auto; 
+      -webkit-overflow-scrolling: touch;
+    }
+    .header-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      max-width: 1000px;
+      margin: 0 auto 20px auto;
+      gap: 12px;
+    }
+    h1 {
+      font-size: 24px;
+      margin: 0;
+      letter-spacing: 0.5px;
+    }
+    .controls {
+      display: flex;
+      gap: 10px;
+      flex: 1;
+      justify-content: flex-end;
+      min-width: 260px;
+    }
+    .search-box {
+      background: #1e1e24;
+      border: 1.5px solid #2e2e38;
+      color: #ffffff;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 15px;
+      width: 100%;
+      max-width: 240px;
+      outline: none;
+    }
+    .add-btn {
+      background: #ff4757;
+      color: #ffffff;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      touch-action: manipulation;
+    }
+    .add-btn:active {
+      opacity: 0.85;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(135px, 1fr));
+      gap: 14px;
+      max-width: 1000px;
+      margin: 0 auto;
+      padding-bottom: 80px;
+    }
+    .app-card {
+      background: #1e1e24;
+      border: 1.5px solid #2e2e38;
+      border-radius: 16px;
+      padding: 18px 10px;
+      text-decoration: none;
+      color: #f1f2f6;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      touch-action: manipulation;
+      position: relative;
+    }
+    .app-card:active {
+      background: #2a2a34;
+      border-color: #ff4757;
+      transform: scale(0.97);
+    }
+    .app-icon {
+      font-size: 30px;
+      margin-bottom: 10px;
+    }
+    .app-title {
+      font-size: 13px;
+      font-weight: 600;
+      word-break: break-word;
+      line-height: 1.3;
+    }
+    .delete-btn {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      background: rgba(255, 71, 87, 0.85);
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 22px;
+      height: 22px;
+      font-size: 12px;
+      line-height: 22px;
+      text-align: center;
+      cursor: pointer;
+    }
+    .delete-btn:active {
+      background: #ff4757;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header-bar">
+    <h1>My Audio Apps (<span id="appCount">56</span>)</h1>
+    <div class="controls">
+      <input type="text" id="searchInput" class="search-box" placeholder="Search apps..." oninput="filterApps()">
+      <button class="add-btn" onclick="addCustomApp()">+ Add Folder</button>
+    </div>
+  </div>
+
+  <div class="grid" id="appGrid">
+
+    <!-- Alphabetical Order (A - Z) -->
+    <a href="-Chord-sequencer/main-index.html" class="app-card"><span class="app-icon">🎹</span><span class="app-title">-Chord-sequencer</span></a>
+    <a href="Audio-Master/main-index.html" class="app-card"><span class="app-icon">🎚️</span><span class="app-title">Audio-Master</span></a>
+    <a href="Audioslicer/main-index.html" class="app-card"><span class="app-icon">✂️</span><span class="app-title">Audioslicer</span></a>
+    <a href="Bpm-overlay/main-index.html" class="app-card"><span class="app-icon">⏱️</span><span class="app-title">Bpm-overlay</span></a>
+    <a href="Chord-Arranger-Studio-Ultimate/main-index.html" class="app-card"><span class="app-icon">🎹</span><span class="app-title">Chord-Arranger-Studio-Ultimate</span></a>
+    <a href="Chord-Explorer/main-index.html" class="app-card"><span class="app-icon">🎹</span><span class="app-title">Chord-Explorer</span></a>
+    <a href="Chord-tools/main-index.html" class="app-card"><span class="app-icon">🎹</span><span class="app-title">Chord-tools</span></a>
+    <a href="Chord-Voicing/main-index.html" class="app-card"><span class="app-icon">🎹</span><span class="app-title">Chord-Voicing</span></a>
+    <a href="Chordcontrol/main-index.html" class="app-card"><span class="app-icon">🎹</span><span class="app-title">Chordcontrol</span></a>
+    <a href="chordmelody/main-index.html" class="app-card"><span class="app-icon">🎹</span><span class="app-title">chordmelody</span></a>
+    <a href="ChordSequencer2/main-index.html" class="app-card"><span class="app-icon">🎹</span><span class="app-title">ChordSequencer2</span></a>
+    <a href="Convertor/main-index.html" class="app-card"><span class="app-icon">⚙️</span><span class="app-title">Convertor</span></a>
+    <a href="Drum-creator/main-index.html" class="app-card"><span class="app-icon">🥁</span><span class="app-title">Drum-creator</span></a>
+    <a href="File-finder/main-index.html" class="app-card"><span class="app-icon">📁</span><span class="app-title">File-finder</span></a>
+    <a href="Harmonystudio/main-index.html" class="app-card"><span class="app-icon">🎵</span><span class="app-title">Harmonystudio</span></a>
+    <a href="HTML-to-swift/main-index.html" class="app-card"><span class="app-icon">💻</span><span class="app-title">HTML-to-swift</span></a>
+    <a href="Incredi-builder/main-index.html" class="app-card"><span class="app-icon">🛠️</span><span class="app-title">Incredi-builder</span></a>
+    <a href="Markov-Chain/main-index.html" class="app-card"><span class="app-icon">🔗</span><span class="app-title">Markov-Chain</span></a>
+    <a href="Midi-Analysis/main-index.html" class="app-card"><span class="app-icon">🎼</span><span class="app-title">Midi-Analysis</span></a>
+    <a href="Midi-chord-tool/main-index.html" class="app-card"><span class="app-icon">🎼</span><span class="app-title">Midi-chord-tool</span></a>
+    <a href="Midi-Extender/main-index.html" class="app-card"><span class="app-icon">🎼</span><span class="app-title">Midi-Extender</span></a>
+    <a href="Midi-maker/main-index.html" class="app-card"><span class="app-icon">🎼</span><span class="app-title">Midi-maker</span></a>
+    <a href="Midi-Markov/main-index.html" class="app-card"><span class="app-icon">🎼</span><span class="app-title">Midi-Markov</span></a>
+    <a href="Midi-Restoration/main-index.html" class="app-card"><span class="app-icon">🎼</span><span class="app-title">Midi-Restoration</span></a>
+    <a href="Midi-to-/main-index.html" class="app-card"><span class="app-icon">🎼</span><span class="app-title">Midi-to-</span></a>
+    <a href="Midi-Tools/main-index.html" class="app-card"><span class="app-icon">🎼</span><span class="app-title">Midi-Tools</span></a>
+    <a href="Midicomposer/main-index.html" class="app-card"><span class="app-icon">🎼</span><span class="app-title">Midicomposer</span></a>
+    <a href="Midisongcreator/main-index.html" class="app-card"><span class="app-icon">🎼</span><span class="app-title">Midisongcreator</span></a>
+    <a href="Motif-generator/main-index.html" class="app-card"><span class="app-icon">🎵</span><span class="app-title">Motif-generator</span></a>
+    <a href="Music-prompt-and-lyric-generator-/main-index.html" class="app-card"><span class="app-icon">📝</span><span class="app-title">Music-prompt-and-lyric-generator-</span></a>
+    <a href="Music-Prompt-Studio/main-index.html" class="app-card"><span class="app-icon">📝</span><span class="app-title">Music-Prompt-Studio</span></a>
+    <a href="New-melody-generator/main-index.html" class="app-card"><span class="app-icon">🎶</span><span class="app-title">New-melody-generator</span></a>
+    <a href="quantumkomposer/main-index.html" class="app-card"><span class="app-icon">🌌</span><span class="app-title">quantumkomposer</span></a>
+    <a href="Reawaken/main-index.html" class="app-card"><span class="app-icon">🌅</span><span class="app-title">Reawaken</span></a>
+    <a href="Sequencer/main-index.html" class="app-card"><span class="app-icon">🎛️</span><span class="app-title">Sequencer</span></a>
+    <a href="Song-Stitcher/main-index.html" class="app-card"><span class="app-icon">🧵</span><span class="app-title">Song-Stitcher</span></a>
+    <a href="SongStudio/main-index.html" class="app-card"><span class="app-icon">🎙️</span><span class="app-title">SongStudio</span></a>
+    <a href="Sound-Forge/main-index.html" class="app-card"><span class="app-icon">🔥</span><span class="app-title">Sound-Forge</span></a>
+    <a href="Step-Sequencer/main-index.html" class="app-card"><span class="app-icon">🎛️</span><span class="app-title">Step-Sequencer</span></a>
+    <a href="Tab-Convertor/main-index.html" class="app-card"><span class="app-icon">🎸</span><span class="app-title">Tab-Convertor</span></a>
+    <a href="Wav-Drum/main-index.html" class="app-card"><span class="app-icon">🥁</span><span class="app-title">Wav-Drum</span></a>
+    <a href="WAV-EvolverFX/main-index.html" class="app-card"><span class="app-icon">🪄</span><span class="app-title">WAV-EvolverFX</span></a>
+    <a href="WAV-Glitch/main-index.html" class="app-card"><span class="app-icon">⚡</span><span class="app-title">WAV-Glitch</span></a>
+    <a href="WAV-Melody/main-index.html" class="app-card"><span class="app-icon">🌊</span><span class="app-title">WAV-Melody</span></a>
+    <a href="WAV-shuffle/main-index.html" class="app-card"><span class="app-icon">🔀</span><span class="app-title">WAV-shuffle</span></a>
+    <a href="WAV-studio/main-index.html" class="app-card"><span class="app-icon">🌊</span><span class="app-title">WAV-studio</span></a>
+    <a href="WAV-Tools/main-index.html" class="app-card"><span class="app-icon">🌊</span><span class="app-title">WAV-Tools</span></a>
+    <a href="WAV-tools2/main-index.html" class="app-card"><span class="app-icon">🌊</span><span class="app-title">WAV-tools2</span></a>
+    <a href="Wav2Midi/main-index.html" class="app-card"><span class="app-icon">🔄</span><span class="app-title">Wav2Midi</span></a>
+    <a href="wavharmonyslicer/main-index.html" class="app-card"><span class="app-icon">🌊</span><span class="app-title">wavharmonyslicer</span></a>
+    <a href="WavSliceSeq/main-index.html" class="app-card"><span class="app-icon">🌊</span><span class="app-title">WavSliceSeq</span></a>
+    <a href="WavSliceSync/main-index.html" class="app-card"><span class="app-icon">🌊</span><span class="app-title">WavSliceSync</span></a>
+    <a href="Wavstretch/main-index.html" class="app-card"><span class="app-icon">🌊</span><span class="app-title">Wavstretch</span></a>
+    <a href="WavStretchNew/main-index.html" class="app-card"><span class="app-icon">🌊</span><span class="app-title">WavStretchNew</span></a>
+
+  </div>
+
+  <script>
+    function sortGridAlphabetically() {
+      const grid = document.getElementById('appGrid');
+      const cards = Array.from(grid.querySelectorAll('.app-card'));
+      cards.sort((a, b) => {
+        const titleA = a.querySelector('.app-title').textContent.replace(/^-/, '').toLowerCase();
+        const titleB = b.querySelector('.app-title').textContent.replace(/^-/, '').toLowerCase();
+        return titleA.localeCompare(titleB);
+      });
+      cards.forEach(card => grid.appendChild(card));
+      document.getElementById('appCount').textContent = cards.length;
+    }
+
+    function removeCustomApp(folderName, event) {
+      event.stopPropagation();
+      event.preventDefault();
+      if (confirm(`Remove "${folderName}" from menu?`)) {
+        let saved = JSON.parse(localStorage.getItem('customAudioApps') || '[]');
+        saved = saved.filter(item => item !== folderName);
+        localStorage.setItem('customAudioApps', JSON.stringify(saved));
+        location.reload();
+      }
+    }
+
+    function loadSavedApps() {
+      const saved = JSON.parse(localStorage.getItem('customAudioApps') || '[]');
+      const grid = document.getElementById('appGrid');
+      saved.forEach(folderName => {
+        const a = document.createElement('a');
+        a.href = folderName + '/main-index.html';
+        a.className = 'app-card';
+        a.innerHTML = `<span class="app-icon">🎵</span><span class="app-title">${folderName}</span><button class="delete-btn" onclick="removeCustomApp('${folderName}', event)">×</button>`;
+        grid.appendChild(a);
+      });
+      sortGridAlphabetically();
+    }
+
+    function addCustomApp() {
+      const folderName = prompt('Enter exact folder name as shown in Koder sidebar:');
+      if (folderName && folderName.trim() !== '') {
+        const cleanName = folderName.trim();
+        const saved = JSON.parse(localStorage.getItem('customAudioApps') || '[]');
+        if (!saved.includes(cleanName)) {
+          saved.push(cleanName);
+          localStorage.setItem('customAudioApps', JSON.stringify(saved));
+          location.reload();
+        }
+      }
+    }
+
+    function filterApps() {
+      const term = document.getElementById('searchInput').value.toLowerCase();
+      document.querySelectorAll('.app-card').forEach(card => {
+        const title = card.querySelector('.app-title').textContent.toLowerCase();
+        card.style.display = title.includes(term) ? 'flex' : 'none';
+      });
+    }
+
+    loadSavedApps();
+  </script>
+</body>
+</html>

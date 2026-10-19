@@ -1,0 +1,1288 @@
+<!doctype html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100 antialiased">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no, viewport-fit=cover" />
+  <title>Sonance Studio - Music Arrangement & Composition Suite</title>
+  <meta name="description" content="Professional music composition, chord progression studio, multitrack Web Audio synthesizer, and arrangement engine." />
+  
+  <!-- Universal iOS / iPadOS double-tap zoom & gesture zoom suppression -->
+  <script>
+    (function() {
+      let lastTouchEndTime = 0;
+      document.addEventListener('touchend', function(event) {
+        const target = event.target;
+        if (target && target.closest('button, a, input, select, textarea, [role="button"], label, .interactive-btn')) {
+          return;
+        }
+        const now = Date.now();
+        if (now - lastTouchEndTime <= 350) {
+          event.preventDefault();
+        }
+        lastTouchEndTime = now;
+      }, { passive: false });
+      document.addEventListener('gesturestart', function(e) { e.preventDefault(); }, { passive: false });
+      document.addEventListener('gesturechange', function(e) { e.preventDefault(); }, { passive: false });
+      document.addEventListener('gestureend', function(e) { e.preventDefault(); }, { passive: false });
+      window.addEventListener('dblclick', function(e) {
+        const target = event.target;
+        if (target && target.closest('button, a, input, select, textarea, [role="button"], label')) {
+          return;
+        }
+        e.preventDefault();
+      }, { passive: false });
+    })();
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    html, body {
+      touch-action: manipulation !important;
+      -webkit-text-size-adjust: 100%;
+      overscroll-behavior: none;
+    }
+    body { 
+      font-family: 'Plus Jakarta Sans', sans-serif; 
+    }
+    *, *::before, *::after {
+      touch-action: manipulation !important;
+      -webkit-tap-highlight-color: transparent !important;
+      -webkit-touch-callout: none !important;
+      -webkit-user-select: none !important;
+      -moz-user-select: none !important;
+      -ms-user-select: none !important;
+      user-select: none !important;
+    }
+    input[type="text"], input[type="number"], textarea, pre, code, .selectable-text {
+      -webkit-user-select: text !important;
+      -moz-user-select: text !important;
+      -ms-user-select: text !important;
+      user-select: text !important;
+      -webkit-touch-callout: default !important;
+    }
+    code, pre, .font-mono { font-family: 'JetBrains Mono', monospace; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #090d16; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+    @keyframes spinAnim {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .spin-fast {
+      animation: spinAnim 0.6s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }
+    @keyframes flashHighlight {
+      0% { box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.7); }
+      50% { box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.4); }
+      100% { box-shadow: none; }
+    }
+    .textarea-flash {
+      animation: flashHighlight 0.7s ease-out !important;
+    }
+    @media print {
+      body * { visibility: hidden; }
+      #pdfPrintableContent, #pdfPrintableContent * { visibility: visible; }
+      #pdfPrintableContent {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        margin: 0;
+        padding: 30px;
+        background: #ffffff !important;
+        color: #0f172a !important;
+      }
+      .no-print { display: none !important; }
+      .page-break { page-break-before: always; }
+      a { text-decoration: underline; color: #1e40af !important; }
+    }
+  </style>
+</head>
+<body class="h-full flex flex-col overflow-hidden bg-slate-950 text-slate-100">
+  <!-- Header -->
+  <header class="flex-none border-b border-slate-800/80 bg-slate-900/90 backdrop-blur px-6 py-3.5 flex items-center justify-between z-20">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-500 to-indigo-600 flex items-center justify-center font-bold text-white shadow-md shadow-indigo-950/40">
+        ♬
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="font-bold text-base tracking-tight text-white">Sonance Studio</h1>
+          <span class="text-[11px] font-mono font-medium text-amber-400 bg-amber-950/40 border border-amber-800/50 px-1.5 py-0.5 rounded">v3.1 Flow & Vocal Studio</span>
+        </div>
+        <p class="text-xs text-slate-400">Harmonic Architecture · Topline & Vocal Compass · AI Song Prompts · MIDI</p>
+      </div>
+    </div>
+    <!-- Global Transport Controls -->
+    <div class="flex items-center gap-3">
+      <div class="flex items-center gap-2 bg-slate-950/80 border border-slate-800 px-3 py-1.5 rounded-lg text-xs">
+        <label for="bpmInput" class="text-slate-400 font-mono">BPM</label>
+        <input type="number" id="bpmInput" value="120" min="40" max="240" class="w-14 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-center font-mono text-amber-400 font-bold focus:outline-none focus:border-amber-500" />
+        <span class="text-slate-600">|</span>
+        <label for="keySelect" class="text-slate-400 font-mono">Key</label>
+        <select id="keySelect" class="bg-slate-900 border border-slate-700 rounded px-2 py-0.5 font-mono text-slate-200 focus:outline-none focus:border-amber-500">
+          <option value="C">C Major / A Minor</option>
+          <option value="G">G Major / E Minor</option>
+          <option value="D">D Major / B Minor</option>
+          <option value="F">F Major / D Minor</option>
+          <option value="Bb">Bb Major / G Minor</option>
+          <option value="Eb">Eb Major / C Minor</option>
+          <option value="Am" selected>A Minor (Natural)</option>
+          <option value="Em">E Minor (Dorian)</option>
+          <option value="F#m">F# Minor (Cinematic)</option>
+        </select>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="openPdfGuideBtn" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold text-xs transition shadow-sm active:scale-95" title="Open complete printable guide on MIDI & Song Prompts">
+          <span>📖</span>
+          <span>PDF Guide</span>
+        </button>
+        <button id="openPromptsHeaderBtn" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-bold text-xs transition shadow-md shadow-amber-500/20 active:scale-95">
+          <span>✨</span>
+          <span>AI Music Prompts</span>
+        </button>
+        <button id="playBtn" class="flex items-center gap-2 px-4 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition shadow-lg shadow-amber-500/20 active:scale-95">
+          <span id="playIcon">▶</span>
+          <span id="playText">Play Arrangement</span>
+        </button>
+        <button id="stopBtn" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs transition">
+          ⏹ Stop
+        </button>
+        <button id="exportMidiBtn" class="px-3 py-1.5 rounded-lg bg-indigo-600/80 hover:bg-indigo-500 text-white font-medium text-xs transition border border-indigo-500/30 flex items-center gap-1.5">
+          <span>🎹</span> Export MIDI
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Workstation Layout -->
+  <div class="flex-1 flex overflow-hidden">
+    <!-- Left Sidebar: Preset Genres & Song Parameters -->
+    <aside class="w-72 flex-none border-r border-slate-800/80 bg-slate-900/50 flex flex-col overflow-y-auto p-4 gap-5">
+      <div>
+        <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2.5">Genre & Style Presets</h2>
+        <div class="grid grid-cols-1 gap-1.5" id="presetsContainer">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+      <!-- Quick AI Music App Prompts Navigation -->
+      <div class="border-t border-slate-800/70 pt-4">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="text-xs font-semibold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+            <span>✨</span> AI Music Prompts
+          </h2>
+          <span class="text-[10px] text-slate-500 font-mono">Select App</span>
+        </div>
+        <p class="text-[11px] text-slate-400 mb-2 leading-relaxed">Instantly generate tuned prompts for:</p>
+        <div class="grid grid-cols-2 gap-1.5" id="sidebarAppList">
+          <button data-target-app="flowmusic" class="quick-app-btn text-left p-2 rounded-lg bg-slate-950/70 border border-teal-500/50 hover:border-teal-400 hover:bg-slate-900 text-xs transition group">
+            <div class="flex items-center gap-1.5 text-slate-200 group-hover:text-teal-300 font-semibold">
+              <span class="w-2 h-2 rounded-full bg-teal-400"></span>
+              Flow Music
+            </div>
+            <div class="text-[10px] text-slate-500 font-mono mt-0.5">Google Audio</div>
+          </button>
+          <button data-target-app="suno" class="quick-app-btn text-left p-2 rounded-lg bg-slate-950/70 border border-slate-800 hover:border-amber-500/60 hover:bg-slate-900 text-xs transition group">
+            <div class="flex items-center gap-1.5 text-slate-200 group-hover:text-amber-300 font-semibold">
+              <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+              Suno AI
+            </div>
+            <div class="text-[10px] text-slate-500 font-mono mt-0.5">Tags & Meta</div>
+          </button>
+          <button data-target-app="udio" class="quick-app-btn text-left p-2 rounded-lg bg-slate-950/70 border border-slate-800 hover:border-indigo-500/60 hover:bg-slate-900 text-xs transition group">
+            <div class="flex items-center gap-1.5 text-slate-200 group-hover:text-indigo-300 font-semibold">
+              <span class="w-2 h-2 rounded-full bg-indigo-400"></span>
+              Udio
+            </div>
+            <div class="text-[10px] text-slate-500 font-mono mt-0.5">Style & Stems</div>
+          </button>
+          <button data-target-app="stable" class="quick-app-btn text-left p-2 rounded-lg bg-slate-950/70 border border-slate-800 hover:border-emerald-500/60 hover:bg-slate-900 text-xs transition group">
+            <div class="flex items-center gap-1.5 text-slate-200 group-hover:text-emerald-300 font-semibold">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              Stable Audio
+            </div>
+            <div class="text-[10px] text-slate-500 font-mono mt-0.5">Structured Audio</div>
+          </button>
+        </div>
+      </div>
+      <div class="border-t border-slate-800/70 pt-4">
+        <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2.5">Composition Modes</h2>
+        <div class="space-y-2">
+          <label class="flex items-center justify-between text-xs text-slate-300 p-2 rounded bg-slate-950/40 border border-slate-800 cursor-pointer hover:border-slate-700">
+            <span>Harmonic Extensions</span>
+            <input type="checkbox" id="extensionsToggle" checked class="rounded border-slate-700 text-amber-500 focus:ring-0" />
+          </label>
+          <label class="flex items-center justify-between text-xs text-slate-300 p-2 rounded bg-slate-950/40 border border-slate-800 cursor-pointer hover:border-slate-700">
+            <span>Synthesizer Drums</span>
+            <input type="checkbox" id="drumsToggle" checked class="rounded border-slate-700 text-amber-500 focus:ring-0" />
+          </label>
+          <label class="flex items-center justify-between text-xs text-slate-300 p-2 rounded bg-slate-950/40 border border-slate-800 cursor-pointer hover:border-slate-700">
+            <span>Humanized Groove</span>
+            <input type="checkbox" id="grooveToggle" checked class="rounded border-slate-700 text-amber-500 focus:ring-0" />
+          </label>
+        </div>
+      </div>
+      <div class="border-t border-slate-800/70 pt-4">
+        <h2 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2.5">Instrument Mixers</h2>
+        <div class="space-y-3 font-mono text-xs">
+          <div>
+            <div class="flex justify-between text-slate-300 mb-1">
+              <span>Chords Pad</span>
+              <span id="chordsVolVal" class="text-slate-400">80%</span>
+            </div>
+            <input type="range" id="chordsVol" min="0" max="100" value="80" class="w-full accent-amber-500 h-1 bg-slate-800 rounded appearance-none" />
+          </div>
+          <div>
+            <div class="flex justify-between text-slate-300 mb-1">
+              <span>Bassline Synth</span>
+              <span id="bassVolVal" class="text-slate-400">85%</span>
+            </div>
+            <input type="range" id="bassVol" min="0" max="100" value="85" class="w-full accent-indigo-500 h-1 bg-slate-800 rounded appearance-none" />
+          </div>
+          <div>
+            <div class="flex justify-between text-slate-300 mb-1">
+              <span>Lead Topline</span>
+              <span id="leadVolVal" class="text-slate-400">90%</span>
+            </div>
+            <input type="range" id="leadVol" min="0" max="100" value="90" class="w-full accent-emerald-500 h-1 bg-slate-800 rounded appearance-none" />
+          </div>
+          <div>
+            <div class="flex justify-between text-slate-300 mb-1">
+              <span>Drum Machine</span>
+              <span id="drumVolVal" class="text-slate-400">75%</span>
+            </div>
+            <input type="range" id="drumVol" min="0" max="100" value="75" class="w-full accent-pink-500 h-1 bg-slate-800 rounded appearance-none" />
+          </div>
+        </div>
+      </div>
+      <!-- Quick Action -->
+      <div class="mt-auto pt-4 border-t border-slate-800/70">
+        <button id="randomizeProgBtn" class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-lg transition border border-slate-700 flex items-center justify-center gap-1.5">
+          <span>🎲</span> Re-compose All Tracks
+        </button>
+      </div>
+    </aside>
+
+    <!-- Center & Right: Studio Workspace Tabs -->
+    <main class="flex-1 flex flex-col overflow-hidden bg-slate-950">
+      <!-- Workspace Navigation Tabs -->
+      <nav class="flex-none border-b border-slate-800 bg-slate-900/30 px-6 pt-2 flex items-center justify-between">
+        <div class="flex items-center gap-2" id="tabButtons">
+          <button data-tab="chords" class="tab-btn active px-4 py-2 border-b-2 border-amber-400 text-white font-medium text-xs transition">
+            Harmonic Chords & Voicings
+          </button>
+          <button data-tab="melody" class="tab-btn px-4 py-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 font-medium text-xs transition">
+            Topline Melody Hook & Vocal Compass
+          </button>
+          <button data-tab="arrangement" class="tab-btn px-4 py-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 font-medium text-xs transition">
+            Arrangement Timeline & Energy
+          </button>
+          <button data-tab="substitutions" class="tab-btn px-4 py-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 font-medium text-xs transition">
+            Reharmonization & Color Chords
+          </button>
+          <button data-tab="prompts" class="tab-btn px-4 py-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 font-medium text-xs transition flex items-center gap-1.5">
+            <span class="text-amber-400 font-bold">✨</span>
+            <span>AI Music App Prompts & DAW</span>
+            <span class="px-1.5 py-0.5 text-[9px] font-mono rounded bg-teal-500/20 text-teal-300 border border-teal-500/30">Flow · Suno · Udio</span>
+          </button>
+        </div>
+        <div class="pb-2 text-xs text-slate-400 font-mono flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span id="currentStatus">Ready to compose</span>
+        </div>
+      </nav>
+
+      <!-- Tab Contents Area -->
+      <div class="flex-1 overflow-y-auto p-6 space-y-6">
+        <!-- TAB 1: Harmonic Chords & Voicings -->
+        <section id="tab-chords" class="tab-content space-y-6">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="flex items-center gap-2">
+                <h2 class="text-lg font-bold text-white tracking-tight">Active Harmonic Progression</h2>
+                <span class="text-xs font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded">Amend & Delete Enabled</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-0.5">Click any chord block to amend its root, quality, bass inversion, or delete/reorder chords in the progression.</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="addChordBtn" class="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs rounded-lg transition shadow-sm flex items-center gap-1 active:scale-95">
+                <span>+</span> Add Chord
+              </button>
+            </div>
+          </div>
+          <!-- Chord Cards Grid -->
+          <div class="grid grid-cols-4 gap-4" id="chordGrid">
+            <!-- Populated dynamically with amend, reorder & delete buttons -->
+          </div>
+          <!-- Detailed Chord Voice Inspector & Live Amendment Studio -->
+          <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-5 space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800/80 pb-3">
+              <div class="flex items-center gap-3">
+                <span class="text-base text-amber-400">🎹</span>
+                <div>
+                  <h3 class="text-sm font-bold uppercase tracking-wider text-slate-200 flex items-center gap-2">
+                    <span>Selected Chord Amendment & Voicing Studio:</span>
+                    <span id="inspectorChordName" class="text-amber-400 font-mono font-bold text-base">Am7</span>
+                    <span id="inspectorRoman" class="text-xs font-mono text-slate-400">i7 (Tonic Minor)</span>
+                  </h3>
+                  <p class="text-[11px] text-slate-400 mt-0.5">Modify root, quality, and bassline. Changes immediately update audio playback and AI prompt tags.</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <button id="duplicateSelectedChordBtn" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded-lg border border-slate-700 font-medium transition flex items-center gap-1 active:scale-95">
+                  <span>📋</span> Duplicate
+                </button>
+                <button id="deleteSelectedChordBtn" class="px-3 py-1.5 bg-rose-950/60 hover:bg-rose-900/60 text-rose-300 hover:text-rose-200 text-xs rounded-lg border border-rose-500/40 font-semibold transition flex items-center gap-1 active:scale-95">
+                  <span>🗑️</span> Delete Chord
+                </button>
+                <button id="auditionCurrentChordBtn" class="px-3.5 py-1.5 bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 text-xs rounded-lg border border-amber-500/40 font-semibold transition flex items-center gap-1.5 active:scale-95">
+                  <span>🔊</span> Audition Chord
+                </button>
+              </div>
+            </div>
+            <!-- Live Amendment Form Controls -->
+            <div class="grid grid-cols-4 gap-4 p-4 rounded-lg bg-slate-950/70 border border-slate-800/80 text-xs">
+              <div class="space-y-1.5">
+                <label for="amendChordRoot" class="block font-medium text-slate-300">Chord Root Note</label>
+                <select id="amendChordRoot" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-2 text-amber-400 font-mono font-bold focus:outline-none focus:border-amber-500">
+                  <option value="C">C</option>
+                  <option value="C#">C# / Db</option>
+                  <option value="D">D</option>
+                  <option value="Eb">D# / Eb</option>
+                  <option value="E">E</option>
+                  <option value="F">F</option>
+                  <option value="F#">F# / Gb</option>
+                  <option value="G">G</option>
+                  <option value="Ab">G# / Ab</option>
+                  <option value="A" selected>A</option>
+                  <option value="Bb">A# / Bb</option>
+                  <option value="B">B</option>
+                </select>
+                <p class="text-[10px] text-slate-400">Fundamental pitch center of voicing.</p>
+              </div>
+              <div class="space-y-1.5">
+                <label for="amendChordQuality" class="block font-medium text-slate-300">Chord Quality & Flavor</label>
+                <select id="amendChordQuality" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-2 text-slate-200 font-mono font-bold focus:outline-none focus:border-amber-500">
+                  <option value="maj">Major Triad (Root - 3 - 5)</option>
+                  <option value="min">Minor Triad (Root - b3 - 5)</option>
+                  <option value="7">Dominant 7th (Root - 3 - 5 - b7)</option>
+                  <option value="maj7">Major 7th (Root - 3 - 5 - 7)</option>
+                  <option value="m7" selected>Minor 7th (Root - b3 - 5 - b7)</option>
+                  <option value="9">Dominant 9th (Root - 3 - 5 - b7 - 9)</option>
+                  <option value="maj9">Major 9th (Root - 3 - 5 - 7 - 9)</option>
+                  <option value="m9">Minor 9th (Root - b3 - 5 - b7 - 9)</option>
+                  <option value="sus4">Suspended 4th (Root - 4 - 5)</option>
+                  <option value="sus2">Suspended 2nd (Root - 2 - 5)</option>
+                  <option value="add9">Add 9 (Root - 3 - 5 - 9)</option>
+                  <option value="m11">Minor 11th (Lush Modern Jazz)</option>
+                  <option value="13">Dominant 13th (Extended Color)</option>
+                  <option value="m7b5">Half-Diminished m7b5</option>
+                  <option value="dim7">Full Diminished 7th</option>
+                  <option value="aug">Augmented Triad</option>
+                </select>
+                <p class="text-[10px] text-slate-400">Harmonic color, intervals, and mood.</p>
+              </div>
+              <div class="space-y-1.5">
+                <label for="amendChordBass" class="block font-medium text-slate-300">Bass Inversion / Slash Note</label>
+                <select id="amendChordBass" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-2 text-indigo-400 font-mono font-bold focus:outline-none focus:border-amber-500">
+                  <option value="root" selected>Root Note in Bass (Standard)</option>
+                  <option value="third">1st Inversion (3rd in Bass)</option>
+                  <option value="fifth">2nd Inversion (5th in Bass)</option>
+                  <option value="seventh">3rd Inversion (7th in Bass)</option>
+                  <option value="pedal_tonic">Pedal Point on Tonic</option>
+                </select>
+                <p class="text-[10px] text-slate-400">Governs bassline walking movement.</p>
+              </div>
+              <div class="space-y-1.5">
+                <label for="amendChordFunction" class="block font-medium text-slate-300">Harmonic Function Label</label>
+                <input type="text" id="amendChordFunction" value="Tonic Foundation / Stable Resolution" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-2 text-slate-200 focus:outline-none focus:border-amber-500 text-xs" />
+                <p class="text-[10px] text-slate-400">Descriptive cue for arrangement prompts.</p>
+              </div>
+            </div>
+            <!-- Detailed Analysis Cards -->
+            <div class="grid grid-cols-3 gap-4 text-xs">
+              <div class="bg-slate-950/70 p-3.5 rounded-lg border border-slate-800/80">
+                <span class="text-slate-400 uppercase font-mono text-[10px] tracking-wider block mb-1">Voicing Notes</span>
+                <p id="inspectorNotes" class="font-mono text-amber-300 text-sm font-semibold">A3 - C4 - E4 - G4</p>
+                <p id="inspectorIntervals" class="text-slate-500 text-[11px] mt-1">Root, Minor 3rd, Perfect 5th, Minor 7th</p>
+              </div>
+              <div class="bg-slate-950/70 p-3.5 rounded-lg border border-slate-800/80">
+                <span class="text-slate-400 uppercase font-mono text-[10px] tracking-wider block mb-1">Harmonic Role</span>
+                <p id="inspectorFunction" class="text-slate-200 font-medium">Tonic Foundation / Stable Resolution</p>
+                <p class="text-slate-500 text-[11px] mt-1">Directly feeds chord guidance into AI prompts</p>
+              </div>
+              <div class="bg-slate-950/70 p-3.5 rounded-lg border border-slate-800/80">
+                <span class="text-slate-400 uppercase font-mono text-[10px] tracking-wider block mb-1">Bass Foundation</span>
+                <p id="inspectorBassNote" class="font-mono text-indigo-400 font-semibold text-sm">A1 / A2 Sub Octaves</p>
+                <p class="text-slate-500 text-[11px] mt-1">Root lock with rhythmic sub-frequency anchor</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 2: Topline Melody Hook & Vocal Compass -->
+        <section id="tab-melody" class="tab-content hidden space-y-6">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-lg font-bold text-white tracking-tight">Topline Melodic Hook & Vocal Range Guide</h2>
+              <p class="text-xs text-slate-400 mt-0.5">Craft memorable instrumental lead hooks and vocal cadences. Changing registers dynamically adapts notes.</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="generateHookBtn" class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold rounded-lg text-white transition flex items-center gap-1.5 active:scale-95 shadow-md shadow-emerald-950/40">
+                <span>🪄</span> Auto-Generate Catchy Hook
+              </button>
+              <button id="auditionHookBtn" class="px-3.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs font-medium rounded-lg text-slate-200 border border-slate-700 transition flex items-center gap-1.5 active:scale-95">
+                <span>🔊</span> Audition Melody
+              </button>
+            </div>
+          </div>
+          <!-- Target Song Section for Melodic Topline -->
+          <div class="p-4 bg-slate-900/60 border border-slate-800 rounded-xl space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="text-base text-emerald-400">🎯</span>
+                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-200">Song Section Choice (Shapes Melody Energy & Hook Structure)</h3>
+              </div>
+              <span id="activeSectionMelodyBadge" class="text-xs font-mono font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-500/50 px-2 py-0.5 rounded">
+                Chorus / Drop (Peak Hook)
+              </span>
+            </div>
+            <p class="text-xs text-slate-400">Choose which song section you are composing for:</p>
+            <div class="grid grid-cols-5 gap-2.5 text-xs" id="melodySectionButtons">
+              <button data-section-target="chorus" class="melody-sec-btn active p-2.5 rounded-lg bg-emerald-950/70 border border-emerald-500 text-emerald-200 font-semibold text-left transition hover:bg-emerald-900/40 shadow-sm">
+                <div class="flex items-center justify-between mb-0.5">
+                  <span class="font-bold text-white">Chorus / Drop</span>
+                  <span class="text-[10px] font-mono text-emerald-400 font-bold">Peak Hook</span>
+                </div>
+                <p class="text-[10px] text-slate-300 leading-snug">High-energy anthemic line, memorable earworm arch contour.</p>
+              </button>
+              <button data-section-target="verse" class="melody-sec-btn p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 font-semibold text-left transition hover:bg-slate-900">
+                <div class="flex items-center justify-between mb-0.5">
+                  <span class="font-bold text-slate-200">Verse Flow</span>
+                  <span class="text-[10px] font-mono text-amber-400 font-bold">Rhythmic</span>
+                </div>
+                <p class="text-[10px] text-slate-400 leading-snug">Syncopated rhythmic pocket, conversational phrasing and groove.</p>
+              </button>
+              <button data-section-target="intro" class="melody-sec-btn p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 font-semibold text-left transition hover:bg-slate-900">
+                <div class="flex items-center justify-between mb-0.5">
+                  <span class="font-bold text-slate-200">Ambient Intro</span>
+                  <span class="text-[10px] font-mono text-cyan-400 font-bold">Sparse</span>
+                </div>
+                <p class="text-[10px] text-slate-400 leading-snug">Spacious atmospheric motif establishing the tonal root.</p>
+              </button>
+              <button data-section-target="bridge" class="melody-sec-btn p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 font-semibold text-left transition hover:bg-slate-900">
+                <div class="flex items-center justify-between mb-0.5">
+                  <span class="font-bold text-slate-200">Bridge Shift</span>
+                  <span class="text-[10px] font-mono text-purple-400 font-bold">Harmonic</span>
+                </div>
+                <p class="text-[10px] text-slate-400 leading-snug">Emotional contrast, unexpected intervals and soaring leaps.</p>
+              </button>
+              <button data-section-target="outro" class="melody-sec-btn p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-300 font-semibold text-left transition hover:bg-slate-900">
+                <div class="flex items-center justify-between mb-0.5">
+                  <span class="font-bold text-slate-200">Outro Release</span>
+                  <span class="text-[10px] font-mono text-indigo-400 font-bold">Fadeout</span>
+                </div>
+                <p class="text-[10px] text-slate-400 leading-snug">Gentle descending cadence, resolving into delay tails.</p>
+              </button>
+            </div>
+          </div>
+          <!-- Vocal Range Compass & Phrasing Contour -->
+          <div class="grid grid-cols-3 gap-4">
+            <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-4">
+              <span class="text-xs font-semibold text-slate-300 block mb-2">Vocal Register Target</span>
+              <select id="vocalRegisterSelect" class="w-full bg-slate-950 border border-slate-700 text-xs rounded px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-emerald-500 font-medium">
+                <option value="tenor" selected>Tenor / Alto Pop Sweetspot (C3 - G4)</option>
+                <option value="soprano">Soprano High Lead / Synth Lead (E4 - C6)</option>
+                <option value="baritone">Baritone / Warm Intimate Range (G2 - E4)</option>
+                <option value="whistle">Hook Riff / Whistle Hook (A4 - E5)</option>
+              </select>
+              <p class="text-[11px] text-slate-400 mt-2">Adjusts melody octave boundaries and tension intervals in real time.</p>
+            </div>
+            <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-4">
+              <span class="text-xs font-semibold text-slate-300 block mb-2">Cadence & Syllabic Meter</span>
+              <select id="cadenceSelect" class="w-full bg-slate-950 border border-slate-700 text-xs rounded px-2.5 py-1.5 text-slate-200 focus:outline-none focus:border-emerald-500 font-medium">
+                <option value="syncopated" selected>Syncopated Pop Hook (Anticipation 8ths)</option>
+                <option value="driving">Driving 16th Staccato (Modern Dance)</option>
+                <option value="spacious">Spacious Ballad / Cinematic Legato</option>
+                <option value="triplet">Trap / R&B Triplet Phrasing</option>
+              </select>
+              <p class="text-[11px] text-slate-400 mt-2">Defines rhythmic note spacing, pauses, and breath marks.</p>
+            </div>
+            <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-4">
+              <span class="text-xs font-semibold text-slate-300 block mb-2">Melodic Contour Shape</span>
+              <div class="flex items-center gap-1.5 mt-1" id="contourButtons">
+                <button data-contour="arch" class="contour-btn active flex-1 py-1.5 text-center text-xs rounded bg-slate-800 text-emerald-400 border border-emerald-500/40 font-mono font-bold">Arch ⌢</button>
+                <button data-contour="ascending" class="contour-btn flex-1 py-1.5 text-center text-xs rounded bg-slate-950 text-slate-400 border border-slate-800 font-mono font-medium">Rise ↗</button>
+                <button data-contour="descending" class="contour-btn flex-1 py-1.5 text-center text-xs rounded bg-slate-950 text-slate-400 border border-slate-800 font-mono font-medium">Fall ↘</button>
+                <button data-contour="wave" class="contour-btn flex-1 py-1.5 text-center text-xs rounded bg-slate-950 text-slate-400 border border-slate-800 font-mono font-medium">Wave ~</button>
+              </div>
+              <p class="text-[11px] text-slate-400 mt-2">Sets pitch peak and dynamic tension curves across the 4 bars.</p>
+            </div>
+          </div>
+          <!-- Step Sequencer / Piano Roll Representation -->
+          <div class="bg-slate-900/70 border border-slate-800 rounded-xl p-5 space-y-3">
+            <div class="flex items-center justify-between text-xs">
+              <div class="flex items-center gap-2">
+                <span class="font-bold text-slate-200">16-Step Melodic Hook Sequencer</span>
+                <span class="text-slate-500 font-mono">(4 Bars / 16 Subdivisions)</span>
+              </div>
+              <div class="flex items-center gap-2 font-mono text-[11px] text-slate-400">
+                <span class="inline-block w-3 h-3 bg-emerald-500/40 rounded-sm border border-emerald-500"></span> Active Hit
+                <span class="inline-block w-3 h-3 bg-slate-800 rounded-sm border border-slate-700 ml-2"></span> Rest
+              </div>
+            </div>
+            <div class="space-y-1.5 font-mono text-xs overflow-x-auto py-2" id="pianoRollGrid">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 3: Arrangement Timeline & Energy Curve -->
+        <section id="tab-arrangement" class="tab-content hidden space-y-6">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-lg font-bold text-white tracking-tight">Song Structure, Timeline & Energy Curve</h2>
+              <p class="text-xs text-slate-400 mt-0.5">Directly adjust section lengths, dynamic tension, transition FX, and reorder song structure in real time.</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="addSectionTimelineBtn" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-xs font-semibold rounded-lg text-white transition flex items-center gap-1 active:scale-95 shadow-sm">
+                <span>➕</span> Add Section
+              </button>
+              <button id="optimizeArrangementBtn" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold rounded-lg text-white transition active:scale-95">
+                ⚡ Radio Pop Curve
+              </button>
+              <button id="flowArrangementBtn" class="px-3 py-1.5 bg-teal-700 hover:bg-teal-600 text-xs font-semibold rounded-lg text-white transition active:scale-95">
+                🌊 Flow State Curve
+              </button>
+              <button id="edmArrangementBtn" class="px-3 py-1.5 bg-purple-700 hover:bg-purple-600 text-xs font-semibold rounded-lg text-white transition active:scale-95">
+                🔥 EDM Build & Drop
+              </button>
+            </div>
+          </div>
+          <!-- Timeline Statistics Overview Banner -->
+          <div class="grid grid-cols-4 gap-4 p-4 rounded-xl bg-slate-900/70 border border-slate-800 text-xs">
+            <div class="flex items-center gap-3">
+              <span class="text-2xl text-amber-400">⏱️</span>
+              <div>
+                <span class="text-slate-400 text-[10px] uppercase font-mono block">Estimated Track Duration</span>
+                <span id="arrangementTotalDuration" class="text-sm font-bold font-mono text-white">2m 16s</span>
+                <span class="text-[10px] text-slate-500 block">Calculated from master BPM</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="text-2xl text-emerald-400">🎼</span>
+              <div>
+                <span class="text-slate-400 text-[10px] uppercase font-mono block">Total Bar Count</span>
+                <span id="arrangementTotalBars" class="text-sm font-bold font-mono text-emerald-400">68 Bars</span>
+                <span class="text-[10px] text-slate-500 block">4/4 Standard Time Signature</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="text-2xl text-indigo-400">🗂️</span>
+              <div>
+                <span class="text-slate-400 text-[10px] uppercase font-mono block">Arrangement Sections</span>
+                <span id="arrangementSectionCount" class="text-sm font-bold font-mono text-indigo-300">6 Structured Sections</span>
+                <span class="text-[10px] text-slate-500 block">Reorder, duplicate or delete</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="text-2xl text-rose-400">📈</span>
+              <div>
+                <span class="text-slate-400 text-[10px] uppercase font-mono block">Dynamic Peak Tension</span>
+                <span id="arrangementPeakEnergy" class="text-sm font-bold font-mono text-rose-400">95% (Main Flow / Drop)</span>
+                <span class="text-[10px] text-slate-500 block">Energy dynamics curve</span>
+              </div>
+            </div>
+          </div>
+          <!-- Section Timeline Interactive Adjuster Blocks -->
+          <div class="space-y-2.5" id="arrangementGrid">
+            <!-- Populated interactively -->
+          </div>
+          <!-- Energy Curve Visualizer -->
+          <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-5 space-y-4">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="text-base text-amber-400">📊</span>
+                <h3 class="text-sm font-semibold text-slate-200">Dynamic Tension & Energy Profile (0-100%)</h3>
+              </div>
+              <span class="text-xs font-mono text-slate-400">Drag or adjust sliders above to reshape tension peaks</span>
+            </div>
+            <div class="h-28 w-full bg-slate-950/80 rounded-lg p-3 relative flex items-end gap-2 border border-slate-800/80" id="energyBars">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+        </section>
+
+        <!-- TAB 4: Reharmonization & Color Chords -->
+        <section id="tab-substitutions" class="tab-content hidden space-y-6">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 class="text-lg font-bold text-white tracking-tight">Harmonic Substitutions & Color Palette</h2>
+              <p class="text-xs text-slate-400 mt-0.5">Replace standard chords with sophisticated jazz substitutions, modal borrowing, or secondary dominants.</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="applySubstitutionsBtn" class="px-3.5 py-1.5 bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 text-xs font-semibold rounded-lg border border-amber-500/40 transition active:scale-95 flex items-center gap-1.5">
+                <span>🔊</span> Audition All Color Chords
+              </button>
+              <button id="applyNeoSoulProgBtn" class="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-500 text-xs font-semibold rounded-lg text-white transition active:scale-95 flex items-center gap-1.5 shadow-sm">
+                <span>✨</span> Apply Neo-Soul Progression
+              </button>
+              <button id="applyCinematicProgBtn" class="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold rounded-lg text-white transition active:scale-95 flex items-center gap-1.5 shadow-sm">
+                <span>🎬</span> Apply Cinematic Progression
+              </button>
+            </div>
+          </div>
+          <!-- Target Bar Selector for Substitutions -->
+          <div class="p-4 bg-slate-900/60 border border-slate-800 rounded-xl flex items-center justify-between gap-4 text-xs">
+            <div class="flex items-center gap-2">
+              <span class="text-base text-amber-400">🎯</span>
+              <div>
+                <label for="substitutionTargetBarSelect" class="font-bold text-slate-200 block">Target Bar to Replace with Color Substitution:</label>
+                <p class="text-[11px] text-slate-400">Selecting a substitution below will immediately replace the chord in this bar.</p>
+              </div>
+            </div>
+            <select id="substitutionTargetBarSelect" class="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-amber-400 font-mono font-bold text-xs focus:outline-none focus:border-amber-500 w-64">
+              <!-- Populated dynamically via JS -->
+            </select>
+          </div>
+          <div class="grid grid-cols-2 gap-4" id="substitutionCards">
+            <!-- Populated via JS -->
+          </div>
+        </section>
+
+        <!-- TAB 5: DAW & Instrumental AI Prompt Studio -->
+        <section id="tab-prompts" class="tab-content hidden space-y-6">
+          <!-- Top Header & Fast Actions -->
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="flex items-center gap-2">
+                <h2 class="text-lg font-bold text-white tracking-tight">AI Music App Prompt Studio & Style Blender</h2>
+                <span class="text-xs font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded">Multi-Style Fusion · Timeline Cues</span>
+              </div>
+              <p class="text-xs text-slate-400 mt-1">Generate conflict-free acoustic prompts and structural section cues tuned for Google Flow Music, Suno, Udio, and DAWs.</p>
+            </div>
+            <div class="flex items-center gap-2">
+              <button id="quickFlowModeBtn" class="px-3.5 py-1.5 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 text-xs font-bold rounded-lg transition shadow-md shadow-teal-500/20 flex items-center gap-1.5 active:scale-95">
+                <span>🌊</span> 1-Click Flow Setup
+              </button>
+              <button id="copyMasterPromptBtn" class="px-3.5 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 text-xs font-bold rounded-lg transition shadow-md shadow-amber-500/20 flex items-center gap-1.5 active:scale-95">
+                <span>📋</span> Copy Style Prompt
+              </button>
+            </div>
+          </div>
+
+          <!-- Platform Selector Tabs (FLOW MUSIC FIRST-CLASS CITIZEN) -->
+          <div class="bg-slate-900/80 border border-slate-800 p-2 rounded-xl flex items-center gap-2 overflow-x-auto" id="promptPlatformTabs">
+            <button data-app="flowmusic" class="prompt-platform-btn active flex items-center gap-2 px-3.5 py-2 rounded-lg bg-teal-500 text-slate-950 font-bold text-xs transition">
+              <span class="w-2 h-2 rounded-full bg-slate-950"></span>
+              <span>Google Flow Music</span>
+            </button>
+            <button data-app="suno" class="prompt-platform-btn flex items-center gap-2 px-3.5 py-2 rounded-lg bg-slate-950 text-slate-300 hover:text-white hover:bg-slate-800 text-xs font-medium transition border border-slate-800">
+              <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+              <span>Suno AI (v3.5 / v4)</span>
+            </button>
+            <button data-app="udio" class="prompt-platform-btn flex items-center gap-2 px-3.5 py-2 rounded-lg bg-slate-950 text-slate-300 hover:text-white hover:bg-slate-800 text-xs font-medium transition border border-slate-800">
+              <span class="w-2 h-2 rounded-full bg-indigo-400"></span>
+              <span>Udio (v1.5)</span>
+            </button>
+            <button data-app="stable" class="prompt-platform-btn flex items-center gap-2 px-3.5 py-2 rounded-lg bg-slate-950 text-slate-300 hover:text-white hover:bg-slate-800 text-xs font-medium transition border border-slate-800">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span>Stable Audio 2.0</span>
+            </button>
+            <button data-app="musicfx" class="prompt-platform-btn flex items-center gap-2 px-3.5 py-2 rounded-lg bg-slate-950 text-slate-300 hover:text-white hover:bg-slate-800 text-xs font-medium transition border border-slate-800">
+              <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+              <span>MusicFX / Lyria</span>
+            </button>
+          </div>
+
+          <!-- Platform Guide Banner -->
+          <div id="platformGuideBanner" class="p-3.5 bg-teal-950/30 border border-teal-500/40 rounded-xl text-xs flex items-start gap-3">
+            <span class="text-teal-400 text-base mt-0.5">ℹ️</span>
+            <div>
+              <strong id="platformGuideTitle" class="text-teal-300 font-semibold block">Google Flow Music Prompting Workflow:</strong>
+              <span id="platformGuideText" class="text-slate-300 mt-0.5 block leading-relaxed">
+                Flow Music does not track clock time or bar numbers. Use relative structural descriptors ([Intro], [Build], [Drop / Main Theme], [Outro]), qualitative tempos, and concise acoustic descriptions. For best multi-part structures, generate section by section using audio continuation / inpainting.
+              </span>
+            </div>
+          </div>
+
+          <!-- 1. MULTI-STYLE BLENDING & FUSION ENGINE -->
+          <div id="styleBlenderSection" class="bg-gradient-to-br from-slate-900 via-slate-900/90 to-amber-950/20 border border-amber-500/40 rounded-xl p-5 space-y-4 shadow-lg shadow-amber-950/20">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-300 flex items-center justify-center text-lg font-bold">
+                  🎛️
+                </div>
+                <div>
+                  <h3 class="text-sm font-bold uppercase tracking-wider text-slate-100 flex items-center gap-2">
+                    <span>Multi-Style Fusion & Blending Engine</span>
+                    <span class="text-xs font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded">Interactive Studio</span>
+                  </h3>
+                  <p class="text-xs text-slate-400 mt-0.5">Seamlessly cross-pollinate 2 or 3 musical genres to generate unique hybrid AI music prompts.</p>
+                </div>
+              </div>
+              <span id="blendRatioBadge" class="text-xs font-mono font-bold bg-indigo-950/80 text-indigo-300 border border-indigo-500/50 px-2.5 py-1 rounded">
+                70% Flow State Deep Work + 30% Ambient Drone
+              </span>
+            </div>
+
+            <!-- Visual Fusion Blend Meter -->
+            <div class="space-y-1.5">
+              <div class="h-2.5 w-full bg-slate-950 rounded-full overflow-hidden flex border border-slate-800">
+                <div id="blendVisualPrimary" class="bg-amber-500 h-full transition-all duration-300" style="width: 70%;"></div>
+                <div id="blendVisualSecondary" class="bg-indigo-500 h-full transition-all duration-300" style="width: 30%;"></div>
+                <div id="blendVisualAccent" class="bg-emerald-500 h-full transition-all duration-300" style="width: 0%;"></div>
+              </div>
+              <div class="flex justify-between text-[11px] font-mono text-slate-400">
+                <span id="blendVisualPrimaryLabel" class="text-amber-400 font-bold">Primary: 70%</span>
+                <span id="blendVisualSecondaryLabel" class="text-indigo-400 font-bold">Secondary: 30%</span>
+                <span id="blendVisualAccentLabel" class="text-emerald-400 font-bold">Accent Flavor: 0%</span>
+              </div>
+            </div>
+
+            <!-- Dropdown Selectors Row -->
+            <div class="grid grid-cols-3 gap-5 text-xs">
+              <div class="space-y-1.5">
+                <label for="primaryStyleSelect" class="block font-medium text-slate-200">1. Primary Core Style</label>
+                <select id="primaryStyleSelect" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-2 text-slate-200 focus:outline-none focus:border-amber-500 font-medium">
+                  <option value="flow_deep_work" selected>🌊 Flow State Deep Work (Steady Hypnotic Focus)</option>
+                  <option value="flow_melodic">✨ Melodic Progressive Flow (Organic Pulse)</option>
+                  <option value="flow_downtempo">☕ Ambient Downtempo Flow (Liquid Rhodes)</option>
+                  <option value="ambient_chill">🌌 Ambient Chillout (Shimmer Pads)</option>
+                  <option value="synthwave">🌆 Retro Synthwave (Analog Saw Arps)</option>
+                  <option value="lofi_hiphop">📻 Lo-Fi Chillhop (Vinyl Crackle, Swung Pocket)</option>
+                  <option value="deep_melodic">⚡ Deep Melodic Techno (Hypnotic Pulse)</option>
+                  <option value="cinematic">🎻 Cinematic Neo-Classical (Grand Piano & Cellos)</option>
+                  <option value="neo_soul">🎸 Neo-Soul Groove (9th Chords, Warm Wurlitzer)</option>
+                </select>
+              </div>
+              <div class="space-y-1.5">
+                <label for="secondaryStyleSelect" class="block font-medium text-slate-200">2. Secondary Blend Style</label>
+                <select id="secondaryStyleSelect" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-2 text-slate-200 focus:outline-none focus:border-amber-500 font-medium">
+                  <option value="ambient_drone" selected>🧘 Meditative Ambient Drone (Singing Bowls)</option>
+                  <option value="cyberpunk">🌃 Dark Cyberpunk (Gritty Reese Bass)</option>
+                  <option value="lofi_jazz">🎷 Lofi Jazz Fusion (Extended Voicings)</option>
+                  <option value="post_rock">🎸 Atmospheric Post-Rock (Volume Swells)</option>
+                  <option value="none">None (100% Pure Primary)</option>
+                </select>
+              </div>
+              <div class="space-y-1.5">
+                <label for="accentStyleSelect" class="block font-medium text-slate-200">3. Instrumental Flavor Accent</label>
+                <select id="accentStyleSelect" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-2 text-slate-200 focus:outline-none focus:border-amber-500 font-medium">
+                  <option value="none" selected>None</option>
+                  <option value="koto_shakuhachi">🎋 Japanese Koto & Shakuhachi</option>
+                  <option value="rhodes_velvet">🎹 Velvet Rhodes Mk II</option>
+                  <option value="reese_bass">🔊 Gritty Reese Bass</option>
+                  <option value="juno_arps">🎛️ Analog Juno-106 Arps</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- VOCAL STYLE & TRACK PERFORMANCE MODE ENGINE -->
+          <div id="vocalSuiteSection" class="bg-gradient-to-r from-purple-950/40 via-indigo-950/30 to-slate-900/60 border border-purple-500/40 rounded-xl p-5 space-y-4 shadow-lg shadow-purple-950/20">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <span class="text-xl text-purple-400">🎤</span>
+                <div>
+                  <h3 class="text-sm font-bold uppercase tracking-wider text-slate-100 flex items-center gap-2">
+                    <span>Performance Mode: Vocal Song vs Instrumental</span>
+                    <span id="activeTrackModeBadge" class="text-xs font-mono font-bold bg-purple-950/80 text-purple-300 border border-purple-500/50 px-2 py-0.5 rounded">
+                      Vocal Song Active
+                    </span>
+                  </h3>
+                  <p class="text-xs text-slate-400 mt-0.5">Choose singing vocal delivery, singer timbre, and effects chain.</p>
+                </div>
+              </div>
+              <div class="flex items-center bg-slate-950 p-1 rounded-lg border border-slate-800">
+                <button id="trackModeInstrumentalBtn" class="track-mode-btn px-3 py-1.5 rounded-md text-xs font-semibold text-slate-400 hover:text-slate-200 transition flex items-center gap-1.5">
+                  <span>🔇</span> Pure Instrumental
+                </button>
+                <button id="trackModeVocalBtn" class="track-mode-btn active px-3 py-1.5 rounded-md text-xs font-bold bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow transition flex items-center gap-1.5">
+                  <span>🎙️</span> Vocal Song
+                </button>
+              </div>
+            </div>
+
+            <!-- Vocal Settings Controls -->
+            <div id="vocalControlsContainer" class="grid grid-cols-4 gap-4 text-xs pt-1">
+              <div class="space-y-1.5">
+                <label for="vocalDeliverySelect" class="block font-medium text-slate-200">1. Vocal Delivery Style</label>
+                <select id="vocalDeliverySelect" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-2 text-slate-200 focus:outline-none focus:border-purple-500 font-medium">
+                  <option value="operatic_soprano" selected>🎭 Cinematic Operatic Soprano (Dramatic High Vocalise)</option>
+                  <option value="ethereal_whisper">🌬️ Ethereal Breathy Whisper (Airy Intimate Falsetto)</option>
+                  <option value="soulful_belt">🔥 Soulful R&B & Belting (Passionate Runs)</option>
+                  <option value="modern_pop">✨ Modern Pop (Stacked Harmonies)</option>
+                  <option value="baritone_spoken">🎙️ Deep Baritone Crooner (Warm Spoken)</option>
+                </select>
+              </div>
+              <div class="space-y-1.5">
+                <label for="vocalGenderSelect" class="block font-medium text-slate-200">2. Singer Timbre & Gender</label>
+                <select id="vocalGenderSelect" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-2 text-slate-200 focus:outline-none focus:border-purple-500 font-medium">
+                  <option value="female" selected>Female Lead Vocalist</option>
+                  <option value="male">Male Lead Vocalist</option>
+                  <option value="choir">Full Vocal Ensemble / Choir</option>
+                </select>
+              </div>
+              <div class="space-y-1.5">
+                <label for="vocalFxSelect" class="block font-medium text-slate-200">3. Vocal FX Chain</label>
+                <select id="vocalFxSelect" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-2 text-slate-200 focus:outline-none focus:border-purple-500 font-medium">
+                  <option value="lush_reverb" selected>Lush Cathedral Plate Reverb & Delay</option>
+                  <option value="crisp_pop">Crisp Studio Pop (Direct, Punchy)</option>
+                  <option value="vintage_tape">Warm Vintage Tube Saturation</option>
+                </select>
+              </div>
+              <div class="space-y-1.5">
+                <label for="vocalRoleSelect" class="block font-medium text-slate-200">4. Vocal Arrangement Role</label>
+                <select id="vocalRoleSelect" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-2 text-slate-200 focus:outline-none focus:border-purple-500 font-medium">
+                  <option value="wordless_vocalise" selected>Wordless Vocalise & Atmospheric Hums</option>
+                  <option value="lead_lyrics">Full Lead Lyrics & Anthemic Hooks</option>
+                  <option value="vocal_chops">Melodic Vocal Chops & Hook Riffs</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- GENERATED OUTPUT PROMPTS -->
+          <div id="outputPromptSection" class="grid grid-cols-2 gap-5">
+            <!-- Primary Style & Prompt Box -->
+            <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-5 space-y-3">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h3 class="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                    <span id="outputBoxTitle">Primary Style & Fusion Prompt</span>
+                    <span id="charCountBadge" class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">0 chars</span>
+                  </h3>
+                  <p class="text-[11px] text-slate-400 mt-0.5">Optimized prompt text for your chosen audio platform.</p>
+                </div>
+                <button id="copyPromptBtn" class="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-lg transition active:scale-95 shadow">
+                  📋 Copy
+                </button>
+              </div>
+              <textarea id="aiPromptOutput" rows="7" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs font-mono text-amber-300 leading-relaxed focus:outline-none focus:border-amber-500 resize-none"></textarea>
+            </div>
+
+            <!-- Arrangement Cues Box -->
+            <div class="bg-slate-900/60 border border-slate-800 rounded-xl p-5 space-y-3">
+              <div class="flex items-center justify-between">
+                <div>
+                  <h3 class="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                    <span id="cuesBoxTitle">Flow Music Structural Arrangement Cues</span>
+                    <span id="cueFormatBadge" class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-teal-950 text-teal-300 border border-teal-500/30">Relative Tags</span>
+                  </h3>
+                  <p class="text-[11px] text-slate-400 mt-0.5">Relative section guides without clock timestamps or bar numbers.</p>
+                </div>
+                <button id="copyStructureBtn" class="px-3 py-1 bg-teal-600 hover:bg-teal-500 text-white font-semibold text-xs rounded-lg transition active:scale-95">
+                  📋 Copy Cues
+                </button>
+              </div>
+              <textarea id="aiStructureOutput" rows="7" class="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs font-mono text-teal-300 leading-relaxed focus:outline-none focus:border-teal-500 resize-none"></textarea>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // --- Application State ---
+    const state = {
+      bpm: 120,
+      key: 'Am',
+      isPlaying: false,
+      currentStep: 0,
+      timerId: null,
+      selectedChordIndex: 0,
+      volumes: { chords: 0.8, bass: 0.85, lead: 0.9, drums: 0.75 },
+      vocalRegister: 'soprano',
+      cadence: 'syncopated',
+      contour: 'arch',
+      melodySection: 'chorus',
+      
+      aiPromptOptions: {
+        app: 'flowmusic', // Defaults to Flow Music
+        trackMode: 'vocal',
+        vocalDelivery: 'operatic_soprano',
+        vocalGender: 'female',
+        vocalFx: 'lush_reverb',
+        vocalRole: 'wordless_vocalise',
+        primaryStyle: 'cinematic',
+        secondaryStyle: 'post_rock',
+        tertiaryStyle: 'none',
+        blendRatio: 70,
+        accentIntensity: 15,
+        injectChords: true,
+        injectVoices: true,
+        injectMelody: true,
+        injectDrums: true,
+        injectTimeline: true
+      },
+
+      presets: [
+        { id: 'cinematic', name: 'Cinematic Ambient', bpm: 72, key: 'Am', chords: [
+            { root: 'A', quality: 'm7', bassType: 'root', name: 'Am7', roman: 'i7', notes: ['A3', 'C4', 'E4', 'G4'], bass: 'A1', function: 'Tonic' },
+            { root: 'F', quality: 'maj7', bassType: 'root', name: 'Fmaj7', roman: 'VImaj7', notes: ['F3', 'A3', 'C4', 'E4'], bass: 'F1', function: 'Subdominant' },
+            { root: 'C', quality: 'maj', bassType: 'root', name: 'C', roman: 'III', notes: ['C3', 'E3', 'G3'], bass: 'C2', function: 'Mediant' },
+            { root: 'G', quality: 'add9', bassType: 'root', name: 'G(add9)', roman: 'VII(9)', notes: ['G3', 'B3', 'D4', 'A4'], bass: 'G1', function: 'Dominant' }
+          ]
+        },
+        { id: 'flow', name: 'Flow State / Deep Focus', bpm: 114, key: 'Am', chords: [
+            { root: 'A', quality: 'm9', bassType: 'root', name: 'Am9', roman: 'i9', notes: ['A3', 'C4', 'E4', 'G4', 'B4'], bass: 'A1', function: 'Hypnotic Center' },
+            { root: 'F', quality: 'maj7', bassType: 'root', name: 'Fmaj7', roman: 'VImaj7', notes: ['F3', 'A3', 'C4', 'E4'], bass: 'F1', function: 'Smooth Emotional Lift' },
+            { root: 'D', quality: 'm9', bassType: 'root', name: 'Dm9', roman: 'iv9', notes: ['D3', 'F3', 'A3', 'C4', 'E4'], bass: 'D2', function: 'Subtle Drift' },
+            { root: 'E', quality: 'm7', bassType: 'root', name: 'Em7', roman: 'v7', notes: ['E3', 'G3', 'B3', 'D4'], bass: 'E1', function: 'Seamless Turnaround' }
+          ]
+        }
+      ],
+
+      chords: [
+        { root: 'A', quality: 'm7', bassType: 'root', name: 'Am7', roman: 'i7', notes: ['A3', 'C4', 'E4', 'G4'], bass: 'A1', function: 'Tonic Foundation' },
+        { root: 'F', quality: 'maj7', bassType: 'root', name: 'Fmaj7', roman: 'VImaj7', notes: ['F3', 'A3', 'C4', 'E4'], bass: 'F1', function: 'Subdominant Emotional Lift' },
+        { root: 'C', quality: 'maj', bassType: 'root', name: 'C', roman: 'III', notes: ['C3', 'E3', 'G3'], bass: 'C2', function: 'Relative Major Anchor' },
+        { root: 'G', quality: 'add9', bassType: 'root', name: 'G(add9)', roman: 'VII(9)', notes: ['G3', 'B3', 'D4', 'A4'], bass: 'G1', function: 'Dominant Resolution' }
+      ],
+
+      melodyNotes: ['C6', 'A5', 'G5', 'E5', 'D5'],
+      melodyGrid: [
+        [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+        [0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0],
+        [0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1],
+        [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0]
+      ],
+
+      sections: [
+        { name: 'Intro', bars: 8, energy: 35, layers: ['Pads', 'Percussion'], transition: 'atmospheric', cue: 'Filtered ambient pad establishing tonal root, tape crackle, slow sub swell' },
+        { name: 'Verse 1', bars: 16, energy: 55, layers: ['Bass', 'Chords', 'Light Drums'], transition: 'sweep', cue: 'Steady rhythmic motif enters, walking bassline, hypnotic syncopation' },
+        { name: 'Build-Up', bars: 8, energy: 75, layers: ['Arp', 'Snare Roll', 'Bass'], transition: 'drop_cut', cue: 'Ascending arpeggios, rising snare density, high-pass filter sweep' },
+        { name: 'Main Theme / Climax', bars: 16, energy: 95, layers: ['Full Lead', 'Sub 808', 'Drums'], transition: 'sub_impact', cue: 'Full peak energy, singing topline melody hook, driving percussion pocket' },
+        { name: 'Bridge', bars: 8, energy: 50, layers: ['Filtered Chords', 'Minimal Drums'], transition: 'atmospheric', cue: 'Half-time breakdown, harmonic color shift, lush spacious delay' },
+        { name: 'Outro', bars: 8, energy: 30, layers: ['Decaying Pad', 'Sub Pulses'], transition: 'tape_stop', cue: 'Warm analog fade, decaying delay tails, smooth gentle release' }
+      ]
+    };
+
+    // Platform guides
+    const PLATFORM_GUIDES = {
+      flowmusic: {
+        title: "Google Flow Music Prompting Workflow:",
+        text: "Flow Music does not track clock time or bar numbers. Use relative structural descriptors ([Intro], [Build], [Drop / Main Theme], [Outro]), qualitative tempos, and concise acoustic descriptions. For best multi-part structures, generate section by section using audio continuation / inpainting."
+      },
+      suno: {
+        title: "Suno AI (v3.5 / v4) Workflow:",
+        text: "Paste the Primary Style Prompt into 'Style of Music' (keep ~120-180 chars). Paste Timestamped Arrangement Cues into the 'Lyrics' field with Custom Mode enabled."
+      },
+      udio: {
+        title: "Udio (v1.5) Workflow:",
+        text: "Use bracketed genre descriptors. Set prompt strength around 50% and clarity around 30%."
+      },
+      stable: {
+        title: "Stable Audio 2.0 Workflow:",
+        text: "Requires descriptive acoustic prose sentences detailing instruments, microphone placement, spatial depth, and master quality."
+      },
+      musicfx: {
+        title: "Google MusicFX / Lyria Workflow:",
+        text: "Focus on seamless continuous loops, melodic contours, tempo, and frequency balance."
+      }
+    };
+
+    const VOCAL_DELIVERIES = {
+      operatic_soprano: { name: "Cinematic Operatic Soprano", tag: "dramatic classical operatic soprano, soaring high range, wordless vocalise", cue: "Soaring operatic soprano vocalise reaching dramatic high pitch climax" },
+      ethereal_whisper: { name: "Ethereal Breathy Whisper", tag: "ethereal breathy vocals, intimate close-mic proximity, airy falsetto", cue: "Intimate breathy whispered vocals with floating delays" },
+      soulful_belt: { name: "Soulful R&B & Belting", tag: "soulful female belting vocals, dynamic vocal runs, expressive vibrato", cue: "Soaring soulful lead vocals with expressive chest resonance" },
+      modern_pop: { name: "Modern Pop Auto-Tune", tag: "polished modern pop vocals, stacked 3-part harmonies", cue: "Catchy modern pop vocal hook with stacked stereo harmonies" },
+      baritone_spoken: { name: "Deep Baritone Crooner", tag: "deep baritone vocals, warm low-end resonance, spoken monologue", cue: "Warm deep baritone vocals with intimate resonance" }
+    };
+
+    const PRIMARY_STYLES = {
+      cinematic: { name: "Cinematic Neo-Classical", tags: "cinematic neo-classical, felt grand piano, orchestral cellos, evocative emotional crescendo" },
+      flow_deep_work: { name: "Flow State Deep Work", tags: "flow state, deep work, hypnotic focus, non-intrusive pulse, continuous warm harmonics" },
+      flow_melodic: { name: "Melodic Progressive Flow", tags: "progressive flow, continuous melodic evolution, fluid momentum, evolving analog filters" },
+      flow_downtempo: { name: "Ambient Downtempo Flow", tags: "ambient downtempo flow, liquid electric keys, mellow sub pulse, tape saturation drift" },
+      ambient_chill: { name: "Ambient Chillout", tags: "ambient chillout, lush shimmer pads, cavernous reverb, peaceful meditative space" },
+      synthwave: { name: "Retro Synthwave", tags: "synthwave, 80s analog nostalgia, polyphonic saw leads, gated reverb drums" },
+      lofi_hiphop: { name: "Lo-Fi Chillhop", tags: "lo-fi chillhop, dusty vinyl crackle, cassette flutter, mellow Rhodes chords" },
+      deep_melodic: { name: "Deep Melodic Techno", tags: "deep melodic techno, minimalist hypnotic kick, subtle modular synths" },
+      neo_soul: { name: "Neo-Soul Groove", tags: "neo-soul, extended 9th chords, laid-back pocket, warm Wurlitzer" }
+    };
+
+    const SECONDARY_STYLES = {
+      none: { name: "Pure Primary", tags: "" },
+      post_rock: { name: "Atmospheric Post-Rock", tags: "dramatic volume swells, delayed chime guitars, expansive room space" },
+      ambient_drone: { name: "Meditative Ambient Drone", tags: "singing bowl resonance, endless shimmer reverb, tape air drift" },
+      cyberpunk: { name: "Dark Cyberpunk", tags: "gritty reese bass, dystopian neon synth stabs, dark analog grit" },
+      lofi_jazz: { name: "Lofi Jazz Fusion", tags: "extended 9th/11th jazz voicings, muted brass, warm brushed percussion" }
+    };
+
+    function formatTime(totalSeconds) {
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = Math.floor(totalSeconds % 60);
+      return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+    }
+
+    // --- Core AIPrompt Builder with Flow Music Conditioning ---
+    function updateAIPrompt() {
+      const opts = state.aiPromptOptions;
+      const keyName = state.key;
+      const bpmVal = state.bpm;
+      const secondsPerBar = 240 / bpmVal;
+      const isVocal = opts.trackMode === 'vocal';
+      const vocDel = VOCAL_DELIVERIES[opts.vocalDelivery] || VOCAL_DELIVERIES.operatic_soprano;
+      const prim = PRIMARY_STYLES[opts.primaryStyle] || PRIMARY_STYLES.cinematic;
+      const sec = SECONDARY_STYLES[opts.secondaryStyle] || SECONDARY_STYLES.none;
+      const activeChordNames = state.chords.map(c => c.name).join(' → ');
+
+      // Primary Prompt Box
+      let primaryPrompt = '';
+      if (opts.app === 'flowmusic') {
+        const tempoDescriptor = bpmVal < 80 ? 'slow and deliberate' : bpmVal < 115 ? 'laid-back steady pulse' : 'driving uptempo rhythm';
+        if (isVocal) {
+          primaryPrompt = `Vocal track in ${keyName}, ${tempoDescriptor} (~${bpmVal} BPM). Fronted by ${opts.vocalGender} ${vocDel.name.toLowerCase()} with cathedral reverb. Blends ${prim.name.toLowerCase()} with ${sec.name.toLowerCase()}. Progression: ${activeChordNames}. Dynamic acoustic mix, clean emotional delivery.`;
+        } else {
+          primaryPrompt = `Instrumental track in ${keyName}, ${tempoDescriptor} (~${bpmVal} BPM). Fusion of ${prim.name.toLowerCase()} and ${sec.name.toLowerCase()}. Harmonies revolve around ${activeChordNames}. Lead: ${state.contour} melodic hook. Wide stereo soundstage, zero vocals, no speech.`;
+        }
+      } else if (opts.app === 'suno') {
+        primaryPrompt = isVocal 
+          ? `[Genre: ${prim.name} / ${sec.name}] [Key: ${keyName} | ${bpmVal} BPM] [Vocals: ${opts.vocalGender} ${vocDel.name}] ${prim.tags}, ${vocDel.tag}, progression: ${activeChordNames}`
+          : `[Instrumental] [Genre: ${prim.name} / ${sec.name}] [Key: ${keyName} | ${bpmVal} BPM] ${prim.tags}, progression: ${activeChordNames}`;
+      } else {
+        primaryPrompt = `${prim.name}, ${sec.name}, ${keyName}, ${bpmVal} BPM, ${activeChordNames}, high quality audio production`;
+      }
+
+      // Structure Output Box (Crucial Fix for Flow Music)
+      let structurePrompt = '';
+      const cuesTitle = document.getElementById('cuesBoxTitle');
+      const cueBadge = document.getElementById('cueFormatBadge');
+
+      if (opts.app === 'flowmusic') {
+        if (cuesTitle) cuesTitle.textContent = "Google Flow Music Arrangement Cues";
+        if (cueBadge) {
+          cueBadge.textContent = "Relative Tags";
+          cueBadge.className = "text-[10px] font-mono px-1.5 py-0.5 rounded bg-teal-950 text-teal-300 border border-teal-500/30";
+        }
+
+        let flowLines = [
+          `[Track: ${isVocal ? opts.vocalGender + ' ' + vocDel.name : 'Pure Instrumental'} | Key: ${keyName} | Tempo: ~${bpmVal} BPM]`,
+          `[Chords: ${activeChordNames}]`,
+          ''
+        ];
+
+        state.sections.forEach((secObj) => {
+          flowLines.push(`[${secObj.name}]`);
+          let details = [];
+          if (secObj.cue) details.push(secObj.cue);
+
+          if (isVocal) {
+            const lower = secObj.name.toLowerCase();
+            if (lower.includes('intro')) details.push('Wordless soft vocalise hums');
+            else if (lower.includes('verse')) details.push('Intimate storytelling vocal');
+            else if (lower.includes('build')) details.push('Ascending pitch, rising vocal tension');
+            else if (lower.includes('main') || lower.includes('drop') || lower.includes('climax')) details.push(`${vocDel.cue} with wide harmonies`);
+            else if (lower.includes('bridge')) details.push('Stripped vulnerable vocal breakdown');
+            else if (lower.includes('outro')) details.push('Decaying vocal ad-libs into ambient reverb');
+          }
+
+          if (secObj.energy >= 80) details.push('Peak dynamic energy');
+          else if (secObj.energy <= 40) details.push('Sparse, atmospheric dynamic');
+
+          flowLines.push(details.join(', '));
+          flowLines.push('');
+        });
+
+        flowLines.push('[Outro / Gentle Fadeout]');
+        structurePrompt = flowLines.join('\n');
+      } else {
+        if (cuesTitle) cuesTitle.textContent = "Timeline-Structured Arrangement Cues";
+        if (cueBadge) {
+          cueBadge.textContent = "Timestamped";
+          cueBadge.className = "text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-500/30";
+        }
+
+        let totalBars = state.sections.reduce((acc, s) => acc + s.bars, 0);
+        let timelinePromptLines = [
+          isVocal ? `[Vocal Song Arrangement | Lead: ${opts.vocalGender} · ${vocDel.name}]` : `[Instrumental Arrangement - No Vocals]`,
+          `[Key: ${keyName} | Tempo: ${bpmVal} BPM | Total Duration: ${formatTime(totalBars * secondsPerBar)} (${totalBars} Bars)]`,
+          `[Harmonic Progression: ${activeChordNames}]`,
+          ''
+        ];
+
+        let cumBar = 1;
+        state.sections.forEach((secObj) => {
+          const startBar = cumBar;
+          const endBar = cumBar + secObj.bars - 1;
+          const startTime = (startBar - 1) * secondsPerBar;
+          const endTime = endBar * secondsPerBar;
+          timelinePromptLines.push(`[${formatTime(startTime)} - ${formatTime(endTime)} | Bars ${startBar}-${endBar}: ${secObj.name}]`);
+          timelinePromptLines.push(`(${secObj.cue} | Energy: ${secObj.energy}%)`);
+          timelinePromptLines.push('');
+          cumBar += secObj.bars;
+        });
+
+        timelinePromptLines.push('[Outro Fade & End]');
+        structurePrompt = timelinePromptLines.join('\n');
+      }
+
+      const promptTa = document.getElementById('aiPromptOutput');
+      const structTa = document.getElementById('aiStructureOutput');
+      if (promptTa) promptTa.value = primaryPrompt;
+      if (structTa) structTa.value = structurePrompt;
+      const charBadge = document.getElementById('charCountBadge');
+      if (charBadge) charBadge.textContent = `${primaryPrompt.length} chars`;
+
+      // Update Guide Banner
+      const guide = PLATFORM_GUIDES[opts.app] || PLATFORM_GUIDES.flowmusic;
+      const guideTitle = document.getElementById('platformGuideTitle');
+      const guideText = document.getElementById('platformGuideText');
+      if (guideTitle) guideTitle.textContent = guide.title;
+      if (guideText) guideText.textContent = guide.text;
+    }
+
+    // --- UI Renderers & Setup ---
+    function renderPresets() {
+      const container = document.getElementById('presetsContainer');
+      if (!container) return;
+      container.innerHTML = '';
+      state.presets.forEach(preset => {
+        const btn = document.createElement('button');
+        btn.className = 'w-full text-left p-2.5 rounded-lg border border-slate-800/80 bg-slate-950/40 hover:bg-slate-900 text-xs transition flex flex-col gap-0.5';
+        btn.innerHTML = `
+          <span class="font-semibold text-slate-200">${preset.name}</span>
+          <span class="text-[11px] font-mono text-slate-400">${preset.bpm} BPM · Key ${preset.key}</span>
+        `;
+        btn.addEventListener('click', () => {
+          state.bpm = preset.bpm;
+          state.key = preset.key;
+          state.chords = JSON.parse(JSON.stringify(preset.chords));
+          document.getElementById('bpmInput').value = preset.bpm;
+          document.getElementById('keySelect').value = preset.key;
+          renderChords();
+          updateAIPrompt();
+        });
+        container.appendChild(btn);
+      });
+    }
+
+    function renderChords() {
+      const container = document.getElementById('chordGrid');
+      if (!container) return;
+      container.innerHTML = '';
+      state.chords.forEach((chord, idx) => {
+        const isSelected = idx === state.selectedChordIndex;
+        const card = document.createElement('div');
+        card.className = `p-4 rounded-xl border transition-all cursor-pointer relative group ${
+          isSelected 
+            ? 'bg-amber-950/30 border-amber-500 shadow-md shadow-amber-950/50 ring-1 ring-amber-500/50' 
+            : 'bg-slate-900/50 border-slate-800 hover:border-slate-700'
+        }`;
+        card.innerHTML = `
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="text-xs font-mono font-bold text-slate-400">Bar ${idx + 1}</span>
+            <span class="text-xs font-mono font-bold text-amber-400 bg-slate-950/70 border border-slate-800 px-1.5 py-0.5 rounded">${chord.roman}</span>
+          </div>
+          <div class="text-2xl font-bold text-white font-mono tracking-tight my-1">${chord.name}</div>
+          <div class="text-xs text-slate-400 font-mono">${chord.notes.join(' · ')}</div>
+        `;
+        card.addEventListener('click', () => {
+          state.selectedChordIndex = idx;
+          renderChords();
+        });
+        container.appendChild(card);
+      });
+    }
+
+    function switchToTab(tabName) {
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        if (btn.dataset.tab === tabName) {
+          btn.classList.add('active', 'border-amber-400', 'text-white');
+          btn.classList.remove('border-transparent', 'text-slate-400');
+        } else {
+          btn.classList.remove('active', 'border-amber-400', 'text-white');
+          btn.classList.add('border-transparent', 'text-slate-400');
+        }
+      });
+      document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.add('hidden');
+      });
+      const target = document.getElementById(`tab-${tabName}`);
+      if (target) target.classList.remove('hidden');
+      if (tabName === 'prompts') updateAIPrompt();
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      renderPresets();
+      renderChords();
+      updateAIPrompt();
+
+      // Tab switcher
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => switchToTab(btn.dataset.tab));
+      });
+
+      // Platform selection
+      document.querySelectorAll('.prompt-platform-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          state.aiPromptOptions.app = btn.dataset.app;
+          document.querySelectorAll('.prompt-platform-btn').forEach(b => {
+            b.classList.remove('active', 'bg-teal-500', 'bg-amber-500', 'text-slate-950', 'font-bold');
+            b.classList.add('bg-slate-950', 'text-slate-300');
+          });
+          btn.classList.add('active', btn.dataset.app === 'flowmusic' ? 'bg-teal-500' : 'bg-amber-500', 'text-slate-950', 'font-bold');
+          btn.classList.remove('bg-slate-950', 'text-slate-300');
+          updateAIPrompt();
+        });
+      });
+
+      // Quick app buttons from sidebar
+      document.querySelectorAll('#sidebarAppList button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const target = btn.dataset.targetApp;
+          const targetBtn = document.querySelector(`.prompt-platform-btn[data-app="${target}"]`);
+          if (targetBtn) targetBtn.click();
+          switchToTab('prompts');
+        });
+      });
+
+      // Performance Mode
+      const trackModeInstBtn = document.getElementById('trackModeInstrumentalBtn');
+      const trackModeVocBtn = document.getElementById('trackModeVocalBtn');
+      if (trackModeInstBtn && trackModeVocBtn) {
+        trackModeInstBtn.addEventListener('click', () => {
+          state.aiPromptOptions.trackMode = 'instrumental';
+          trackModeInstBtn.className = 'track-mode-btn active px-3 py-1.5 rounded-md text-xs font-bold bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 shadow transition flex items-center gap-1.5';
+          trackModeVocBtn.className = 'track-mode-btn px-3 py-1.5 rounded-md text-xs font-semibold text-slate-400 hover:text-slate-200 transition flex items-center gap-1.5';
+          document.getElementById('activeTrackModeBadge').textContent = 'Pure Instrumental Active';
+          document.getElementById('activeTrackModeBadge').className = 'text-xs font-mono font-bold bg-amber-950/80 text-amber-300 border border-amber-500/50 px-2 py-0.5 rounded';
+          updateAIPrompt();
+        });
+        trackModeVocBtn.addEventListener('click', () => {
+          state.aiPromptOptions.trackMode = 'vocal';
+          trackModeVocBtn.className = 'track-mode-btn active px-3 py-1.5 rounded-md text-xs font-bold bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow transition flex items-center gap-1.5';
+          trackModeInstBtn.className = 'track-mode-btn px-3 py-1.5 rounded-md text-xs font-semibold text-slate-400 hover:text-slate-200 transition flex items-center gap-1.5';
+          document.getElementById('activeTrackModeBadge').textContent = 'Vocal Song Active';
+          document.getElementById('activeTrackModeBadge').className = 'text-xs font-mono font-bold bg-purple-950/80 text-purple-300 border border-purple-500/50 px-2 py-0.5 rounded';
+          updateAIPrompt();
+        });
+      }
+
+      // Copy Buttons
+      document.getElementById('copyPromptBtn').addEventListener('click', () => {
+        navigator.clipboard.writeText(document.getElementById('aiPromptOutput').value);
+        document.getElementById('currentStatus').textContent = 'Copied style prompt!';
+      });
+      document.getElementById('copyStructureBtn').addEventListener('click', () => {
+        navigator.clipboard.writeText(document.getElementById('aiStructureOutput').value);
+        document.getElementById('currentStatus').textContent = 'Copied arrangement cues!';
+      });
+      document.getElementById('openPromptsHeaderBtn').addEventListener('click', () => switchToTab('prompts'));
+      document.getElementById('quickFlowModeBtn').addEventListener('click', () => {
+        state.aiPromptOptions.app = 'flowmusic';
+        const flowBtn = document.querySelector('.prompt-platform-btn[data-app="flowmusic"]');
+        if (flowBtn) flowBtn.click();
+        switchToTab('prompts');
+      });
+    });
+  </script>
+</body>
+</html>

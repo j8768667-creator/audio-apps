@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Composer Lab Pro - Human Composer v2</title>
+<style>
+:root{--bg:#07070a;--panel:#111116;--cyan:#00f0ff;--green:#39ff14;--pink:#ff007f;--yellow:#ffcc00;--text:#e2e8f0;--border:#22222e}
+*{box-sizing:border-box;margin:0;padding:0;font-family:monospace;touch-action:manipulation}
+body{background:var(--bg);color:var(--text);padding:15px;display:flex;justify-content:center;min-height:100vh}
+.lab-card{width:100%;max-width:480px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:15px;margin-bottom:12px}
+h1{font-size:1.1rem;letter-spacing:1px;color:#fff;margin-bottom:5px}
+label{display:block;font-size:.75rem;margin-bottom:5px;color:#a0aec0}
+input[type=text],select{width:100%;background:#000;border:1px solid var(--border);padding:10px;color:#fff;font-size:16px!important;border-radius:4px;outline:none}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px}
+.btn-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px}
+.p-btn{background:#1a1a24;border:1px solid var(--border);color:#fff;padding:8px 4px;font-size:.7rem;cursor:pointer;border-radius:4px;text-align:center;user-select:none;-webkit-user-select:none}
+.p-btn.active{background:var(--cyan);color:#000;font-weight:bold}
+.s-row{display:flex;justify-content:space-between;font-size:.75rem;margin-top:10px}
+input[type=range]{width:100%;accent-color:var(--cyan);margin-top:4px}
+.console{background:#000;border:1px solid #1f441f;height:100px;overflow-y:auto;font-size:.7rem;color:var(--green);padding:8px;border-radius:4px}
+.action-btn{width:100%;padding:12px;background:var(--cyan);color:#000;font-weight:bold;border:none;border-radius:6px;cursor:pointer;font-size:.85rem;margin-bottom:8px;user-select:none}
+.action-btn.on{background:#000;color:#ff3333;border:1px solid #ff3333}
+.export-btn{background:#102a10;color:var(--green);border:1px solid var(--green)}
+.drum-row{display:flex;align-items:center;margin-bottom:6px}.drum-label{width:50px;font-size:.65rem;color:var(--yellow);font-weight:bold}
+.step-grid{display:grid;grid-template-columns:repeat(16,1fr);gap:3px;flex:1}
+.step{aspect-ratio:1;background:#181820;border:1px solid #2a2a38;border-radius:2px;cursor:pointer}
+.step.active{background:var(--pink);border-color:#ff66cc}.step.current{border:1px solid var(--cyan);box-shadow:0 0 4px var(--cyan)}
+.step:nth-child(4n+1){border-left-color:#555}
+.small-note{font-size:.67rem;color:#77809a;line-height:1.45;margin-top:8px}
+.transport{display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:6px;position:sticky;bottom:8px;z-index:5}
+.transport .action-btn{margin:0;padding:11px 5px;font-size:.72rem}
+.composer-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.preset-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.preset-grid .p-btn{font-size:.65rem}
+.action-btn.secondary{background:#1a1a24;color:#fff;border:1px solid var(--border)}
+.action-btn.secondary.active{background:#fff;color:#000}
+@media(max-width:380px){.transport{grid-template-columns:1.35fr 1fr 1fr}.transport .action-btn{font-size:.65rem;padding:10px 2px}.preset-grid{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<div style="width:100%;max-width:480px">
+  <div class="lab-card">
+    <h1>COMPOSER LAB PRO — HUMAN COMPOSER v2</h1>
+    <div class="small-note">Motif-led melody • voice-leading • bass movement • humanised MIDI timing • phrase dynamics</div>
+  </div>
+
+  <div class="lab-card">
+    <label>Chord Progression</label>
+    <input type="text" id="chords" value="C, G, Am, F" oninput="invalidateSchedule()">
+    <div class="grid-2">
+      <div>
+        <label>Key Center & Scale</label>
+        <select id="scale" onchange="invalidateSchedule()">
+          <option value="chromatic">Chromatic</option>
+          <option value="major" selected>Major</option>
+          <option value="minor">Minor</option>
+          <option value="pentatonic">Pentatonic</option>
+        </select>
+      </div>
+      <div>
+        <label>Base Octave</label>
+        <select id="octave" onchange="invalidateSchedule()">
+          <option value="3">Octave 3</option>
+          <option value="4" selected>Octave 4</option>
+          <option value="5">Octave 5</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="lab-card">
+    <label>Human Composer</label>
+    <div class="composer-grid">
+      <select id="composer" onchange="logComposerStyle();invalidateSchedule()">
+        <option value="pop" selected>Modern Pop</option>
+        <option value="ballad">Piano Ballad</option>
+        <option value="cinematic">Cinematic</option>
+        <option value="soul">Soul / R&B</option>
+        <option value="indie">Indie / Folk</option>
+        <option value="ambient">Ambient</option>
+        <option value="classical">Classical</option>
+      </select>
+      <select id="texture" onchange="invalidateSchedule()">
+        <option value="melodic" selected>Melodic Lead</option>
+        <option value="arpeggio">Arpeggio</option>
+        <option value="alberti">Alberti</option>
+        <option value="pedal">Pedal Point</option>
+        <option value="voiceLeading">Voice Lead</option>
+        <option value="bassline">Bass + Chords</option>
+      </select>
+    </div>
+    <div id="composerDesc" class="small-note">Pop: memorable hooks, syncopation and repeated motifs.</div><label style="margin-top:10px">Articulation Character</label>
+    <div class="btn-grid">
+      <button class="p-btn active" onclick="setArt('legato',this)">Legato</button>
+      <button class="p-btn" onclick="setArt('staccato',this)">Staccato</button>
+      <button class="p-btn" onclick="setArt('tenuto',this)">Tenuto</button>
+      <button class="p-btn" onclick="setArt('accent',this)">Accent</button>
+      <button class="p-btn" onclick="setArt('marcato',this)">Marcato</button>
+      <button class="p-btn" onclick="setArt('glissando',this)">Glissando</button>
+    </div>
+    <div class="s-row"><span>Tempo</span><span id="tVal">120 BPM</span></div>
+    <input type="range" id="tempo" min="60" max="180" value="120" oninput="up()" onchange="invalidateSchedule()">
+  </div>
+
+  <div class="lab-card">
+    <label style="color:var(--pink);font-weight:bold;margin-bottom:8px">16-STEP DRUM ENGINE</label>
+    <div class="drum-row"><div class="drum-label">HI-HAT</div><div class="step-grid" id="grid-hat"></div></div>
+    <div class="drum-row"><div class="drum-label">SNARE</div><div class="step-grid" id="grid-snare"></div></div>
+    <div class="drum-row"><div class="drum-label">KICK</div><div class="step-grid" id="grid-kick"></div></div>
+    <label style="margin-top:10px">Drum Presets</label>
+    <div class="preset-grid">
+      <button class="p-btn" onclick="loadPreset('pop')">Pop</button>
+      <button class="p-btn" onclick="loadPreset('rock')">Rock</button>
+      <button class="p-btn" onclick="loadPreset('funk')">Funk</button>
+      <button class="p-btn" onclick="loadPreset('disco')">Disco</button>
+      <button class="p-btn" onclick="loadPreset('ballad')">Ballad</button>
+      <button class="p-btn" onclick="loadPreset('hiphop')">Hip-Hop</button>
+      <button class="p-btn" onclick="loadPreset('indie')">Indie</button>
+      <button class="p-btn" onclick="loadPreset('shuffle')">Shuffle</button>
+      <button class="p-btn" onclick="loadPreset('breakbeat')">Breakbeat</button>
+    </div>
+  </div>
+
+  <div class="lab-card">
+    <label>Export Repetitions</label>
+    <select id="exportLoops" onchange="invalidateSchedule()">
+      <option value="1">1 Progression Loop</option>
+      <option value="2">2 Progression Loops</option>
+      <option value="4" selected>4 Progression Loops</option>
+      <option value="8">8 Progression Loops</option>
+    </select>
+    <div class="small-note">Melodic mode creates a four-bar motif, repeats it with controlled variation, and lets the melody resolve into chord tones.</div>
+  </div>
+
+  <div class="lab-card"><div class="console" id="term">System Standby...</div></div>
+  <div class="transport">
+  <button class="action-btn" id="act" onclick="toggle()">PLAY</button>
+  <button class="action-btn secondary" onclick="pauseEngine()">PAUSE</button>
+  <button class="action-btn secondary" onclick="rewindEngine()">↶ BEGIN</button>
+</div>
+<button class="action-btn export-btn" onclick="exportMIDI()">EXPORT 5-TRACK MIDI</button>
+</div>
+
+<script>
+let ctx=null,playing=false,paused=false,pattern='melodic',articulation='legato',composer='pop',step=0,drumStep=0,timer=null,lastPreviewFreq=null;
+let scheduleData=null,transportBaseCtxTime=0,pausedAtRel=0,evtCursor=0;
+let voiceBus=null,masterReverb=null;
+
+const drumState={
+  hat:[1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0],
+  snare:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0],
+  kick:[1,0,0,0,0,0,1,0,0,0,1,0,0,0,0,0]
+};
+
+const noteNames=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+const chordIntervals={
+  "":[0,4,7],"m":[0,3,7],"5":[0,7],"7":[0,4,7,10],
+  "maj7":[0,4,7,11],"m7":[0,3,7,10],"dim":[0,3,6],"sus4":[0,5,7]
+};
+
+function initDrumUI(){
+  ['hat','snare','kick'].forEach(inst=>{
+    const c=document.getElementById(`grid-${inst}`);c.innerHTML='';
+    for(let i=0;i<16;i++){
+      const e=document.createElement('div');
+      e.className=`step ${drumState[inst][i]?'active':''}`;
+      e.onclick=()=>{drumState[inst][i]^=1;e.className=`step ${drumState[inst][i]?'active':''}`;invalidateSchedule()};
+      c.appendChild(e);
+    }
+  });
+}
+initDrumUI();
+
+function loadPreset(type){
+  const presets={
+    pop:{
+      hat:[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      snare:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0],
+      kick:[1,0,0,0,0,0,1,0,0,0,1,0,0,0,1,0]},
+    rock:{
+      hat:[1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0],
+      snare:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0],
+      kick:[1,0,1,0,0,0,0,0,1,0,0,0,0,0,1,0]},
+    funk:{
+      hat:[1,1,1,0,1,1,1,0,1,1,1,0,1,1,1,1],
+      snare:[0,0,1,0,1,0,0,1,0,0,1,0,1,0,0,1],
+      kick:[1,0,0,1,0,0,1,0,1,0,0,1,0,1,0,0]},
+    disco:{
+      hat:[1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0],
+      snare:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0],
+      kick:[1,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0]},
+    ballad:{
+      hat:[0,0,1,0,0,0,1,0,0,0,1,0,0,0,1,0],
+      snare:[0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0],
+      kick:[1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0]},
+    hiphop:{
+      hat:[1,0,1,1,1,0,1,0,1,0,1,1,1,0,1,1],
+      snare:[0,0,0,1,1,0,0,0,0,0,1,0,1,0,0,0],
+      kick:[1,0,0,1,0,0,1,0,1,0,0,0,0,1,0,0]},
+    indie:{
+      hat:[1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,1],
+      snare:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0],
+      kick:[1,0,0,0,0,0,1,0,1,0,0,0,0,0,1,0]},
+    shuffle:{
+      hat:[1,0,0,1,1,0,0,1,1,0,0,1,1,0,0,1],
+      snare:[0,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0],
+      kick:[1,0,0,0,0,0,1,0,1,0,0,0,0,0,1,0]},
+    breakbeat:{
+      hat:[1,0,1,1,1,0,1,0,1,1,0,1,1,0,1,0],
+      snare:[0,0,0,1,1,0,0,0,0,0,1,0,1,0,0,0],
+      kick:[1,0,0,1,0,1,0,0,1,0,0,1,0,0,1,0]}
+  };
+  const q=presets[type]||presets.pop;
+  drumState.hat=q.hat.slice();drumState.snare=q.snare.slice();drumState.kick=q.kick.slice();
+  initDrumUI();log("Loaded "+type.toUpperCase()+" drum pattern.");invalidateSchedule();
+}
+
+function parseChord(symbol){
+  let s=symbol.trim(),m=s.match(/^([A-G][#b]?)(.*)$/);
+  if(!m)return [60,64,67];
+  let root=m[1],type=m[2].toLowerCase();
+  const flats={"Db":"C#","Eb":"D#","Gb":"F#","Ab":"G#","Bb":"A#"};
+  if(flats[root])root=flats[root];
+  let idx=noteNames.indexOf(root);if(idx<0)idx=0;
+  let octave=parseInt(document.getElementById('octave').value,10);
+  let base=(octave+1)*12+idx;
+  let ints=chordIntervals[type]||chordIntervals[""];
+  return ints.map(i=>base+i);
+}
+function chordRoot(symbol){return parseChord(symbol)[0];}
+function up(){document.getElementById('tVal').innerText=document.getElementById('tempo').value+" BPM"}
+function setPattern(p,b){pattern=p;b.parentElement.querySelectorAll('.p-btn').forEach(x=>x.classList.remove('active'));b.classList.add('active');log("Pattern: "+p.toUpperCase())}
+function logComposerStyle(){
+  composer=document.getElementById('composer').value;
+  const d={
+    pop:'Pop: memorable hooks, syncopation and repeated motifs.',
+    ballad:'Ballad: spacious phrases, stepwise motion and warm resolutions.',
+    cinematic:'Cinematic: wide register, larger leaps and long 8-bar arcs.',
+    soul:'Soul / R&B: syncopation, approach notes and expressive turns.',
+    indie:'Indie / Folk: simple singable motifs with gentle repetition.',
+    ambient:'Ambient: sparse notes, wide register and long breathing spaces.',
+    classical:'Classical: balanced phrases, passing tones and cadential direction.'
+  };
+  document.getElementById('composerDesc').textContent=d[composer]||'';
+  log('Composer: '+composer.toUpperCase());
+}
+function setArt(a,b){articulation=a;b.parentElement.querySelectorAll('.p-btn').forEach(x=>x.classList.remove('active'));b.classList.add('active');log("Articulation: "+a.toUpperCase());invalidateSchedule()}
+function log(msg){const c=document.getElementById('term');c.innerHTML+="<br>> "+msg;c.scrollTop=c.scrollHeight}
+
+function toggle(){
+  if(!ctx)ctx=new(window.AudioContext||window.webkitAudioContext)();
+  if(ctx.state==='suspended')ctx.resume();
+  playing?stop():start();
+}
+function start(){
+  playing=true;paused=false;
+  const b=document.getElementById('act');b.innerText="STOP";b.classList.add('on');
+  if(!scheduleData){
+    // Compose the real arrangement (identical pipeline to the MIDI export) rather than a
+    // separate, much simpler stand-in - what you hear on Play now matches what you export.
+    log("Composing the full arrangement for preview...");
+    try{
+      const arr=composeArrangement();
+      scheduleData=buildSchedule(arr);
+      evtCursor=0;pausedAtRel=0;
+      log("Playing "+arr.pattern.toUpperCase()+" \u2022 "+arr.composer.toUpperCase()+" \u2022 "+arr.articulation.toUpperCase()+" ("+arr.loops+" loop"+(arr.loops>1?'s':'')+" through "+arr.chordsList.join(' - ')+").");
+    }catch(e){
+      log("Preview error: "+(e&&e.message?e.message:e));
+      playing=false;b.innerText="PLAY";b.classList.remove('on');
+      return;
+    }
+  }else{
+    log("Resuming playback.");
+  }
+  transportBaseCtxTime=ctx.currentTime-pausedAtRel+.06;
+  runScheduler();
+}
+function stopCommon(msg){
+  playing=false;clearTimeout(timer);
+  pausedAtRel=Math.max(0,ctx?ctx.currentTime-transportBaseCtxTime:0);
+  document.getElementById('act').innerText="PLAY";document.getElementById('act').classList.remove('on');
+  log(msg);
+}
+function stop(){paused=false;stopCommon("Playback stopped.");}
+function pauseEngine(){
+  if(!playing)return;
+  paused=true;stopCommon("Paused.");
+}
+function rewindEngine(){
+  clearTimeout(timer);playing=false;paused=false;
+  scheduleData=null;evtCursor=0;pausedAtRel=0;
+  document.getElementById('act').innerText="PLAY";
+  document.getElementById('act').classList.remove('on');
+  log("Returned to beginning.");
+}
+
+// Any control that changes what should be composed (composer, texture, articulation, tempo,
+// chords, scale, octave, loop count, drum pattern) must throw away the cached arrangement -
+// otherwise Play just keeps resuming whatever was baked in on the very first press, and every
+// knob on the page silently stops doing anything after that. If we're already playing, restart
+// immediately so the change is heard right away instead of requiring a manual rewind.
+function invalidateSchedule(){
+  scheduleData=null;evtCursor=0;pausedAtRel=0;
+  if(playing){
+    clearTimeout(timer);
+    start();
+  }
+}
+
+/* Lookahead scheduler: converts the arrangement's tick-based events (with rubato tempo curve
+   applied) into real audio-clock time, and fires them slightly ahead of when they're due so
+   the Web Audio engine has time to start each note precisely - the standard technique for
+   drift-free JS-driven audio scheduling. */
+function runScheduler(){
+  if(!playing||!scheduleData)return;
+  const lookahead=.15,nowRel=ctx.currentTime-transportBaseCtxTime;
+  while(evtCursor<scheduleData.events.length&&scheduleData.events[evtCursor].sec<nowRel+lookahead){
+    const e=scheduleData.events[evtCursor];
+    const del=Math.max(0,(transportBaseCtxTime+e.sec)-ctx.currentTime);
+    if(e.kind==='synth')playSynth(e.n,e.vel,del,e.dur,{timbre:e.timbre,art:e.art,gain:e.gain});
+    else playDrumSound(e.type,del);
+    evtCursor++;
+  }
+  if(evtCursor>=scheduleData.events.length&&nowRel>scheduleData.totalSec){
+    transportBaseCtxTime+=scheduleData.totalSec;
+    evtCursor=0;
+    log("Looping arrangement...");
+  }
+  timer=setTimeout(runScheduler,25);
+}
+
+// A shared reverb bus is what actually stops this from sounding like a dry toy synth - every
+// voice below feeds it, giving the whole ensemble a sense of shared space instead of each note
+// sounding like an isolated beep. The impulse response is generated procedurally (decaying noise)
+// since we can't load an external audio file here.
+function makeImpulseResponse(duration,decay){
+  const rate=ctx.sampleRate,len=Math.floor(rate*duration),buf=ctx.createBuffer(2,len,rate);
+  for(let ch=0;ch<2;ch++){
+    const d=buf.getChannelData(ch);
+    for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/len,decay);
+  }
+  return buf;
+}
+function ensureAudioGraph(){
+  if(!ctx||voiceBus)return;
+  masterReverb=ctx.createConvolver();
+  masterReverb.buffer=makeImpulseResponse(2.3,2.7);
+  const reverbGain=ctx.createGain();reverbGain.gain.value=.22;
+  masterReverb.connect(reverbGain);reverbGain.connect(ctx.destination);
+  voiceBus=ctx.createGain();voiceBus.gain.value=1;
+  voiceBus.connect(ctx.destination);
+  voiceBus.connect(masterReverb);
+}
+
+function playSynth(n,vel,del,dur,opts){
+  if(!ctx)return;
+  ensureAudioGraph();
+  opts=opts||{};
+  const trig=ctx.currentTime+del,d=Math.max(.03,dur),timbre=opts.timbre||'lead';
+  if(timbre==='bass')playBassVoice(n,vel,trig,d);
+  else if(timbre==='pad')playPadVoice(n,vel,trig,d,opts.gain);
+  else playLeadVoice(n,vel,trig,d,opts.art,opts.gain);
+}
+
+// Lead: two slightly detuned oscillators (saw+triangle) through a filter that closes after the
+// attack, plus vibrato on longer notes - this is what gives a synth lead actual body and
+// movement instead of one flat waveform.
+function playLeadVoice(n,vel,trig,d,art,gainMul){
+  const f=440*Math.pow(2,(n-69)/12);
+  const g=ctx.createGain(),filt=ctx.createBiquadFilter();
+  filt.type='lowpass';filt.Q.value=1.1;
+  const o1=ctx.createOscillator();o1.type='sawtooth';
+  const o2=ctx.createOscillator();o2.type='triangle';
+  if(art==='glissando'&&lastPreviewFreq){
+    o1.frequency.setValueAtTime(lastPreviewFreq,trig);o1.frequency.linearRampToValueAtTime(f,trig+Math.min(d,.14));
+    o2.frequency.setValueAtTime(lastPreviewFreq*1.004,trig);o2.frequency.linearRampToValueAtTime(f*1.004,trig+Math.min(d,.14));
+  }else{
+    o1.frequency.setValueAtTime(f,trig);
+    o2.frequency.setValueAtTime(f*1.004,trig); // slight detune for width/chorus, not a bare single tone
+  }
+  lastPreviewFreq=f;
+  let attack=Math.min(.025,d*.16),release=Math.min(.24,d*.42);
+  if(art==='staccato'||art==='marcato'||art==='accent'){attack=Math.min(.007,d*.1);release=Math.min(.11,d*.28);}
+  else if(art==='legato'){attack=Math.min(.03,d*.2);release=Math.min(.3,d*.5);}
+  const peak=Math.min(.15,Math.max(.02,vel*.15*(gainMul||1)));
+  filt.frequency.setValueAtTime(Math.min(6500,f*3),trig);
+  filt.frequency.exponentialRampToValueAtTime(Math.max(500,f*1.3),trig+attack+release*.8);
+  if(d>.28){ // vibrato only kicks in on notes that ring long enough to notice
+    const lfo=ctx.createOscillator();lfo.type='sine';lfo.frequency.value=5.3;
+    const lfoGain=ctx.createGain();lfoGain.gain.value=f*.006;
+    lfo.connect(lfoGain);lfoGain.connect(o1.frequency);lfoGain.connect(o2.frequency);
+    lfo.start(trig+Math.min(.15,d*.35));lfo.stop(trig+attack+release+.1);
+  }
+  g.gain.setValueAtTime(0,trig);
+  g.gain.linearRampToValueAtTime(peak,trig+attack);
+  g.gain.exponentialRampToValueAtTime(.001,trig+attack+release);
+  o1.connect(filt);o2.connect(filt);filt.connect(g);g.connect(voiceBus);
+  const stopAt=trig+attack+release+.08;
+  o1.start(trig);o2.start(trig);o1.stop(stopAt);o2.stop(stopAt);
+}
+
+// Pad/piano: a fundamental + a quiet detuned upper partial (piano's characteristic slight
+// inharmonicity) plus a short filtered-noise "hammer" transient on attack, decaying naturally
+// rather than just being gated by note-off - real struck/plucked instruments keep ringing.
+function playPadVoice(n,vel,trig,d,gainMul){
+  const f=440*Math.pow(2,(n-69)/12);
+  const g=ctx.createGain(),filt=ctx.createBiquadFilter();
+  filt.type='lowpass';filt.frequency.value=Math.min(5200,f*3.2);filt.Q.value=.6;
+  const o1=ctx.createOscillator();o1.type='triangle';o1.frequency.setValueAtTime(f,trig);
+  const o2=ctx.createOscillator();o2.type='sine';o2.frequency.setValueAtTime(f*2.006,trig);
+  const o2g=ctx.createGain();o2g.gain.value=.16;
+  const nb=ctx.createBuffer(1,Math.max(1,Math.floor(ctx.sampleRate*.018)),ctx.sampleRate);
+  const nd=nb.getChannelData(0);for(let i=0;i<nd.length;i++)nd[i]=(Math.random()*2-1)*(1-i/nd.length);
+  const noise=ctx.createBufferSource();noise.buffer=nb;
+  const noiseFilt=ctx.createBiquadFilter();noiseFilt.type='highpass';noiseFilt.frequency.value=1600;
+  const noiseGain=ctx.createGain();
+  noiseGain.gain.setValueAtTime(Math.min(.05,vel*.06),trig);noiseGain.gain.linearRampToValueAtTime(0,trig+.018);
+  const attack=.006,decayTime=Math.max(.18,Math.min(d*1.15,2.4));
+  const peak=Math.min(.14,Math.max(.02,vel*.14*(gainMul||1)));
+  g.gain.setValueAtTime(0,trig);
+  g.gain.linearRampToValueAtTime(peak,trig+attack);
+  g.gain.exponentialRampToValueAtTime(.0007,trig+attack+decayTime);
+  o1.connect(filt);o2.connect(o2g);o2g.connect(filt);filt.connect(g);g.connect(voiceBus);
+  noise.connect(noiseFilt);noiseFilt.connect(noiseGain);noiseGain.connect(voiceBus);
+  const stopAt=trig+attack+decayTime+.1;
+  o1.start(trig);o2.start(trig);noise.start(trig);
+  o1.stop(stopAt);o2.stop(stopAt);noise.stop(trig+.03);
+}
+
+// Bass: sub-octave sine for weight under a sawtooth body, with a filter that closes quickly for
+// a punchy pluck rather than an open buzzy tone.
+function playBassVoice(n,vel,trig,d){
+  const f=440*Math.pow(2,(n-69)/12);
+  const g=ctx.createGain(),filt=ctx.createBiquadFilter();
+  filt.type='lowpass';filt.Q.value=1.8;
+  filt.frequency.setValueAtTime(Math.min(1300,f*6),trig);
+  filt.frequency.exponentialRampToValueAtTime(Math.max(180,f*1.6),trig+Math.min(d,.3));
+  const sub=ctx.createOscillator();sub.type='sine';sub.frequency.setValueAtTime(f/2,trig);
+  const subG=ctx.createGain();subG.gain.value=.5;
+  const body=ctx.createOscillator();body.type='sawtooth';body.frequency.setValueAtTime(f,trig);
+  const attack=Math.min(.012,d*.1),release=Math.max(d,Math.min(.32,d*.55));
+  const peak=Math.min(.2,Math.max(.03,vel*.2));
+  g.gain.setValueAtTime(0,trig);
+  g.gain.linearRampToValueAtTime(peak,trig+attack);
+  g.gain.exponentialRampToValueAtTime(.001,trig+attack+release);
+  body.connect(filt);filt.connect(g);sub.connect(subG);subG.connect(g);g.connect(voiceBus);
+  const stopAt=trig+attack+release+.08;
+  sub.start(trig);body.start(trig);sub.stop(stopAt);body.stop(stopAt);
+}
+
+function playDrumSound(type,del){
+  if(!ctx)return;
+  ensureAudioGraph();
+  const t=ctx.currentTime+del;
+  if(type==='kick'){
+    const o=ctx.createOscillator(),g=ctx.createGain();
+    o.frequency.setValueAtTime(155,t);o.frequency.exponentialRampToValueAtTime(46,t+.14);
+    g.gain.setValueAtTime(.4,t);g.gain.exponentialRampToValueAtTime(.001,t+.22);
+    o.connect(g);g.connect(voiceBus);o.start(t);o.stop(t+.24);
+    // Click transient - real kicks have a percussive attack, not just a pitched thump.
+    const nb=ctx.createBuffer(1,Math.max(1,Math.floor(ctx.sampleRate*.006)),ctx.sampleRate);
+    const nd=nb.getChannelData(0);for(let i=0;i<nd.length;i++)nd[i]=Math.random()*2-1;
+    const ns=ctx.createBufferSource();ns.buffer=nb;
+    const nf=ctx.createBiquadFilter();nf.type='highpass';nf.frequency.value=2000;
+    const ng=ctx.createGain();ng.gain.setValueAtTime(.18,t);ng.gain.exponentialRampToValueAtTime(.001,t+.008);
+    ns.connect(nf);nf.connect(ng);ng.connect(voiceBus);ns.start(t);
+  }else if(type==='snare'){
+    const n=ctx.createBufferSource(),b=ctx.createBuffer(1,Math.floor(ctx.sampleRate*.15),ctx.sampleRate);
+    const d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1)*(1-i/d.length*.6);
+    n.buffer=b;const f=ctx.createBiquadFilter();f.type='highpass';f.frequency.value=1300;
+    const g=ctx.createGain();g.gain.setValueAtTime(.22,t);g.gain.exponentialRampToValueAtTime(.001,t+.14);
+    n.connect(f);f.connect(g);g.connect(voiceBus);n.start(t);
+    // Tonal body under the noise - what gives a snare its "crack" rather than just being a hiss.
+    const o=ctx.createOscillator(),og=ctx.createGain();o.type='triangle';o.frequency.setValueAtTime(190,t);
+    og.gain.setValueAtTime(.12,t);og.gain.exponentialRampToValueAtTime(.001,t+.09);
+    o.connect(og);og.connect(voiceBus);o.start(t);o.stop(t+.1);
+  }else{
+    const n=ctx.createBufferSource(),b=ctx.createBuffer(1,Math.floor(ctx.sampleRate*.045),ctx.sampleRate);
+    const d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;
+    n.buffer=b;const f=ctx.createBiquadFilter();f.type='highpass';f.frequency.value=6500;
+    const g=ctx.createGain();g.gain.setValueAtTime(.1,t);g.gain.exponentialRampToValueAtTime(.001,t+.045);
+    n.connect(f);f.connect(g);g.connect(voiceBus);n.start(t);
+  }
+}
+
+/* ---------- Musical generation ---------- */
+
+function makeRng(seed){
+  let s=seed>>>0;
+  return ()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296};
+}
+function seedFromText(s){
+  let h=2166136261>>>0;
+  for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}
+  return h>>>0;
+}
+function scaleIntervals(kind){
+  if(kind==='minor')return [0,2,3,5,7,8,10];
+  if(kind==='pentatonic')return [0,2,4,7,9];
+  if(kind==='chromatic')return [...Array(12).keys()];
+  return [0,2,4,5,7,9,11];
+}
+function scaleNotesAround(root,kind,min,max){
+  const ints=scaleIntervals(kind),out=[];
+  for(let n=min;n<=max;n++){
+    const pc=((n-root)%12+12)%12;
+    if(ints.includes(pc))out.push(n);
+  }
+  return out;
+}
+function nearest(arr,target){
+  return arr.reduce((best,n)=>Math.abs(n-target)<Math.abs(best-target)?n:best,arr[0]);
+}
+function chordTone(n,chord){
+  return chord.some(c=>((n-c)%12+12)%12===0);
+}
+function chooseMelodyPitch(candidates,last,chord,beat,strong,rng,profile){
+  const leap=profile?profile.leap:.2, stepBias=profile?profile.stepBias:.7;
+  const distPenalty=1.7-leap*1.3;         // high-leap styles (cinematic) penalise distant notes less
+  const leapWindow=5+Math.round(leap*10); // ...and tolerate wider jumps before the hard cutoff
+  let scored=candidates.map(n=>{
+    let score=0;
+    const dist=Math.abs(n-last);
+    score-=dist*distPenalty;
+    if(dist<=2)score+=stepBias*2.4;       // reward stepwise motion for high-stepBias styles (ballad, indie)
+    if(chordTone(n,chord))score+=strong?5:2.2;
+    else score+=rng()<.14?1.0:0;
+    if(beat===0&&chordTone(n,chord))score+=3;
+    if(dist===0)score-=2;
+    if(n>last+leapWindow||n<last-leapWindow)score-=2;
+    return {n,score:score+(rng()-.5)*1.4};
+  }).sort((a,b)=>b.score-a.score);
+  return scored[Math.floor(rng()*Math.min(3,scored.length))].n;
+}
+function motifFor(kind,rng){
+  // Scale degrees relative to the first chord. Mostly stepwise, with one characteristic leap.
+  const choices=kind==='pentatonic'?[0,1,2,4,3]:[0,1,2,1,3,2,4,5];
+  const m=[];
+  for(let i=0;i<4;i++)m.push(choices[Math.floor(rng()*choices.length)]);
+  if(rng()<.7)m[2]=m[0]+2;
+  return m;
+}
+
+function composerProfile(name){
+  return {
+    // density: fraction of off-beat rhythm slots kept (structural, not random - this is what makes
+    // a style feel genuinely busy or spacious every time, not just occasionally).
+    // swing: deterministic delay applied to the "and" of the beat, for a shuffled/groove feel.
+    pop:{range:0,density:1.00,swing:.18,stepBias:.72,leap:.18,rest:.12,repeat:.42,phrase:4,octave:.08,sync:.18,approach:.28},
+    ballad:{range:-4,density:.55,swing:.05,stepBias:.84,leap:.10,rest:.22,repeat:.55,phrase:4,octave:.03,sync:.08,approach:.38},
+    cinematic:{range:6,density:.45,swing:0,stepBias:.58,leap:.34,rest:.18,repeat:.30,phrase:8,octave:.22,sync:.10,approach:.18},
+    soul:{range:-3,density:.85,swing:.30,stepBias:.60,leap:.27,rest:.10,repeat:.48,phrase:4,octave:.10,sync:.35,approach:.42},
+    indie:{range:-1,density:.70,swing:.10,stepBias:.78,leap:.14,rest:.20,repeat:.58,phrase:4,octave:.04,sync:.22,approach:.25},
+    ambient:{range:9,density:.35,swing:0,stepBias:.68,leap:.24,rest:.34,repeat:.25,phrase:8,octave:.28,sync:.04,approach:.12},
+    classical:{range:3,density:.75,swing:0,stepBias:.82,leap:.16,rest:.10,repeat:.36,phrase:4,octave:.06,sync:.16,approach:.48}
+  }[name] || null;
+}
+function generateMelody(chords,loops,tpq,kind,baseOct,rng){
+  const profile=composerProfile(composer)||composerProfile('pop');
+
+  const bars=chords.length*loops,barTicks=tpq*4,events=[];
+  // Melody register sits roughly one to two octaves above the chord root - close to where a lead
+  // vocal or synth lead actually lives. The old bounds (root+24 to root+51) put every note two to
+  // four-plus octaves above the chords - MIDI 93-110 for a default C-major progression, i.e.
+  // ~1.7kHz-4.7kHz - which is why the preview sounded like a shrill whistle instead of a melody.
+  const root=chordRoot(chords[0]),min=root,max=root+24;
+  const scale=scaleNotesAround(root,kind,min,max);
+  let last=nearest(scale,root+12);
+  const motif=motifFor(kind,rng);
+  const rhythmSets=[
+    [0,2,4,6,8,10,12,14],
+    [0,3,4,6,9,11,12,15],
+    [0,2,5,7,8,11,13],
+    [1,3,6,8,10,12,15]
+  ];
+  const phraseLen=profile.phrase; // 4-bar phrases for pop/ballad/soul/indie/classical, 8-bar arcs for cinematic/ambient
+  for(let b=0;b<bars;b++){
+    const chord=parseChord(chords[b%chords.length]),barStart=b*barTicks;
+    const phraseBar=b%phraseLen;
+    const isCadenceBar=phraseBar===phraseLen-1;
+    let positions=rhythmSets[phraseBar%rhythmSets.length].map(p=>({p,six:Math.round(p)}));
+    if(isCadenceBar)positions=[0,2,5,8,10,12,15].map(p=>({p,six:p})); // more space before resolution
+    // Density: sparse styles (ambient/ballad/cinematic) deterministically drop off-beat onsets down to
+    // a slower, more spacious grid every time - not a random maybe, an actual structural difference in
+    // how busy the part is. Strong beats are always kept so the harmonic rhythm stays intact.
+    if(profile.density<1){
+      const keepEvery=Math.max(1,Math.round(1/profile.density));
+      positions=positions.filter((pos,idx)=>pos.six%4===0||idx%keepEvery===0);
+    }
+    // Swing: a deterministic shuffle delay on the "and" of the beat - pop/soul groove, classical/cinematic stay straight.
+    if(profile.swing>0&&!isCadenceBar){
+      positions=positions.map(pos=>pos.six%4===2?{...pos,p:pos.p+profile.swing*1.6}:pos);
+    }
+    // Syncopation on top of that: a probabilistic push earlier, for a looser "pocket" feel that varies performance to performance.
+    if(profile.sync>0&&!isCadenceBar){
+      positions=positions.map(pos=>(pos.six%4===2&&rng()<profile.sync)?{...pos,p:pos.p-.5}:pos);
+    }
+    const variation=Math.floor(b/chords.length);
+    positions.forEach((pos,i)=>{
+      const p=pos.p,six=pos.six;
+      let dur=(i%3===0?tpq/2:tpq/4);
+      if(i===positions.length-1)dur=tpq*(isCadenceBar?1.0:.5);
+      if(six===15)dur=Math.max(dur,tpq/2);
+      const strong=(six%4===0);
+
+      // Rests: leave more air on weak beats for spacious styles (ambient/ballad breathe; pop/soul stay busy).
+      if(!strong&&i!==0&&i!==positions.length-1&&rng()<profile.rest*.55)return;
+
+      // Some styles favour restating the previous pitch rather than always moving (indie/ballad repetition).
+      if(!strong&&rng()<profile.repeat*.35){
+        events.push({t:barStart+p*(tpq/4),n:last,vel:Math.max(52,Math.min(112,74+Math.round((rng()-.5)*8))),dur});
+        return;
+      }
+
+      let targetIndex=(motif[i%motif.length]+phraseBar)%scale.length;
+      let target=scale[Math.max(0,Math.min(scale.length-1,targetIndex+Math.floor(scale.length/2)))];
+      if(variation>0){
+        // Controlled development: transpose the motif slightly, then let chord tones win.
+        target=nearest(scale,target+(variation%2?2:-2));
+      }
+      let n=chooseMelodyPitch(scale,last,chord,six/4,strong,rng,profile);
+      if(rng()<.52)n=nearest(scale,target);
+      if(i===positions.length-1&&isCadenceBar){
+        n=nearest(chord,last);
+      }
+      if(Math.abs(n-last)>7)n=nearest(scale,last+(n>last?5:-5));
+      // Occasional neighbour/passing or chromatic approach note - frequency set by the composer's "approach" character.
+      if(i>0&&rng()<(.05+profile.approach*.32)){
+        const dir=n>=last?1:-1;
+        const passing=nearest(scale,last+dir*2);
+        if(Math.abs(passing-last)<=4)n=passing;
+      }
+      // Octave displacement for wider, more dramatic register (cinematic/ambient lean into this; pop/ballad rarely do).
+      if(!strong&&rng()<profile.octave*.5){
+        if(n+12<=max)n+=12; else if(n-12>=min)n-=12;
+      }
+      // Phrase dynamic arc: energy rises toward the middle of the phrase and settles into the cadence.
+      const posRatio=phraseBar/Math.max(1,phraseLen-1);
+      let vel=76+Math.round(22*Math.sin(posRatio*Math.PI));
+      vel+=strong?7:0;
+      vel+=Math.round((rng()-.5)*10);
+      events.push({t:barStart+p*(tpq/4),n,vel:Math.max(52,Math.min(112,vel)),dur});
+      last=n;
+    });
+  }
+  return events;
+}
+function chooseVoicing(chord,prev){
+  const opts=[];
+  for(let mask=0;mask<8;mask++){
+    const ns=chord.map((n,i)=>n+(mask&(1<<i)?12:0));
+    const avg=ns.reduce((a,b)=>a+b,0)/ns.length;
+    opts.push({ns,score:prev?ns.reduce((s,n,i)=>s+Math.abs(n-prev[i%prev.length]),0):Math.abs(avg-parseInt(document.getElementById('octave').value,10)*12-48)});
+  }
+  return opts.sort((a,b)=>a.score-b.score)[0].ns;
+}
+function generateChords(chords,loops,tpq,kind,rng){
+  const out=[],bar=tpq*4;let prev=null;
+  const profile=composerProfile(composer)||composerProfile('pop');
+  for(let b=0;b<chords.length*loops;b++){
+    const raw=parseChord(chords[b%chords.length]),v=chooseVoicing(raw,prev);prev=v;
+    const start=b*bar;
+    const patterns=[
+      [{p:0,d:3.5,v:.48}],
+      [{p:0,d:1.7,v:.42},{p:2,d:1.5,v:.35}],
+      [{p:0,d:1,v:.40},{p:1,d:1,v:.28},{p:2,d:1,v:.35},{p:3,d:.8,v:.28}],
+      [{p:0,d:2.8,v:.40},{p:3.5,d:.45,v:.34}]
+    ];
+    // Comping density follows the composer's syncopation character rather than a fixed rotation.
+    let mode=b%4;
+    if(rng()<profile.sync*.6)mode=2;           // busier syncopated comping (pop/soul)
+    else if(profile.sync<.1&&rng()<.4)mode=0;  // sparse sustained pads (classical/ballad)
+    patterns[mode].forEach(hit=>{
+      v.forEach(n=>out.push({t:start+hit.p*tpq,n,vel:Math.round(62*hit.v/.42),dur:Math.round(hit.d*tpq)}));
+    });
+  }
+  return out;
+}
+function generateBass(chords,loops,tpq,rng){
+  const out=[],bar=tpq*4;
+  const profile=composerProfile(composer)||composerProfile('pop');
+  for(let b=0;b<chords.length*loops;b++){
+    const c=parseChord(chords[b%chords.length]),root=c[0]-12, fifth=(root+7),next=parseChord(chords[(b+1)%chords.length])[0]-12;
+    const start=b*bar;
+    let choices=[
+      [{p:0,n:root,d:1.5},{p:2,n:fifth,d:1},{p:3,n:root,d:.75}],
+      [{p:0,n:root,d:1},{p:1.5,n:fifth,d:.75},{p:2.5,n:root,d:1},{p:3.5,n:next,d:.5}],
+      [{p:0,n:root,d:2},{p:2,n:fifth,d:1.5}],
+      [{p:0,n:root,d:1},{p:2,n:fifth,d:1},{p:3,n:next,d:.75}]
+    ][b%4];
+    // Chromatic approach into the next bar's root - common in soul/classical walking bass, rare in ambient.
+    if(rng()<profile.approach*.4){
+      choices=choices.slice(0,-1).concat([{p:3.5,n:next+(next>root?-1:1),d:.4},{p:3.85,n:next,d:.25}]);
+    }
+    choices.forEach(x=>{
+      const push=(profile.sync>.2&&x.p>0&&rng()<profile.sync*.3)?-.1:0;
+      out.push({t:start+(x.p+push)*tpq,n:x.n,vel:68+Math.round(rng()*10),dur:x.d*tpq});
+    });
+  }
+  return out;
+}
+
+/* ---------- MIDI ---------- */
+function vlq(v){
+  v=Math.max(0,Math.floor(v));let buffer=[v&127];
+  while((v>>=7))buffer.push((v&127)|128);
+  return buffer.reverse();
+}
+function trackName(name){
+  const bytes=[...new TextEncoder().encode(name)];
+  return [0xff,0x03,bytes.length,...bytes];
+}
+function makeTrack(events,name,program,channel,tempo,ccEvents){
+  const all=[{t:0,kind:'meta',data:trackName(name)}];
+  if(program!==null)all.push({t:0,kind:'program',program,channel});
+  if(tempo){
+    const list=Array.isArray(tempo)?tempo:[{t:0,tempo}];
+    list.forEach(te=>all.push({t:te.t,kind:'tempo',tempo:te.tempo}));
+  }
+  events.forEach(e=>{
+    all.push({t:e.t,kind:'on',n:e.n,vel:e.vel,channel,dur:e.dur});
+    all.push({t:e.t+e.dur,kind:'off',n:e.n,vel:0,channel});
+  });
+  if(ccEvents)ccEvents.forEach(e=>all.push({t:e.t,kind:'cc',cc:e.cc,val:e.val,channel}));
+  all.sort((a,b)=>a.t-b.t || (a.kind==='off'? -1:1));
+  const bytes=[],active=[];
+  let last=0;
+  for(const e of all){
+    const delta=e.t-last;last=e.t;bytes.push(...vlq(delta));
+    if(e.kind==='meta')bytes.push(...e.data);
+    else if(e.kind==='tempo')bytes.push(0xff,0x51,0x03,(e.tempo>>16)&255,(e.tempo>>8)&255,e.tempo&255);
+    else if(e.kind==='program')bytes.push(0xc0|e.channel,e.program);
+    else if(e.kind==='cc')bytes.push(0xb0|e.channel,e.cc,e.val);
+    else if(e.kind==='on')bytes.push(0x90|e.channel,e.n,Math.max(1,Math.min(127,e.vel)));
+    else bytes.push(0x80|e.channel,e.n,0);
+  }
+  bytes.push(0x00,0xff,0x2f,0x00);
+  return [0x4d,0x54,0x72,0x6b,(bytes.length>>24)&255,(bytes.length>>16)&255,(bytes.length>>8)&255,bytes.length&255,...bytes];
+}
+function generatePedalEvents(chords,loops,tpq){
+  // Sustain pedal (CC64) tied to chord changes - a simple, very audible piano "human touch".
+  const out=[],bar=tpq*4;
+  for(let b=0;b<chords.length*loops;b++){
+    const start=b*bar;
+    out.push({t:start+4,cc:64,val:127});     // pedal down just after the chord change
+    out.push({t:start+bar-30,cc:64,val:0});  // lift just before the next chord
+  }
+  return out;
+}
+function rubatoTempoEvents(chords,loops,tpq,baseUsq,profile,rng){
+  // Subtle rubato: a slight ritardando into each phrase's cadence bar, then back to tempo.
+  const bar=tpq*4,bars=chords.length*loops,events=[{t:0,tempo:baseUsq}];
+  const phraseLen=profile.phrase;
+  for(let b=phraseLen-1;b<bars-1;b+=phraseLen){
+    const dipUsq=Math.round(baseUsq*(1.03+rng()*.03));
+    events.push({t:b*bar+Math.round(bar*.65),tempo:dipUsq});
+    events.push({t:(b+1)*bar,tempo:baseUsq});
+  }
+  return events;
+}
+function insertGlissandoRuns(events,rng){
+  // A written-out chromatic run reads as a glissando in any GM synth/DAW, unlike a raw pitch-bend
+  // message whose range is device-dependent and often not set up by the receiving instrument.
+  const sorted=events.slice().sort((a,b)=>a.t-b.t);
+  const out=[];
+  for(let i=0;i<sorted.length;i++){
+    const e=sorted[i],nxt=sorted[i+1];
+    out.push(e);
+    if(nxt&&Math.abs(nxt.n-e.n)>=4){
+      const dir=nxt.n>e.n?1:-1;
+      const gapStart=e.t+e.dur*.55,gapEnd=nxt.t;
+      const steps=Math.min(6,Math.abs(nxt.n-e.n)-1);
+      if(steps>0&&gapEnd>gapStart){
+        const stepDur=Math.max(14,Math.floor((gapEnd-gapStart)/(steps+1)));
+        for(let s=1;s<=steps;s++){
+          out.push({t:Math.round(gapStart+stepDur*(s-1)),n:e.n+dir*s,vel:Math.max(30,Math.round((e.vel+nxt.vel)/2*.55+rng()*4)),dur:stepDur+4});
+        }
+      }
+    }
+  }
+  return out;
+}
+function makeDrumTrack(chords,loops,tpq,rng){
+  const ev=[],total=chords.length*loops*16;
+  for(let s=0;s<total;s++){
+    const p=s%16,t=s*(tpq/4);
+    if(drumState.kick[p])ev.push({t,n:36,vel:(p===0?108:82)+Math.round(rng()*8),dur:35});
+    if(drumState.snare[p])ev.push({t,n:38,vel:(p===4||p===12?100:78)+Math.round(rng()*7),dur:35});
+    if(drumState.hat[p]){
+      let v=(p%4===0?78:58)+Math.round(rng()*10);
+      if(p===15&&rng()<.45)v=92;
+      ev.push({t,n:42,vel:v,dur:20});
+    }
+    // Small human-style ghost hat, used sparingly on otherwise empty offbeats.
+    if(p%2===1&&!drumState.hat[p]&&rng()<.18)ev.push({t:t+8,n:42,vel:32+Math.round(rng()*10),dur:16});
+    // Phrase-ending fill.
+    if(p===15&&s%64===15&&rng()<.75)ev.push({t:t+55,n:38,vel:58+Math.round(rng()*15),dur:25});
+  }
+  return ev;
+}
+function humanizeEvents(events,rng,ticks=8,opts={}){
+  const bias=opts.bias||0;                                   // constant push(-)/layback(+) in ticks for this track
+  const velWalk=opts.velWalk!==undefined?opts.velWalk:.5;     // how strongly each note's velocity carries over from the last
+  let velDrift=0;
+  return events.map(e=>{
+    // Bell-shaped micro-timing (sum of three uniforms) approximates real onset-deviation distributions:
+    // human timing clusters tightly around the beat with occasional larger outliers, unlike flat random jitter.
+    const jitter=((rng()+rng()+rng())/3-.5)*ticks*1.6;
+    const t=Math.max(0,Math.round(e.t+jitter+bias));
+    const dur=Math.max(20,Math.round(e.dur*(.94+rng()*.12)));
+    // Correlated velocity drift: dynamics evolve smoothly note-to-note instead of jittering independently,
+    // matching how real performance velocity trends (crescendo/diminuendo) rather than scattering at random.
+    velDrift=velDrift*velWalk+(rng()-.5)*7*(1-velWalk);
+    const vel=Math.max(1,Math.min(127,Math.round(e.vel+velDrift)));
+    return {...e,t,dur,vel};
+  });
+}
+
+function applyTexture(events,chords,loops,tpq,style,rng){
+  const profile=composerProfile(composer)||composerProfile('pop');
+  const bar=tpq*4,out=[];
+  for(let b=0;b<chords.length*loops;b++){
+    const c=parseChord(chords[b%chords.length]),start=b*bar;
+    const phraseBar=b%profile.phrase,isCadence=phraseBar===profile.phrase-1;
+    const posRatio=phraseBar/Math.max(1,profile.phrase-1),arc=Math.sin(posRatio*Math.PI); // 0 at phrase edges, 1 mid-phrase
+    if(style==='arpeggio'){
+      // 16th-note arpeggio; density, reach, swing and push all follow the composer's character.
+      let seq=[c[0],c[1],c[2],c[1],c[0]+12,c[1],c[2]+12,c[1],
+                 c[0],c[2],c[1],c[2]+12,c[0]+12,c[1],c[2],c[1]];
+      // Wide-register composers (cinematic/ambient) occasionally reach an extra octave up.
+      if(profile.octave>.15)seq=seq.map((n,i)=>(i%5===4&&rng()<profile.octave*.6)?n+12:n);
+      // Structural (deterministic) density: sparse composers actually play fewer, longer-held notes
+      // every time, not just a lucky dropout - this is what makes the texture feel genuinely slower.
+      const stepMul=Math.max(1,Math.round(1/profile.density));
+      seq.forEach((n,i)=>{
+        if(i%stepMul!==0)return;
+        if(i===14&&rng()<.45)return;
+        if(i%4!==0&&rng()<profile.rest*.45)return;
+        const swing=(profile.swing>0&&i%4===2)?tpq/4*profile.swing*.6:0;
+        const push=(profile.sync>.2&&i%4===2&&rng()<profile.sync*.5)?-tpq/16:0;
+        const t=start+i*tpq/4+swing+push;
+        const dur=Math.round(tpq*(i%4===0?.42:.28)*stepMul);
+        const vel=54+(i%4===0?18:0)+Math.round(arc*8)+(rng()<.18?8:0)+(profile.sync>.25?4:0);
+        out.push({t,n,vel,dur});
+      });
+      if(isCadence)out.push({t:start+bar-tpq*.45,n:c[0]+12,vel:84,dur:Math.round(tpq*.38)});
+    }else if(style==='alberti'){
+      const lo=c[0],hi=c[c.length-1],mid=c[Math.floor(c.length/2)]||lo;
+      let seq=[lo,hi,mid,hi,lo,hi,mid,hi];
+      // Classical/soul favour a chromatic lower-neighbour on the turn note; other styles rarely do.
+      if(rng()<profile.approach*.5)seq=seq.map((n,i)=>(i===2||i===6)?n-1:n);
+      const stepMul=Math.max(1,Math.round(1/profile.density));
+      seq.forEach((n,i)=>{
+        if(i%stepMul!==0&&i%4!==0)return; // strong beats always survive; sparse styles thin the rest
+        const swing=(profile.swing>0&&i%4===2)?tpq/2*profile.swing*.6:0;
+        const push=(profile.sync>.2&&i%4===2&&rng()<profile.sync*.4)?-tpq/16:0;
+        const vel=(i%4===0?68:50)+Math.round(arc*10);
+        out.push({t:start+i*tpq/2+swing+push,n,vel,dur:Math.round(tpq*.34*stepMul)});
+      });
+    }else if(style==='pedal'){
+      // Sustain length and voicing width follow the composer: ambient/cinematic hold longer, wider chords;
+      // pop/soul restate the pedal note more often and stay narrower.
+      const restrikes=profile.rest>.25?1:2; // sparser styles restrike the low pedal less often
+      for(let r=0;r<restrikes;r++)out.push({t:start+r*(bar/restrikes),n:c[0]-12,vel:74+Math.round(arc*10),dur:(bar/restrikes)-20});
+      const voicing=profile.octave>.15?c.concat(c.map(n=>n+12)):c;
+      [0,2].forEach(q=>voicing.forEach(n=>out.push({t:start+q*tpq,n,vel:40+Math.round(arc*8),dur:tpq*1.7})));
+    }else if(style==='bassline'){
+      const root=c[0]-12,fifth=root+7,next=parseChord(chords[(b+1)%chords.length])[0]-12;
+      let hits=[[0,root,88,.75],[1,fifth,67,.5],[2,root,76,.5],[2.75,fifth,62,.4],[3.5,next,74,.35]];
+      // Chromatic lead-in to the next bar's root for approach-heavy styles (soul/classical); skip for ambient.
+      if(rng()<profile.approach*.45)hits=hits.slice(0,-1).concat([[3.5,next+(next>root?-1:1),58,.25],[3.85,next,70,.2]]);
+      hits.forEach(x=>{
+        const push=(profile.sync>.2&&x[0]>0&&rng()<profile.sync*.35)?-.1:0;
+        out.push({t:start+(x[0]+push)*tpq,n:x[1],vel:x[2]+Math.round(arc*6),dur:x[3]*tpq});
+      });
+    }else if(style==='voiceLeading'){
+      // Entrance spread and dynamics follow the composer's syncopation/leap character - soul enters loosely
+      // and syncopated, classical enters tight and even.
+      const spread=.1+profile.sync*.5;
+      c.forEach((n,i)=>{
+        const t=start+i*tpq*spread+(rng()<profile.sync*.3?-tpq*.08:0);
+        out.push({t,n,vel:56+i*6+Math.round(arc*10),dur:tpq*3.65});
+      });
+      if(profile.octave>.15)out.push({t:start,n:c[0]+12,vel:40,dur:tpq*3.65});
+    }else{
+      // Rich melodic mode is generated elsewhere.
+      return events;
+    }
+  }
+  return out;
+}
+
+
+// Converts tick positions to seconds, honouring the rubato tempo curve (piecewise tempo changes)
+// rather than assuming one constant tempo for the whole piece.
+function buildTickToSeconds(tempoEvents,tpq){
+  const segs=tempoEvents.slice().sort((a,b)=>a.t-b.t);
+  const cum=[0];
+  for(let i=1;i<segs.length;i++){
+    cum.push(cum[i-1]+(segs[i].t-segs[i-1].t)/tpq*(segs[i-1].tempo/1e6));
+  }
+  return function(ticks){
+    let idx=0;
+    for(let i=0;i<segs.length;i++){if(segs[i].t<=ticks)idx=i;else break;}
+    return cum[idx]+(ticks-segs[idx].t)/tpq*(segs[idx].tempo/1e6);
+  };
+}
+const DRUM_NOTE_TYPE={36:'kick',38:'snare',42:'hat'};
+function buildSchedule(arr){
+  const t2s=buildTickToSeconds(arr.tempoEvents,arr.tpq);
+  const evts=[];
+  const add=(list,timbre,gain)=>list.forEach(e=>{
+    const s=t2s(e.t);
+    evts.push({sec:s,kind:'synth',n:e.n,vel:e.vel/127,dur:Math.max(.03,t2s(e.t+e.dur)-s),timbre,gain,art:arr.articulation});
+  });
+  add(arr.melody,'lead',1);
+  add(arr.harmony,'pad',.55);
+  add(arr.bass,'bass',.8);
+  arr.drums.forEach(e=>{
+    const type=DRUM_NOTE_TYPE[e.n];
+    if(type)evts.push({sec:t2s(e.t),kind:'drum',type});
+  });
+  evts.sort((a,b)=>a.sec-b.sec);
+  return {events:evts,totalSec:t2s(arr.totalTicks)};
+}
+
+function composeArrangement(){
+  let chords=document.getElementById('chords').value.split(',').map(x=>x.trim()).filter(Boolean);
+  if(!chords.length)chords=['C'];
+  const loops=+document.getElementById('exportLoops').value;
+  const tempo=+document.getElementById('tempo').value;
+  composer=document.getElementById('composer').value;
+  pattern=document.getElementById('texture').value;
+  const kind=document.getElementById('scale').value;
+  const tpq=480, rng=makeRng(seedFromText(chords.join('|')+'|'+tempo+'|'+pattern+'|'+articulation+'|'+composer));
+  const baseOct=+document.getElementById('octave').value;
+
+  let melody=generateMelody(chords,loops,tpq,kind,baseOct,rng);
+  const composerRange=composerProfile(composer).range;
+  // Texture is a real composition choice, not just a UI label. Note: applyTexture rebuilds the
+  // part from raw chord tones for every non-melodic style, so the composer's register offset has
+  // to be applied AFTER texture runs - applying it before (then handing the result to a function
+  // that discards it) meant every composer sounded identical in arpeggio/alberti/pedal/etc.
+  if(pattern!=='melodic') melody=applyTexture(melody,chords,loops,tpq,pattern,rng);
+  melody.forEach(e=>{e.n+=composerRange;if(composer==='ambient'&&rng()<.22)e.dur=Math.round(e.dur*1.35);});
+  let harmony=generateChords(chords,loops,tpq,kind,rng);
+  let bass=generateBass(chords,loops,tpq,rng);
+  if(pattern==='arpeggio'||pattern==='alberti') harmony=harmony.map(e=>({...e,vel:Math.max(28,e.vel-18),dur:Math.min(e.dur,tpq*2)}));
+  if(pattern==='pedal') bass=bass.map(e=>({...e,vel:Math.max(35,e.vel-12)}));
+  let drums=makeDrumTrack(chords,loops,tpq,rng);
+
+  // More timing freedom for lead, less for accompaniment. Each part also gets a small
+  // constant push/layback bias so the ensemble doesn't sound quantised to one grid -
+  // lead sits slightly ahead (lift/urgency), bass and drums sit slightly behind (the "pocket").
+  melody=humanizeEvents(melody,rng,9,{bias:-4,velWalk:.55});
+  harmony=humanizeEvents(harmony,rng,3,{bias:2,velWalk:.7});
+  bass=humanizeEvents(bass,rng,4,{bias:3,velWalk:.7});
+  drums=humanizeEvents(drums,rng,3,{bias:0,velWalk:.6});
+
+  const art={
+    legato:{gate:1.15,boost:1.00,spread:2,accentEvery:8},
+    staccato:{gate:.20,boost:.90,spread:5,accentEvery:4},
+    tenuto:{gate:.98,boost:1.05,spread:2,accentEvery:4},
+    accent:{gate:.60,boost:1.15,spread:11,accentEvery:2},
+    marcato:{gate:.34,boost:1.25,spread:14,accentEvery:1},
+    glissando:{gate:.85,boost:1.02,spread:4,accentEvery:4}
+  };
+  const ac=art[articulation]||art.legato;
+  [melody,harmony,bass].forEach((track,ti)=>track.forEach((e,i)=>{
+    e.dur=Math.max(18,Math.round(e.dur*ac.gate));
+    e.vel=Math.min(127,Math.round(e.vel*ac.boost*(ti===0?1.04:1)));
+    e.t=Math.max(0,Math.round(e.t+(rng()-.5)*ac.spread));
+    if(i%ac.accentEvery===0){
+      if(articulation==='accent')e.vel=Math.min(127,e.vel+18);
+      else if(articulation==='marcato')e.vel=Math.min(127,e.vel+14);
+      else if(articulation==='tenuto')e.vel=Math.min(127,e.vel+6);
+    }
+  }));
+  if(articulation==='staccato')melody.forEach(e=>e.dur=Math.min(e.dur,Math.round(tpq*.22)));
+  if(articulation==='marcato')melody.forEach(e=>e.dur=Math.min(e.dur,Math.round(tpq*.38)));
+  if(articulation==='legato'){
+    // True legato: each note's tail reaches just past the next note's onset instead of merely
+    // being "long" - the overlap is what actually reads as connected/slurred versus tenuto's
+    // full-value-but-separated notes.
+    const sorted=melody.slice().sort((a,b)=>a.t-b.t);
+    sorted.forEach((e,i)=>{
+      const nextT=i<sorted.length-1?sorted[i+1].t:e.t+e.dur;
+      e.dur=Math.max(e.dur,Math.max(24,(nextT-e.t)+16));
+    });
+  }
+  if(articulation==='glissando')melody=insertGlissandoRuns(melody,rng);
+
+  const usq=Math.round(60000000/tempo);
+  const tempoEvents=rubatoTempoEvents(chords,loops,tpq,usq,composerProfile(composer)||composerProfile('pop'),rng);
+  const pedalEvents=generatePedalEvents(chords,loops,tpq);
+  const bars=chords.length*loops,totalTicks=bars*tpq*4;
+
+  return {melody,harmony,bass,drums,tempoEvents,pedalEvents,tpq,chordsList:chords,loops,tempo,totalTicks,composer,pattern,articulation};
+}
+
+async function exportMIDI(){
+ try{
+  log("Composing motif and melodic contour...");
+  const arr=composeArrangement();
+  const {melody,harmony,bass,drums,tempoEvents,pedalEvents,tpq,chordsList:chords,loops}=arr;
+
+  const tracks=[
+    makeTrack(melody,"01 Lead Melody",80,0,tempoEvents),        // GM lead synth 81, carries subtle rubato
+    makeTrack(harmony,"02 Piano Harmony",0,1,null,pedalEvents), // sustain pedal (CC64) on the piano part
+    makeTrack(bass,"03 Bass",32,2,null),
+    makeTrack([], "04 Arrangement Markers", null,3,null),
+    makeTrack(drums,"05 Drums",null,9,null)
+  ];
+
+  // Add a simple arrangement marker track.
+  const markerEvents=[];
+  for(let b=0;b<chords.length*loops;b++){
+    const text=`Bar ${b+1} ${chords[b%chords.length]}`;
+    const bytes=[...new TextEncoder().encode(text)];
+    markerEvents.push({t:b*tpq*4,kind:'marker',data:[0xff,0x06,bytes.length,...bytes]});
+  }
+  function markerTrack(events){
+    const all=[{t:0,kind:'meta',data:trackName("04 Arrangement Markers")},...events].sort((a,b)=>a.t-b.t);
+    const out=[];let last=0;
+    for(const e of all){out.push(...vlq(e.t-last));last=e.t;out.push(...e.data)}
+    out.push(0,0xff,0x2f,0);return [0x4d,0x54,0x72,0x6b,(out.length>>24)&255,(out.length>>16)&255,(out.length>>8)&255,out.length&255,...out];
+  }
+  tracks[3]=markerTrack(markerEvents);
+
+  const header=[0x4d,0x54,0x68,0x64,0,0,0,6,0,1,0,5,(tpq>>8)&255,tpq&255];
+  const bytes=new Uint8Array([...header,...tracks.flat()]);
+  await deliverMIDI(bytes,"composer_lab_human_v2.mid");
+ }catch(err){
+  log("Export error: "+(err&&err.message?err.message:err));
+ }
+}
+
+/* Robust delivery for restricted iOS webviews (e.g. an in-app HTML editor/previewer that hosts
+   this page). Two tiers, not three: many in-app WKWebViews don't implement download handling for
+   blob: object URLs at all (a bare <a download> click silently does nothing, with no error to
+   catch), so we skip straight from the Share Sheet to a self-contained base64 data: URI, which
+   doesn't depend on the blob: object-URL registry and survives sandboxes that block it. We don't
+   also try a blob-URL anchor first, because on platforms where the Share Sheet is unavailable but
+   downloads DO work fine (most regular browsers), stacking both would fire two separate downloads
+   with no way to tell whether the first one actually landed. */
+async function deliverMIDI(bytes,filename){
+  const mime="audio/midi";
+  let blob;
+  try{blob=new Blob([bytes],{type:mime});}
+  catch(e){log("Could not build the MIDI file: "+e.message);return;}
+
+  try{
+    const file=new File([blob],filename,{type:mime});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){
+      await navigator.share({files:[file],title:"Composer Lab Human MIDI"});
+      log("Exported via Share Sheet: "+filename);
+      return;
+    }
+  }catch(e){
+    if(e&&e.name==='AbortError'){log("Export canceled.");return;}
+    log("Share Sheet unavailable here, saving directly...");
+  }
+
+  try{
+    const dataUrl=await new Promise((resolve,reject)=>{
+      const reader=new FileReader();
+      reader.onload=()=>resolve(reader.result);
+      reader.onerror=()=>reject(reader.error||new Error("FileReader failed"));
+      reader.readAsDataURL(blob);
+    });
+    const a=document.createElement('a');
+    a.href=dataUrl;a.download=filename;a.rel="noopener";
+    document.body.appendChild(a);a.click();a.remove();
+    log("Saved "+filename+". If nothing appeared, check this app's Files/Downloads location, or open this page directly in Safari and export again.");
+  }catch(e){
+    log("Export failed in this environment: "+(e&&e.message?e.message:e)+". Try opening this page in Safari directly.");
+  }
+}
+</script>
+</body>
+</html>

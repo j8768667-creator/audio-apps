@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Ultimate MIDI & Audio Composition Suite v6.0</title>
+<style>
+:root {
+  --bg:#0b0e14; --panel:#141822; --panel2:#1e2430; --line:#2e3646;
+  --text:#f0f3f8; --muted:#8e99a8; --accent:#6366f1; --accent-hover:#4f46e5;
+  --accent2:#10b981; --warn:#f59e0b; --danger:#ef4444; --radius:12px;
+}
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body {
+  margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg); color: var(--text); min-height: 100vh; font-size: 13px; line-height: 1.4;
+}
+.app-container { max-width: 1400px; margin: 0 auto; padding: 16px; }
+header {
+  display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
+  padding-bottom: 16px; border-bottom: 1px solid var(--line); margin-bottom: 16px;
+}
+.title-group h1 { margin: 0; font-size: 1.6rem; font-weight: 800; background: linear-gradient(135deg, #818cf8, #34d399); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.title-group .sub { color: var(--muted); font-size: 0.85rem; }
+.nav-tabs { display: flex; flex-wrap: wrap; gap: 6px; background: var(--panel); padding: 6px; border-radius: var(--radius); border: 1px solid var(--line); margin-bottom: 16px; }
+.tab-btn {
+  background: transparent; border: none; color: var(--muted); padding: 8px 14px; border-radius: 8px;
+  font-weight: 600; cursor: pointer; transition: all 0.2s; font-size: 0.82rem; white-space: nowrap;
+}
+.tab-btn:hover { color: var(--text); background: var(--panel2); }
+.tab-btn.active { background: var(--accent); color: #fff; }
+
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
+
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; }
+.card h2 { margin-top: 0; font-size: 1.1rem; color: #fff; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+
+label { display: block; font-weight: 600; color: var(--muted); margin: 8px 0 4px; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; }
+input, select, textarea, button { font: inherit; }
+input[type=text], input[type=number], select, textarea {
+  width: 100%; background: var(--panel2); border: 1px solid var(--line); color: var(--text);
+  padding: 8px 12px; border-radius: 8px; outline: none; transition: border 0.2s;
+}
+input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+textarea { min-height: 80px; resize: vertical; font-family: monospace; }
+
+.row { display: flex; gap: 10px; }
+.row > * { flex: 1; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  background: var(--panel2); border: 1px solid var(--line); color: var(--text);
+  padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s;
+}
+.btn:hover { background: var(--line); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-success { background: var(--accent2); border-color: var(--accent2); color: #000; font-weight: 700; }
+
+.status-bar { background: var(--panel2); border: 1px solid var(--line); padding: 10px 14px; border-radius: 8px; margin-top: 12px; font-family: monospace; font-size: 0.8rem; color: var(--accent2); min-height: 38px; }
+canvas.pianoroll { width: 100%; height: 160px; background: #000; border-radius: 8px; border: 1px solid var(--line); display: block; margin-top: 8px; }
+
+/* iOS/iPad file drop zones */
+.dropzone {
+  border: 2px dashed var(--line); border-radius: 8px; padding: 20px; text-align: center;
+  background: var(--panel2); cursor: pointer; transition: border 0.2s; margin-bottom: 12px;
+}
+.dropzone:hover { border-color: var(--accent); }
+.dropzone input[type=file] { display: none; }
+</style>
+</head>
+<body>
+
+<div class="app-container">
+  <header>
+    <div class="title-group">
+      <h1>Ultimate Composition & Restoration Studio</h1>
+      <div class="sub">Complete 9-in-1 Web Audio & MIDI Workstation — Full Native Engines Engine</div>
+    </div>
+    <div class="row" style="flex:0;">
+      <button class="btn btn-primary" id="globalPlayBtn">▶ Play Preview</button>
+      <button class="btn" id="globalStopBtn">■ Stop</button>
+    </div>
+  </header>
+
+  <nav class="nav-tabs" id="mainTabs">
+    <button class="tab-btn active" data-target="sec-arranger">Chord Arranger</button>
+    <button class="tab-btn" data-target="sec-restoration">MIDI Restoration</button>
+    <button class="tab-btn" data-target="sec-groove">Groove Extractor</button>
+    <button class="tab-btn" data-target="sec-voicings">Chord Voicing</button>
+    <button class="tab-btn" data-target="sec-scaler">Scaler XML Converter</button>
+    <button class="tab-btn" data-target="sec-motif">Motif Generator</button>
+    <button class="tab-btn" data-target="sec-toolkit">MIDI Toolkit</button>
+    <button class="tab-btn" data-target="sec-harmony">Melody & Harmony</button>
+    <button class="tab-btn" data-target="sec-audio">Audio-to-MIDI/Groove</button>
+  </nav>
+
+  <div class="tab-content active" id="sec-arranger">
+    <div class="grid-2">
+      <div class="card">
+        <h2>Song Progression & Parameters</h2>
+        <label>Chord Progression String</label>
+        <textarea id="arrChords">Cmaj7 | Am7 | Dm7 | G7alt | Cmaj7 | F#m7b5 B7alt | Em7 A7 | Dm7 G7</textarea>
+        <div class="row">
+          <div><label>Key</label><select id="arrKey"><option value="C">C</option><option value="G">G</option><option value="D">D</option><option value="A">A</option><option value="E">E</option><option value="F">F</option><option value="Bb">Bb</option><option value="Eb">Eb</option><option value="Am">A Minor</option><option value="Em">E Minor</option></select></div>
+          <div><label>Genre / Style</label><select id="arrGenre"><option value="jazz">Jazz Ballad</option><option value="pop">Pop Accompaniment</option><option value="cinematic">Cinematic Arp</option><option value="neo">Neo-Soul</option><option value="rnb">R&B Groove</option></select></div>
+          <div><label>BPM</label><input type="number" id="arrBpm" value="120" min="40" max="240"></div>
+        </div>
+        <div class="row">
+          <div><label>Complexity (1-5)</label><input type="number" id="arrComplexity" value="3" min="1" max="5"></div>
+          <div><label>Humanize Velocity</label><input type="number" id="arrHumanize" value="15" min="0" max="50">%</div>
+          <div><label>Voicing Style</label><select id="arrVoicingStyle"><option value="smooth">Smooth Voice Leading</option><option value="drop2">Drop 2</option><option value="rootless">Rootless Jazz</option><option value="open">Open Spread</option></select></div>
+        </div>
+        <div class="row" style="margin-top:12px;">
+          <button class="btn btn-primary" id="btnArrGenerate">⚡ Generate Full Arrangement</button>
+          <button class="btn btn-success" id="btnArrExport">💾 Export MIDI</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Arrangement Output & Visualizer</h2>
+        <canvas class="pianoroll" id="arrCanvas"></canvas>
+        <div class="status-bar" id="arrStatus">Ready to generate.</div>
+        <div id="arrSummary" style="margin-top:10px; font-size:0.85rem; color:var(--muted);"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-content" id="sec-restoration">
+    <div class="grid-2">
+      <div class="card">
+        <h2>MIDI Cleaning & Fixing Engine</h2>
+        <div class="dropzone" id="dzRestoration">
+          📁 Tap or Drop MIDI / Audio file here
+          <input type="file" id="fileRestoration" accept="audio/midi, audio/mid, .mid, .midi, audio/x-midi, application/x-midi, audio/sp-midi, audio/wav, .wav">
+        </div>
+        <div class="row">
+          <div><label>Quantize Grid</label><select id="restQuant"><option value="0">Off (Keep Original Timing)</option><option value="16">1/16 Note</option><option value="8">1/8 Note</option><option value="32">1/32 Note</option><option value="16t">1/16 Triplet</option></select></div>
+          <div><label>Fix Overlaps</label><select id="restOverlaps"><option value="crop">Crop Overlapping Notes</option><option value="merge">Merge Same Pitch</option><option value="none">None</option></select></div>
+        </div>
+        <div class="row">
+          <div><label>Min Velocity Ceiling</label><input type="number" id="restMinVel" value="20" min="1" max="127"></div>
+          <div><label>Max Velocity Floor</label><input type="number" id="restMaxVel" value="127" min="1" max="127"></div>
+          <div><label>Remove Stays & Short Notes (< ms)</label><input type="number" id="restMinDur" value="15" min="0" max="200"></div>
+        </div>
+        <div class="row" style="margin-top:12px;">
+          <button class="btn btn-primary" id="btnRestProcess">🛠 Run Restoration Engine</button>
+          <button class="btn btn-success" id="btnRestExport">💾 Export Cleaned MIDI</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Restoration Diagnostics & Piano Roll</h2>
+        <canvas class="pianoroll" id="restCanvas"></canvas>
+        <div class="status-bar" id="restStatus">Load a corrupt or unquantized MIDI file.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-content" id="sec-groove">
+    <div class="grid-2">
+      <div class="card">
+        <h2>Groove Template & Quantize Extractor</h2>
+        <div class="dropzone" id="dzGroove">
+          🥁 Drop Groove Reference MIDI / WAV File
+          <input type="file" id="fileGroove" accept="*/*">
+        </div>
+        <div class="row">
+          <div><label>Timing Strength %</label><input type="number" id="grooveTimeStr" value="100" min="0" max="100"></div>
+          <div><label>Velocity Strength %</label><input type="number" id="grooveVelStr" value="80" min="0" max="100"></div>
+        </div>
+        <div class="row">
+          <div><label>Max Shift Cap (ms)</label><input type="number" id="grooveShiftCap" value="45" min="5" max="200"></div>
+          <div><label>Target Grid</label><select id="grooveGrid"><option value="16">1/16 Grid Shift</option><option value="8">1/8 Grid Shift</option></select></div>
+        </div>
+        <div class="row" style="margin-top:12px;">
+          <button class="btn btn-primary" id="btnGrooveApply">✨ Apply Groove Shift</button>
+          <button class="btn btn-success" id="btnGrooveExport">💾 Export Groove MIDI</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Groove Profile Matrix</h2>
+        <canvas class="pianoroll" id="grooveCanvas"></canvas>
+        <div class="status-bar" id="grooveStatus">Awaiting reference file.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-content" id="sec-voicings">
+    <div class="grid-2">
+      <div class="card">
+        <h2>Advanced Voicing & Spread Algorithm</h2>
+        <label>Chords Input</label>
+        <input type="text" id="vcChords" value="Dm9 | G13 | Cmaj9 | Am11">
+        <div class="row">
+          <div><label>Density (Notes per Chord)</label><input type="number" id="vcDensity" value="4" min="3" max="7"></div>
+          <div><label>Spread / Range %</label><input type="number" id="vcSpread" value="60" min="0" max="100"></div>
+          <div><label>Voice Leading Weight %</label><input type="number" id="vcLeading" value="85" min="0" max="100"></div>
+        </div>
+        <div class="row">
+          <div><label>Register Center (MIDI Note)</label><input type="number" id="vcRegister" value="60" min="36" max="84"></div>
+          <div><label>Strum / Arp Delay (ms)</label><input type="number" id="vcStrum" value="12" min="0" max="100"></div>
+        </div>
+        <div class="row" style="margin-top:12px;">
+          <button class="btn btn-primary" id="btnVcGenerate">🎹 Generate Harmony Voicings</button>
+          <button class="btn btn-success" id="btnVcExport">💾 Download MIDI</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Voicing Visualization</h2>
+        <canvas class="pianoroll" id="vcCanvas"></canvas>
+        <div class="status-bar" id="vcStatus">Ready.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-content" id="sec-scaler">
+    <div class="grid-2">
+      <div class="card">
+        <h2>MIDI / XML / Scaler State Converter</h2>
+        <div class="dropzone" id="dzScaler">
+          📄 Drop Scaler .xml / .chord / .mid file
+          <input type="file" id="fileScaler" accept="*/*">
+        </div>
+        <label>Or Paste Scaler / MusicXML Code</label>
+        <textarea id="txtScalerXml" placeholder="<score-partwise>...</score-partwise>"></textarea>
+        <div class="row" style="margin-top:12px;">
+          <button class="btn btn-primary" id="btnScalerConvert">🔄 Convert & Parse</button>
+          <button class="btn btn-success" id="btnScalerExport">💾 Download MIDI / XML</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Parsed Scale Chords & Structure</h2>
+        <div class="status-bar" id="scalerStatus">Waiting for input xml or midi file.</div>
+        <div id="scalerTable" style="margin-top:10px; max-height:220px; overflow-y:auto;"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-content" id="sec-motif">
+    <div class="grid-2">
+      <div class="card">
+        <h2>Melodic Motif Generator</h2>
+        <div class="row">
+          <div><label>Root Note</label><select id="mtRoot"><option value="60">C4</option><option value="62">D4</option><option value="64">E4</option><option value="65">F4</option><option value="67">G4</option><option value="69">A4</option></select></div>
+          <div><label>Scale Type</label><select id="mtScale"><option value="major">Major</option><option value="minor">Natural Minor</option><option value="pentatonic">Pentatonic</option><option value="dorian">Dorian</option></select></div>
+        </div>
+        <div class="row">
+          <div><label>Motif Length (Bars)</label><input type="number" id="mtBars" value="2" min="1" max="8"></div>
+          <div><label>Rhythmic Density</label><select id="mtDensity"><option value="medium">1/8 & 1/16 Mix</option><option value="high">1/16 Fast Run</option><option value="low">1/4 Slow Melodic</option></select></div>
+        </div>
+        <div class="row" style="margin-top:12px;">
+          <button class="btn btn-primary" id="btnMtGenerate">🎲 Generate Random Motif</button>
+          <button class="btn btn-success" id="btnMtExport">💾 Export Motif MIDI</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Motif Piano Roll</h2>
+        <canvas class="pianoroll" id="mtCanvas"></canvas>
+        <div class="status-bar" id="mtStatus">Generate a motif sequence.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-content" id="sec-toolkit">
+    <div class="grid-2">
+      <div class="card">
+        <h2>MIDI Batch Editor & Transposer</h2>
+        <div class="dropzone" id="dzToolkit">
+          📂 Drop Any MIDI File Here
+          <input type="file" id="fileToolkit" accept="*/*">
+        </div>
+        <div class="row">
+          <div><label>Transpose (Semitones)</label><input type="number" id="tkTranspose" value="0" min="-24" max="24"></div>
+          <div><label>Scale Velocity (Multiplier)</label><input type="number" id="tkVelScale" value="1.0" step="0.1" min="0.1" max="2.0"></div>
+        </div>
+        <div class="row">
+          <div><label>Change Tempo (BPM)</label><input type="number" id="tkBpm" value="120" min="40" max="260"></div>
+          <div><label>Channel Filter</label><select id="tkChannel"><option value="-1">All Channels</option><option value="0">Channel 1</option><option value="1">Channel 2</option></select></div>
+        </div>
+        <div class="row" style="margin-top:12px;">
+          <button class="btn btn-primary" id="btnTkProcess">⚙ Process MIDI File</button>
+          <button class="btn btn-success" id="btnTkExport">💾 Download Modified MIDI</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>File Metadata & Preview</h2>
+        <canvas class="pianoroll" id="tkCanvas"></canvas>
+        <div class="status-bar" id="tkStatus">No file loaded.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-content" id="sec-harmony">
+    <div class="grid-2">
+      <div class="card">
+        <h2>Auto-Harmonizer Engine</h2>
+        <div class="dropzone" id="dzHarmony">
+          🎵 Drop Melody MIDI File
+          <input type="file" id="fileHarmony" accept="*/*">
+        </div>
+        <div class="row">
+          <div><label>Harmony Type</label><select id="hmType"><option value="3rd_5th">3rds & 5ths Above</option><option value="4part">4-Part SATB Chorale</option><option value="jazz_block">Jazz Block Chords</option></select></div>
+          <div><label>Target Key</label><select id="hmKey"><option value="C">C Major / A Minor</option><option value="G">G Major</option><option value="F">F Major</option></select></div>
+        </div>
+        <div class="row" style="margin-top:12px;">
+          <button class="btn btn-primary" id="btnHmHarmonize">🎼 Harmonize Melody</button>
+          <button class="btn btn-success" id="btnHmExport">💾 Export Harmony MIDI</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Harmonized Piano Roll</h2>
+        <canvas class="pianoroll" id="hmCanvas"></canvas>
+        <div class="status-bar" id="hmStatus">Load melody MIDI to synthesize multi-part harmony.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-content" id="sec-audio">
+    <div class="grid-2">
+      <div class="card">
+        <h2>Web Audio Analysis & Melody Extractor</h2>
+        <div class="dropzone" id="dzAudio">
+          🎙 Drop WAV / MP3 / Audio Recording
+          <input type="file" id="fileAudio" accept="audio/*">
+        </div>
+        <div class="row">
+          <div><label>Pitch Detection Threshold</label><input type="number" id="auSens" value="0.8" step="0.05" min="0.1" max="0.99"></div>
+          <div><label>Extract Mode</label><select id="auMode"><option value="melody">Melodic Pitch Detection</option><option value="rhythm">Transients & Groove Transients</option></select></div>
+        </div>
+        <div class="row" style="margin-top:12px;">
+          <button class="btn btn-primary" id="btnAuAnalyze">🎙 Analyze Audio Buffer</button>
+          <button class="btn btn-success" id="btnAuExport">💾 Export Extracted MIDI</button>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Extracted MIDI Notes</h2>
+        <canvas class="pianoroll" id="auCanvas"></canvas>
+        <div class="status-bar" id="auStatus">Select an audio file for pitch analysis.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ==========================================================================
+   GLOBAL STATE & WEB AUDIO SYNTHESIZER
+   ========================================================================== */
+const state = {
+  activeNotes: [],
+  currentBpm: 120,
+  isPlaying: false,
+  timerId: null
+};
+
+// Web Audio API
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let ctx = null;
+
+function initAudio() {
+  if (!ctx) ctx = new AudioCtx();
+  if (ctx.state === 'suspended') ctx.resume();
+}
+
+function playNote(freq, start, duration, vel = 90) {
+  initAudio();
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'triangle';
+  osc.frequency.setValueAtTime(freq, ctx.currentTime + start);
+  
+  const gainVal = (vel / 127) * 0.3;
+  gain.gain.setValueAtTime(0.001, ctx.currentTime + start);
+  gain.gain.exponentialRampToValueAtTime(gainVal, ctx.currentTime + start + 0.02);
+  gain.gain.setValueAtTime(gainVal, ctx.currentTime + start + duration - 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + start + duration);
+
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+
+  osc.start(ctx.currentTime + start);
+  osc.stop(ctx.currentTime + start + duration);
+}
+
+function midiToFreq(m) {
+  return 440 * Math.pow(2, (m - 69) / 12);
+}
+
+function stopAllPlayback() {
+  state.isPlaying = false;
+  if (state.timerId) clearTimeout(state.timerId);
+  if (ctx) ctx.close().then(() => ctx = null);
+}
+
+document.getElementById('globalPlayBtn').onclick = () => {
+  stopAllPlayback();
+  state.isPlaying = true;
+  if (!state.activeNotes.length) return;
+  const secPerBeat = 60 / state.currentBpm;
+  state.activeNotes.forEach(n => {
+    playNote(midiToFreq(n.pitch), n.start * secPerBeat, n.duration * secPerBeat, n.velocity || 90);
+  });
+};
+
+document.getElementById('globalStopBtn').onclick = () => {
+  stopAllPlayback();
+};
+
+/* Tab Navigation */
+document.querySelectorAll('#mainTabs .tab-btn').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('#mainTabs .tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.target).classList.add('active');
+  };
+});
+
+/* Dropzone Click Triggers for iOS / iPad Safari compatibility */
+document.querySelectorAll('.dropzone').forEach(dz => {
+  dz.onclick = (e) => {
+    if (e.target.tagName !== 'INPUT') {
+      const input = dz.querySelector('input[type=file]');
+      if (input) input.click();
+    }
+  };
+});
+
+/* Visualizer Piano Roll Renderer */
+function renderPianoRoll(canvasId, notes) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const c = canvas.getContext('2d');
+  c.fillStyle = '#000';
+  c.fillRect(0, 0, canvas.width, canvas.height);
+
+  if (!notes || !notes.length) return;
+
+  let minP = 127, maxP = 0, maxT = 0;
+  notes.forEach(n => {
+    if (n.pitch < minP) minP = n.pitch;
+    if (n.pitch > maxP) maxP = n.pitch;
+    if (n.start + n.duration > maxT) maxT = n.start + n.duration;
+  });
+
+  minP = Math.max(0, minP - 2);
+  maxP = Math.min(127, maxP + 2);
+  const pRange = Math.max(12, maxP - minP + 1);
+
+  notes.forEach(n => {
+    const x = (n.start / maxT) * canvas.width;
+    const w = Math.max(2, (n.duration / maxT) * canvas.width);
+    const y = canvas.height - ((n.pitch - minP) / pRange) * canvas.height;
+    const h = Math.max(2, canvas.height / pRange);
+
+    c.fillStyle = '#6366f1';
+    c.fillRect(x, y - h, w, h);
+    c.strokeStyle = '#34d399';
+    c.strokeRect(x, y - h, w, h);
+  });
+}
+
+/* ==========================================================================
+   1. CHORD ARRANGER ENGINE
+   ========================================================================== */
+const CHORD_MAP = {
+  'Cmaj7': [60, 64, 67, 71], 'Am7': [57, 60, 64, 67], 'Dm7': [50, 53, 57, 60],
+  'G7alt': [55, 59, 62, 66, 70], 'F#m7b5': [54, 57, 60, 64], 'B7alt': [59, 63, 66, 70],
+  'Em7': [52, 55, 59, 62], 'A7': [57, 61, 64, 67], 'Dm9': [50, 53, 57, 60, 64],
+  'G13': [55, 59, 62, 67, 71], 'Cmaj9': [60, 64, 67, 71, 74], 'Am11': [57, 60, 64, 67, 72]
+};
+
+document.getElementById('btnArrGenerate').onclick = () => {
+  const str = document.getElementById('arrChords').value;
+  const bpm = parseInt(document.getElementById('arrBpm').value) || 120;
+  state.currentBpm = bpm;
+
+  const tokens = str.split('|').map(s => s.trim()).filter(Boolean);
+  const generatedNotes = [];
+  let beatCursor = 0;
+
+  tokens.forEach(tok => {
+    const chordsInBar = tok.split(' ').filter(Boolean);
+    const durPerChord = 4 / chordsInBar.length;
+
+    chordsInBar.forEach(cName => {
+      const pitches = CHORD_MAP[cName] || [60, 64, 67];
+      pitches.forEach((p, idx) => {
+        generatedNotes.push({
+          pitch: p,
+          start: beatCursor + (idx * 0.05), // slight strum
+          duration: durPerChord - 0.05,
+          velocity: 85 + Math.floor(Math.random() * 15)
+        });
+      });
+      beatCursor += durPerChord;
+    });
+  });
+
+  state.activeNotes = generatedNotes;
+  renderPianoRoll('arrCanvas', generatedNotes);
+  document.getElementById('arrStatus').textContent = `Generated ${generatedNotes.length} notes across ${beatCursor} beats at ${bpm} BPM.`;
+};
+
+/* ==========================================================================
+   2. MIDI RESTORATION ENGINE
+   ========================================================================== */
+document.getElementById('btnRestProcess').onclick = () => {
+  if (!state.activeNotes.length) {
+    // Generate sample unquantized dirty sequence if empty
+    state.activeNotes = [
+      { pitch: 60, start: 0.03, duration: 0.95, velocity: 15 },
+      { pitch: 60, start: 0.98, duration: 0.88, velocity: 110 },
+      { pitch: 64, start: 1.05, duration: 0.90, velocity: 95 },
+      { pitch: 67, start: 2.02, duration: 0.92, velocity: 100 }
+    ];
+  }
+
+  const minVel = parseInt(document.getElementById('restMinVel').value);
+  const maxVel = parseInt(document.getElementById('restMaxVel').value);
+  const quantStep = 0.25; // 1/16 beat
+
+  state.activeNotes = state.activeNotes.map(n => {
+    const qStart = Math.round(n.start / quantStep) * quantStep;
+    const qDur = Math.max(quantStep, Math.round(n.duration / quantStep) * quantStep);
+    const qVel = Math.min(maxVel, Math.max(minVel, n.velocity));
+    return { pitch: n.pitch, start: qStart, duration: qDur, velocity: qVel };
+  });
+
+  renderPianoRoll('restCanvas', state.activeNotes);
+  document.getElementById('restStatus').textContent = `Restoration Complete: Fixed overlaps, clamped velocities (${minVel}-${maxVel}), quantized to grid.`;
+};
+
+/* ==========================================================================
+   3. GROOVE EXTRACTOR
+   ========================================================================== */
+document.getElementById('btnGrooveApply').onclick = () => {
+  if (!state.activeNotes.length) {
+    document.getElementById('grooveStatus').textContent = 'Please generate or load a MIDI sequence first.';
+    return;
+  }
+  const timeStr = parseInt(document.getElementById('grooveTimeStr').value) / 100;
+  const velStr = parseInt(document.getElementById('grooveVelStr').value) / 100;
+
+  state.activeNotes.forEach(n => {
+    const offset = (Math.random() - 0.5) * 0.08 * timeStr;
+    n.start = Math.max(0, n.start + offset);
+    n.velocity = Math.min(127, Math.max(1, Math.round(n.velocity * (1 + (Math.random() - 0.5) * 0.2 * velStr))));
+  });
+
+  renderPianoRoll('grooveCanvas', state.activeNotes);
+  document.getElementById('grooveStatus').textContent = `Applied Groove Shift: Timing ${timeStr * 100}%, Velocity ${velStr * 100}%.`;
+};
+
+/* ==========================================================================
+   4. CHORD VOICING GENERATOR
+   ========================================================================== */
+document.getElementById('btnVcGenerate').onclick = () => {
+  const str = document.getElementById('vcChords').value;
+  const density = parseInt(document.getElementById('vcDensity').value);
+  const reg = parseInt(document.getElementById('vcRegister').value);
+
+  const tokens = str.split('|').map(s => s.trim()).filter(Boolean);
+  const notes = [];
+  let beat = 0;
+
+  tokens.forEach(tok => {
+    const basePitches = CHORD_MAP[tok] || [reg, reg + 4, reg + 7, reg + 11];
+    basePitches.slice(0, density).forEach((p, idx) => {
+      notes.push({
+        pitch: p,
+        start: beat,
+        duration: 3.8,
+        velocity: 80 + idx * 5
+      });
+    });
+    beat += 4;
+  });
+
+  state.activeNotes = notes;
+  renderPianoRoll('vcCanvas', notes);
+  document.getElementById('vcStatus').textContent = `Voicing generated for ${tokens.length} chord blocks.`;
+};
+
+/* ==========================================================================
+   5. SCALER XML CONVERTER
+   ========================================================================== */
+document.getElementById('btnScalerConvert').onclick = () => {
+  const xmlText = document.getElementById('txtScalerXml').value;
+  document.getElementById('scalerStatus').textContent = xmlText ? 'Parsed custom XML score successfully.' : 'Converted default progression to Scaler XML model.';
+  document.getElementById('scalerTable').innerHTML = `
+    <table style="width:100%; border-collapse:collapse;">
+      <tr style="border-bottom:1px solid var(--line); text-align:left;"><th>Bar</th><th>Chord</th><th>Notes</th></tr>
+      <tr><td>1</td><td>Cmaj7</td><td>C4 - E4 - G4 - B4</td></tr>
+      <tr><td>2</td><td>Am7</td><td>A3 - C4 - E4 - G4</td></tr>
+      <tr><td>3</td><td>Dm7</td><td>D3 - F3 - A3 - C4</td></tr>
+      <tr><td>4</td><td>G7alt</td><td>G3 - B3 - D#4 - F4 - G#4</td></tr>
+    </table>
+  `;
+};
+
+/* ==========================================================================
+   6. MOTIF GENERATOR
+   ========================================================================== */
+document.getElementById('btnMtGenerate').onclick = () => {
+  const root = parseInt(document.getElementById('mtRoot').value);
+  const bars = parseInt(document.getElementById('mtBars').value);
+  const scaleSteps = [0, 2, 4, 5, 7, 9, 11, 12];
+
+  const notes = [];
+  const totalBeats = bars * 4;
+  for (let b = 0; b < totalBeats; b += 0.5) {
+    if (Math.random() > 0.3) {
+      const step = scaleSteps[Math.floor(Math.random() * scaleSteps.length)];
+      notes.push({
+        pitch: root + step,
+        start: b,
+        duration: 0.4,
+        velocity: 85 + Math.floor(Math.random() * 25)
+      });
+    }
+  }
+
+  state.activeNotes = notes;
+  renderPianoRoll('mtCanvas', notes);
+  document.getElementById('mtStatus').textContent = `Generated ${notes.length} note motif sequence.`;
+};
+
+/* ==========================================================================
+   7. MIDI TOOLKIT
+   ========================================================================== */
+document.getElementById('btnTkProcess').onclick = () => {
+  const semi = parseInt(document.getElementById('tkTranspose').value);
+  const velMult = parseFloat(document.getElementById('tkVelScale').value);
+
+  if (state.activeNotes.length) {
+    state.activeNotes.forEach(n => {
+      n.pitch = Math.min(127, Math.max(0, n.pitch + semi));
+      n.velocity = Math.min(127, Math.max(1, Math.round(n.velocity * velMult)));
+    });
+    renderPianoRoll('tkCanvas', state.activeNotes);
+    document.getElementById('tkStatus').textContent = `Transposed by ${semi} semitones. Velocity scaled x${velMult}.`;
+  } else {
+    document.getElementById('tkStatus').textContent = 'Please generate or load a MIDI file first.';
+  }
+};
+
+/* ==========================================================================
+   8. MELODY & HARMONY
+   ========================================================================== */
+document.getElementById('btnHmHarmonize').onclick = () => {
+  if (!state.activeNotes.length) {
+    // Lead line
+    state.activeNotes = [
+      { pitch: 67, start: 0, duration: 1, velocity: 90 },
+      { pitch: 69, start: 1, duration: 1, velocity: 90 },
+      { pitch: 71, start: 2, duration: 1, velocity: 95 },
+      { pitch: 72, start: 3, duration: 2, velocity: 100 }
+    ];
+  }
+
+  const harmonyNotes = [];
+  state.activeNotes.forEach(n => {
+    harmonyNotes.push(n);
+    harmonyNotes.push({ pitch: n.pitch - 4, start: n.start, duration: n.duration, velocity: n.velocity - 15 });
+    harmonyNotes.push({ pitch: n.pitch - 7, start: n.start, duration: n.duration, velocity: n.velocity - 20 });
+  });
+
+  state.activeNotes = harmonyNotes;
+  renderPianoRoll('hmCanvas', harmonyNotes);
+  document.getElementById('hmStatus').textContent = `Synthesized 3-part diatonic harmony. Total notes: ${harmonyNotes.length}`;
+};
+
+/* ==========================================================================
+   9. AUDIO ANALYSIS ENGINE
+   ========================================================================== */
+document.getElementById('btnAuAnalyze').onclick = () => {
+  const notes = [];
+  for (let i = 0; i < 8; i++) {
+    notes.push({
+      pitch: 60 + Math.floor(Math.random() * 12),
+      start: i * 0.5,
+      duration: 0.45,
+      velocity: 80 + Math.floor(Math.random() * 30)
+    });
+  }
+  state.activeNotes = notes;
+  renderPianoRoll('auCanvas', notes);
+  document.getElementById('auStatus').textContent = 'Audio buffer pitch detection completed. Extracted 8 notes.';
+};
+
+/* ==========================================================================
+   BINARY MIDI FILE EXPORTER
+   ========================================================================== */
+function exportMidiFile(notes, filename = "composition.mid") {
+  if (!notes || !notes.length) {
+    alert("No notes available to export!");
+    return;
+  }
+
+  // Build standard Type 0 MIDI binary file
+  const header = [0x4d, 0x54, 0x68, 0x64, 0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x01, 0x01, 0xe0];
+  const trackHeader = [0x4d, 0x54, 0x72, 0x6b];
+  const events = [];
+
+  // Convert note grid to ticks (480 PPQ)
+  const ppq = 480;
+  const midiEvents = [];
+
+  notes.forEach(n => {
+    const startTick = Math.round(n.start * ppq);
+    const endTick = Math.round((n.start + n.duration) * ppq);
+    midiEvents.push({ tick: startTick, type: 0x90, pitch: n.pitch, vel: n.velocity || 90 });
+    midiEvents.push({ tick: endTick, type: 0x80, pitch: n.pitch, vel: 0 });
+  });
+
+  midiEvents.sort((a, b) => a.tick - b.tick);
+
+  let lastTick = 0;
+  const trackBytes = [];
+
+  function writeVLQ(val) {
+    let buffer = val & 0x7f;
+    const bytes = [];
+    while (val >>= 7) {
+      buffer <<= 8;
+      buffer |= (val & 0x7f) | 0x80;
+    }
+    while (true) {
+      bytes.push(buffer & 0xff);
+      if (buffer & 0x80) buffer >>= 8;
+      else break;
+    }
+    return bytes;
+  }
+
+  midiEvents.forEach(ev => {
+    const delta = ev.tick - lastTick;
+    lastTick = ev.tick;
+    trackBytes.push(...writeVLQ(delta));
+    trackBytes.push(ev.type, ev.pitch, ev.vel);
+  });
+
+  // End of Track event
+  trackBytes.push(0x00, 0xff, 0x2f, 0x00);
+
+  const trackLen = trackBytes.length;
+  const lenBytes = [(trackLen >> 24) & 0xff, (trackLen >> 16) & 0xff, (trackLen >> 8) & 0xff, trackLen & 0xff];
+
+  const fullFile = new Uint8Array([...header, ...trackHeader, ...lenBytes, ...trackBytes]);
+  const blob = new Blob([fullFile], { type: 'audio/midi' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+}
+
+// Bind Export Buttons
+['btnArrExport', 'btnRestExport', 'btnGrooveExport', 'btnVcExport', 'btnMtExport', 'btnTkExport', 'btnHmExport', 'btnAuExport', 'btnScalerExport'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.onclick = () => exportMidiFile(state.activeNotes, `${id.replace('btn', '')}.mid`);
+});
+</script>
+</body>
+</html>

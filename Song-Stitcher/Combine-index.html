@@ -1,0 +1,1308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Splice Deck — Auto Song Assembler</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#14161a;
+    --panel:#1c1f26;
+    --panel-2:#22262f;
+    --line:#2c313c;
+    --text:#edeff2;
+    --muted:#8b93a1;
+    --amber:#e8a33d;
+    --amber-dim:#8a641f;
+    --teal:#4fd1c5;
+    --red:#e2635a;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);}
+  body{
+    font-family:'Space Grotesk',system-ui,sans-serif;
+    padding-bottom:60px;
+    overflow-x:hidden;
+  }
+  ::selection{background:var(--amber);color:#14161a;}
+  .wrap{max-width:760px;margin:0 auto;padding:22px 18px 40px;}
+
+  header{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px;}
+  header h1{font-size:22px;font-weight:700;letter-spacing:.01em;margin:0;}
+  header .mono{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--amber);letter-spacing:.08em;}
+  .sub{color:var(--muted);font-size:13px;margin:2px 0 24px;line-height:1.5;}
+
+  .reel{
+    display:flex;align-items:stretch;height:34px;border-radius:8px;overflow:hidden;
+    border:1px solid var(--line);background:var(--panel-2);margin:14px 0 26px;
+  }
+  .reel .seg{position:relative;display:flex;align-items:center;justify-content:center;
+    font-family:'JetBrains Mono',monospace;font-size:10px;color:#0e0f12;font-weight:600;
+    border-right:1px solid rgba(0,0,0,.35);overflow:hidden;white-space:nowrap;
+  }
+  .reel .seg:last-child{border-right:none;}
+  .reel .seg .fade{position:absolute;top:0;bottom:0;width:14%;background:linear-gradient(90deg, rgba(20,22,26,.55), transparent);}
+  .reel .seg .fade.right{right:0;left:auto;background:linear-gradient(270deg, rgba(20,22,26,.55), transparent);}
+  .reel .empty{flex:1;display:flex;align-items:center;justify-content:center;color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:11px;}
+
+  section{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:16px;}
+  section h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--amber);margin:0 0 12px;font-weight:600;}
+
+  .filebtn{
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    width:100%;padding:16px;border-radius:8px;border:1.5px dashed var(--line);
+    background:var(--panel-2);color:var(--text);font-size:15px;font-weight:600;
+    cursor:pointer;font-family:inherit;
+  }
+  .filebtn:active{border-color:var(--amber);}
+  input[type=file]{display:none;}
+
+  .channel{
+    padding:10px 8px;border-bottom:1px solid var(--line);
+  }
+  .channel:last-child{border-bottom:none;}
+  .chRow1{display:flex;align-items:center;gap:10px;}
+  .chRow2{display:flex;align-items:center;gap:8px;margin-top:8px;padding-left:60px;}
+  .channel .num{font-family:'JetBrains Mono',monospace;color:var(--muted);font-size:13px;width:16px;flex-shrink:0;text-align:center;}
+  .channel .meta{flex:1;min-width:0;}
+  .channel .name{font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .channel .stats{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);margin-top:2px;}
+  .channel .stats b{color:var(--teal);font-weight:600;}
+  .channel .ord{display:flex;flex-direction:column;gap:3px;}
+  .iconbtn{
+    width:30px;height:26px;border-radius:6px;border:1px solid var(--line);background:var(--panel-2);
+    color:var(--text);font-size:13px;display:flex;align-items:center;justify-content:center;cursor:pointer;
+    flex-shrink:0;
+  }
+  .iconbtn:disabled{opacity:.25;cursor:default;}
+  .previewbtn{width:34px;height:34px;font-size:14px;}
+  .previewbtn:disabled{opacity:.35;}
+  .lenInput{
+    width:56px;flex-shrink:0;padding:6px 4px;text-align:center;border-radius:6px;
+    border:1px solid var(--line);background:var(--panel-2);color:var(--text);
+    font-family:'JetBrains Mono',monospace;font-size:12px;
+  }
+  .lenInput:focus{outline:none;border-color:var(--amber);}
+  .lenInput::placeholder{color:var(--muted);}
+  .layerSelect{
+    flex:1;min-width:0;padding:7px 6px;border-radius:6px;border:1px solid var(--line);
+    background:var(--panel-2);color:var(--text);font-size:12px;font-family:'Space Grotesk',sans-serif;
+  }
+  .layerSelect:focus{outline:none;border-color:var(--amber);}
+  .iconbtn:active{background:var(--amber);color:#14161a;border-color:var(--amber);}
+  .rmbtn{color:var(--red);border-color:var(--red);background:transparent;}
+
+  .row{display:flex;gap:12px;flex-wrap:wrap;}
+  .field{flex:1;min-width:130px;}
+  .field label{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;}
+  .field input, .field select{
+    width:100%;padding:10px;border-radius:7px;border:1px solid var(--line);background:var(--panel-2);
+    color:var(--text);font-family:'JetBrains Mono',monospace;font-size:14px;
+  }
+  .field input:focus, .field select:focus{outline:none;border-color:var(--amber);}
+
+  .primary{
+    width:100%;padding:15px;border-radius:8px;border:none;background:var(--amber);color:#14161a;
+    font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;letter-spacing:.01em;
+  }
+  .primary:disabled{background:var(--amber-dim);color:#3a3a3a;}
+  .ghost{
+    padding:12px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--text);
+    font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;width:100%;
+  }
+
+  .progress{height:6px;border-radius:3px;background:var(--panel-2);overflow:hidden;margin-top:12px;display:none;}
+  .progress .bar{height:100%;width:0%;background:var(--teal);transition:width .15s;}
+
+  .status{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--muted);margin-top:10px;min-height:14px;}
+  .status.err{color:var(--red);}
+
+  audio{width:100%;margin-top:12px;}
+  .dl{display:block;text-align:center;margin-top:10px;padding:13px;border-radius:8px;background:var(--panel-2);
+    color:var(--teal);text-decoration:none;font-weight:600;font-size:14px;border:1px solid var(--line);}
+
+  .hidden{display:none !important;}
+  .hint{font-size:11.5px;color:var(--muted);line-height:1.5;margin-top:8px;}
+  footer{text-align:center;color:var(--muted);font-size:11px;margin-top:30px;font-family:'JetBrains Mono',monospace;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Splice&nbsp;Deck</h1>
+    <span class="mono">v1.0</span>
+  </header>
+  <p class="sub">Load a handful of WAV or MIDI files. Splice Deck listens to each one, works out a common key and tempo, and stitches them into a single song of the length you set — retiming and retuning every piece to lock together.</p>
+
+  <div class="reel" id="reel"><div class="empty">— no files loaded —</div></div>
+  <div class="status" id="reelStatus" style="margin:-18px 0 18px;"></div>
+
+  <section>
+    <h2>01 · Load source files</h2>
+    <label class="filebtn" for="fileInput">
+      <span>＋ Add WAV / MIDI files</span>
+    </label>
+    <input type="file" id="fileInput" accept=".wav,.mid,.midi,audio/wav,audio/x-wav" multiple>
+    <div id="channelList"></div>
+    <div class="status" id="analyzeStatus"></div>
+    <button class="ghost hidden" id="resetBtn" style="margin-top:12px;">↺ Start over</button>
+  </section>
+
+  <section id="settingsSection" class="hidden">
+    <h2>02 · Arrangement settings</h2>
+    <div class="row">
+      <div class="field">
+        <label>Song length (mm:ss)</label>
+        <input type="text" id="songLength" value="1:30">
+      </div>
+      <div class="field">
+        <label>Crossfade (sec)</label>
+        <input type="number" id="crossfade" value="2" min="0" max="6" step="0.1">
+      </div>
+    </div>
+    <div class="row" style="margin-top:12px;">
+      <div class="field">
+        <label>Target tempo (BPM)</label>
+        <input type="number" id="targetTempo" min="40" max="220">
+      </div>
+      <div class="field">
+        <label>Target key</label>
+        <select id="targetKey"></select>
+      </div>
+    </div>
+    <p class="hint">Auto-filled from what Splice Deck heard across your files — tweak either field if you want to steer it. Order below sets the sequence; reorder with the arrows. Each clip also has a length field (seconds) in step 01 — leave it blank for an equal automatic share of the song, or set a number to pin that clip's length; the remaining clips split whatever time is left. Every clip can also be set to "Layer onto" another clip instead of taking its own segment — it then plays simultaneously with that clip, sharing its timing and crossfades, rather than one-after-the-other. Segment and crossfade lengths snap to whole bars at the target tempo so transitions land on a downbeat instead of an arbitrary point.</p>
+    <div class="row" style="margin-top:14px;">
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);flex:1;min-width:150px;">
+        <input type="checkbox" id="djFilter" checked style="width:16px;height:16px;"> DJ filter sweep on joins
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);flex:1;min-width:150px;">
+        <input type="checkbox" id="rhythmPulse" style="width:16px;height:16px;"> Rhythmic pulse (audible thump — off by default)
+      </label>
+    </div>
+    <p class="hint">"DJ filter sweep" rolls the highs/bass off the outgoing clip and opens them back up on the incoming one during each crossfade — like a DJ working the filter knob on a mix, rather than a flat volume fade. "Rhythmic pulse" adds a synthesized low thump on every beat under the whole song — it's audible on its own, not just a subtle glue, so it's off unless you want that effect.</p>
+    <div class="row" style="margin-top:14px;">
+      <div class="field">
+        <label>Max pitch shift (semitones)</label>
+        <input type="number" id="maxShift" value="6" min="0" max="6" step="1">
+      </div>
+    </div>
+    <p class="hint">Left at 6 (full range) clips get retuned exactly onto the target key. Turning this down makes big shifts sound less robotic, but a partial correction can leave two overlapping clips slightly out of tune with each other during a crossfade, which is more jarring than either an exact match or no correction — so only lower it if a specific clip sounds artificial, and consider 0 (no retuning) over a middle value.</p>
+  </section>
+
+
+  <section id="buildSection" class="hidden">
+    <h2>03 · Build</h2>
+    <button class="primary" id="buildBtn">Assemble song</button>
+    <div class="progress" id="buildProgress"><div class="bar" id="buildBar"></div></div>
+    <div class="status" id="buildStatus"></div>
+    <audio id="player" controls class="hidden"></audio>
+    <a href="#" download="splice-deck-song.wav" class="dl hidden" id="dlLink">↓ Download WAV</a>
+    <a href="#" download="splice-deck-song.mid" class="dl hidden" id="dlMidiLink">↓ Download MIDI</a>
+    <p class="hint hidden" id="midiNote">Only the MIDI-sourced clips are included — audio (WAV) clips can't be represented as note data, so they're left out of this file.</p>
+  </section>
+
+  <footer>runs entirely on-device · nothing is uploaded</footer>
+</div>
+
+<script>
+/* ---------------------------------------------------------
+   STATE
+--------------------------------------------------------- */
+let items = []; // {id,file,type,name,tempo,key,mode,pitchClass,centroid,duration,buffer,noteEvents,ticksPerQuarter}
+let idCounter = 0;
+let sharedCtx = null;
+
+const KEY_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+
+/* ---------------------------------------------------------
+   FFT (iterative radix-2, in place)
+--------------------------------------------------------- */
+function fftInPlace(re, im){
+  const n = re.length;
+  for(let i=1,j=0;i<n;i++){
+    let bit = n>>1;
+    for(; j&bit; bit>>=1) j^=bit;
+    j^=bit;
+    if(i<j){
+      let t=re[i]; re[i]=re[j]; re[j]=t;
+      t=im[i]; im[i]=im[j]; im[j]=t;
+    }
+  }
+  for(let len=2; len<=n; len<<=1){
+    const ang = -2*Math.PI/len;
+    const wr = Math.cos(ang), wi = Math.sin(ang);
+    for(let i=0;i<n;i+=len){
+      let curWr=1, curWi=0;
+      for(let k=0;k<len/2;k++){
+        const ur=re[i+k], ui=im[i+k];
+        const trr=re[i+k+len/2]*curWr - im[i+k+len/2]*curWi;
+        const tri=re[i+k+len/2]*curWi + im[i+k+len/2]*curWr;
+        re[i+k]=ur+trr; im[i+k]=ui+tri;
+        re[i+k+len/2]=ur-trr; im[i+k+len/2]=ui-tri;
+        const nwr = curWr*wr - curWi*wi;
+        const nwi = curWr*wi + curWi*wr;
+        curWr=nwr; curWi=nwi;
+      }
+    }
+  }
+}
+
+/* ---------------------------------------------------------
+   KEY DETECTION (Krumhansl-Schmuckler)
+--------------------------------------------------------- */
+function detectKeyFromChroma(chroma){
+  const major=[6.35,2.23,3.48,2.33,4.38,4.09,2.52,5.19,2.39,3.66,2.29,2.88];
+  const minor=[6.33,2.68,3.52,5.38,2.60,3.53,2.54,4.75,3.98,2.69,3.34,3.17];
+  function corr(x,y){
+    const mx=x.reduce((a,b)=>a+b,0)/x.length, my=y.reduce((a,b)=>a+b,0)/y.length;
+    let num=0,dx=0,dy=0;
+    for(let i=0;i<x.length;i++){ num+=(x[i]-mx)*(y[i]-my); dx+=(x[i]-mx)**2; dy+=(y[i]-my)**2; }
+    return num/Math.sqrt((dx*dy)||1);
+  }
+  let best={score:-Infinity,tonic:0,mode:'major'};
+  for(let tonic=0;tonic<12;tonic++){
+    for(const [mode,profile] of [['major',major],['minor',minor]]){
+      const rotated = Array.from({length:12},(_,pc)=>profile[(pc-tonic+12)%12]);
+      const score = corr(chroma, rotated);
+      if(score>best.score) best={score,tonic,mode};
+    }
+  }
+  return {key:KEY_NAMES[best.tonic], mode:best.mode, pitchClass:best.tonic};
+}
+
+/* ---------------------------------------------------------
+   WAV ANALYSIS: tempo (onset autocorrelation) + key + centroid
+--------------------------------------------------------- */
+function detectTempo(buffer){
+  const sr = buffer.sampleRate;
+  const data = buffer.getChannelData(0);
+  const hop = 512;
+  const frames = Math.floor(data.length/hop);
+  if(frames<4) return 120;
+  const energy = new Float32Array(frames);
+  for(let i=0;i<frames;i++){
+    let sum=0;
+    const base=i*hop;
+    for(let j=0;j<hop;j++){ const s=data[base+j]||0; sum+=s*s; }
+    energy[i]=Math.sqrt(sum/hop);
+  }
+  const onset = new Float32Array(frames);
+  for(let i=1;i<frames;i++) onset[i]=Math.max(0, energy[i]-energy[i-1]);
+  const frameTime = hop/sr;
+  const minLag = Math.max(2, Math.floor((60/200)/frameTime));
+  const maxLag = Math.min(frames-1, Math.ceil((60/50)/frameTime));
+  let bestLag=minLag, bestVal=-Infinity;
+  for(let lag=minLag; lag<=maxLag; lag++){
+    let sum=0;
+    for(let i=0;i<frames-lag;i++) sum+=onset[i]*onset[i+lag];
+    if(sum>bestVal){ bestVal=sum; bestLag=lag; }
+  }
+  let bpm = 60/(bestLag*frameTime);
+  while(bpm<70) bpm*=2;
+  while(bpm>180) bpm/=2;
+  return Math.round(bpm);
+}
+
+function detectKeyAndCentroid(buffer){
+  const data = buffer.getChannelData(0);
+  const sr = buffer.sampleRate;
+  const fftSize=4096;
+  const maxFrames = Math.max(1, Math.floor(data.length/fftSize));
+  const numFrames = Math.min(150, maxFrames);
+  const chroma = new Array(12).fill(0);
+  let centroidSum=0, centroidWeight=0;
+  const step = Math.max(1, Math.floor((data.length-fftSize)/Math.max(1,numFrames)));
+  for(let f=0; f<numFrames; f++){
+    const start = f*step;
+    if(start+fftSize>data.length) break;
+    const re = new Float32Array(fftSize);
+    const im = new Float32Array(fftSize);
+    for(let i=0;i<fftSize;i++){
+      const w = 0.5-0.5*Math.cos(2*Math.PI*i/(fftSize-1));
+      re[i]=data[start+i]*w;
+    }
+    fftInPlace(re,im);
+    const half=fftSize/2;
+    let frameMagSum=0, frameCentroid=0;
+    for(let k=1;k<half;k++){
+      const mag=Math.hypot(re[k],im[k]);
+      const freq=k*sr/fftSize;
+      frameMagSum+=mag; frameCentroid+=freq*mag;
+      if(freq>=60 && freq<=5000){
+        const midi=69+12*Math.log2(freq/440);
+        const pc=((Math.round(midi)%12)+12)%12;
+        chroma[pc]+=mag;
+      }
+    }
+    if(frameMagSum>0){ centroidSum+=frameCentroid/frameMagSum; centroidWeight++; }
+  }
+  const centroid = centroidWeight? centroidSum/centroidWeight : 1000;
+  const keyInfo = detectKeyFromChroma(chroma);
+  return {...keyInfo, centroid};
+}
+
+/* ---------------------------------------------------------
+   MIDI PARSING
+--------------------------------------------------------- */
+function parseMidi(arrayBuffer){
+  const data = new DataView(arrayBuffer);
+  let pos=0;
+  function u8(){ return data.getUint8(pos++); }
+  function u16(){ const v=data.getUint16(pos); pos+=2; return v; }
+  function u32(){ const v=data.getUint32(pos); pos+=4; return v; }
+  function varLen(){ let value=0, byte; do{ byte=u8(); value=(value<<7)|(byte&0x7f); } while(byte&0x80); return value; }
+  function chunkType(){ const s=String.fromCharCode(u8(),u8(),u8(),u8()); return s; }
+
+  if(chunkType()!=='MThd') throw new Error('Not a valid MIDI file');
+  u32(); // header length
+  u16(); // format
+  const numTracks = u16();
+  const division = u16();
+  const ticksPerQuarter = (division & 0x8000) ? 480 : division;
+
+  let tempo = 500000;
+  const notes = [];
+  for(let t=0;t<numTracks;t++){
+    const ctype = chunkType();
+    const clen = u32();
+    const chunkEnd = pos+clen;
+    if(ctype!=='MTrk'){ pos=chunkEnd; continue; }
+    let tick=0;
+    let runningStatus=0;
+    const active = {};
+    while(pos<chunkEnd){
+      const delta = varLen();
+      tick+=delta;
+      let statusByte = u8();
+      if(statusByte<0x80){ pos--; statusByte=runningStatus; } else { runningStatus=statusByte; }
+      const type = statusByte & 0xf0;
+      if(statusByte===0xFF){
+        const metaType = u8();
+        const len = varLen();
+        if(metaType===0x51){ tempo=(u8()<<16)|(u8()<<8)|u8(); }
+        else { pos+=len; }
+      } else if(statusByte===0xF0 || statusByte===0xF7){
+        const len=varLen(); pos+=len;
+      } else if(type===0x90 || type===0x80){
+        const note = u8(); const vel = u8();
+        if(type===0x90 && vel>0){
+          (active[note]=active[note]||[]).push({startTick:tick, velocity:vel});
+        } else if(active[note] && active[note].length){
+          const n=active[note].shift();
+          notes.push({pitch:note, startTick:n.startTick, endTick:tick, velocity:n.velocity});
+        }
+      } else if(type===0xA0||type===0xB0||type===0xE0){ pos+=2; }
+      else if(type===0xC0||type===0xD0){ pos+=1; }
+    }
+    pos = chunkEnd;
+  }
+  const secPerTick = tempo/1e6/ticksPerQuarter;
+  const noteEvents = notes.map(n=>({
+    pitch:n.pitch,
+    start: n.startTick*secPerTick,
+    duration: Math.max(0.05,(n.endTick-n.startTick)*secPerTick),
+    velocity: Math.max(0.15, n.velocity/127)
+  })).sort((a,b)=>a.start-b.start);
+  const duration = noteEvents.reduce((m,n)=>Math.max(m,n.start+n.duration),0.1);
+  const bpm = Math.round(60000000/tempo) || 120;
+  return { noteEvents, ticksPerQuarter, tempo, bpm, duration };
+}
+
+function detectKeyFromMidi(noteEvents){
+  const chroma = new Array(12).fill(0);
+  let pitchSum=0, weight=0;
+  for(const n of noteEvents){
+    chroma[((n.pitch%12)+12)%12] += n.duration*n.velocity;
+    pitchSum += n.pitch*n.duration; weight += n.duration;
+  }
+  const info = detectKeyFromChroma(chroma);
+  const avgPitch = weight? pitchSum/weight : 64;
+  return {...info, centroid: 20*Math.pow(2, (avgPitch-40)/12)}; // rough proxy scaled comparable to Hz centroid
+}
+
+/* ---------------------------------------------------------
+   FILE ANALYSIS PIPELINE
+--------------------------------------------------------- */
+function ensureCtx(){
+  if(!sharedCtx) sharedCtx = new (window.AudioContext||window.webkitAudioContext)();
+  if(sharedCtx.state==='suspended') sharedCtx.resume();
+  return sharedCtx;
+}
+
+/* Finds the strongest transient near the start of a clip (within the first
+   ~4s) so playback — and every loop repeat — can begin exactly on that
+   beat instead of at sample 0, which might be lead-in silence or land
+   mid-bar. Beat-matching alone only locks tempo (speed); this is what
+   locks phase (where the downbeat falls) so multiple layered clips'
+   beats actually coincide instead of just running at the same speed. */
+function detectFirstStrongOnset(buffer){
+  const sr = buffer.sampleRate;
+  const data = buffer.getChannelData(0);
+  const hop = 512;
+  const scanSamples = Math.min(data.length, sr*4);
+  const frames = Math.floor(scanSamples/hop);
+  if(frames<4) return 0;
+  const energy = new Float32Array(frames);
+  for(let i=0;i<frames;i++){
+    let sum=0; const base=i*hop;
+    for(let j=0;j<hop;j++){ const s=data[base+j]||0; sum+=s*s; }
+    energy[i]=Math.sqrt(sum/hop);
+  }
+  const onset = new Float32Array(frames);
+  for(let i=1;i<frames;i++) onset[i]=Math.max(0, energy[i]-energy[i-1]);
+  let bestIdx=0, bestVal=-Infinity;
+  for(let i=0;i<frames;i++){ if(onset[i]>bestVal){ bestVal=onset[i]; bestIdx=i; } }
+  return Math.max(0, (bestIdx*hop)/sr - 0.008);
+}
+
+function trimToOnset(buffer, onsetSec){
+  const sr = buffer.sampleRate;
+  const startSample = Math.min(buffer.length-1, Math.round(onsetSec*sr));
+  if(startSample<8) return buffer;
+  const newLen = buffer.length-startSample;
+  if(newLen < sr*0.2) return buffer;
+  const outCtx = ensureCtx();
+  const out = outCtx.createBuffer(buffer.numberOfChannels, newLen, sr);
+  for(let c=0;c<buffer.numberOfChannels;c++){
+    out.getChannelData(c).set(buffer.getChannelData(c).subarray(startSample));
+  }
+  return out;
+}
+
+/* Blend the tail of a WAV buffer into its head with a short equal-power
+   crossfade so it loops with no click/pop at the seam. */
+function makeSeamlessLoopBuffer(buffer, fadeSec){
+  const sr = buffer.sampleRate;
+  const fadeSamples = Math.min(Math.floor(fadeSec*sr), Math.floor(buffer.length/4));
+  if(fadeSamples<8 || buffer.length<=fadeSamples*2) return buffer;
+  const newLen = buffer.length - fadeSamples;
+  const outCtx = ensureCtx();
+  const out = outCtx.createBuffer(buffer.numberOfChannels, newLen, sr);
+  for(let c=0;c<buffer.numberOfChannels;c++){
+    const src = buffer.getChannelData(c);
+    const dst = out.getChannelData(c);
+    for(let i=0;i<newLen;i++) dst[i]=src[i];
+    for(let i=0;i<fadeSamples;i++){
+      const x = i/fadeSamples;
+      const fadeIn = Math.sin(x*Math.PI/2);
+      const fadeOut = Math.cos(x*Math.PI/2);
+      dst[i] = dst[i]*fadeIn + src[newLen+i]*fadeOut;
+    }
+  }
+  return out;
+}
+
+async function analyzeFile(item){
+  const buf = await item.file.arrayBuffer();
+  const lower = item.file.name.toLowerCase();
+  if(lower.endsWith('.mid') || lower.endsWith('.midi')){
+    const parsed = parseMidi(buf);
+    const keyInfo = detectKeyFromMidi(parsed.noteEvents);
+    Object.assign(item, {
+      type:'midi', tempo: parsed.bpm, duration: parsed.duration,
+      noteEvents: parsed.noteEvents, ticksPerQuarter: parsed.ticksPerQuarter,
+      key: keyInfo.key, mode: keyInfo.mode, pitchClass: keyInfo.pitchClass, centroid: keyInfo.centroid
+    });
+  } else {
+    const ctx = ensureCtx();
+    const audioBuffer = await ctx.decodeAudioData(buf.slice(0));
+    const tempo = detectTempo(audioBuffer);
+    const keyInfo = detectKeyAndCentroid(audioBuffer);
+    const onsetOffset = detectFirstStrongOnset(audioBuffer);
+    const trimmed = trimToOnset(audioBuffer, onsetOffset);
+    const loopBuffer = makeSeamlessLoopBuffer(trimmed, 0.015);
+    Object.assign(item, {
+      type:'wav', tempo, duration: audioBuffer.duration, loopDuration: trimmed.duration,
+      buffer: audioBuffer, loopBuffer,
+      key: keyInfo.key, mode: keyInfo.mode, pitchClass: keyInfo.pitchClass, centroid: keyInfo.centroid
+    });
+  }
+  return item;
+}
+
+/* ---------------------------------------------------------
+   UI: file list / channel strips
+--------------------------------------------------------- */
+const fileInput = document.getElementById('fileInput');
+const channelList = document.getElementById('channelList');
+const analyzeStatus = document.getElementById('analyzeStatus');
+const settingsSection = document.getElementById('settingsSection');
+const buildSection = document.getElementById('buildSection');
+const targetTempoInput = document.getElementById('targetTempo');
+const targetKeySelect = document.getElementById('targetKey');
+const reel = document.getElementById('reel');
+
+for(let pc=0; pc<12; pc++){
+  for(const mode of ['major','minor']){
+    const opt = document.createElement('option');
+    opt.value = pc+'-'+mode;
+    opt.textContent = KEY_NAMES[pc] + (mode==='minor' ? ' minor' : ' major');
+    targetKeySelect.appendChild(opt);
+  }
+}
+
+fileInput.addEventListener('change', async (e)=>{
+  const files = Array.from(e.target.files || []);
+  if(!files.length) return;
+  analyzeStatus.textContent = 'Analyzing '+files.length+' file(s)…';
+  analyzeStatus.classList.remove('err');
+  for(const file of files){
+    const item = { id: idCounter++, file, name: file.name };
+    items.push(item);
+    renderChannels();
+    try{
+      await analyzeFile(item);
+    } catch(err){
+      item.error = err.message || 'could not read file';
+    }
+    renderChannels();
+  }
+  fileInput.value = '';
+  const failed = items.filter(i=>i.error).length;
+  analyzeStatus.textContent = failed
+    ? (items.length-failed)+' analyzed, '+failed+' failed to read.'
+    : items.length+' file(s) analyzed.';
+  if(failed) analyzeStatus.classList.add('err');
+  updateAfterAnalysis();
+});
+
+function renderChannels(){
+  channelList.innerHTML='';
+  let primaryCounter = 0;
+  const primaryIndexById = {};
+  items.forEach(it=>{ if(!it.layerTarget){ primaryCounter++; primaryIndexById[it.id]=primaryCounter; } });
+
+  items.forEach((item, idx)=>{
+    const row = document.createElement('div');
+    row.className='channel';
+    row.dataset.id = item.id;
+    const stats = item.error
+      ? '<span style="color:var(--red)">'+item.error+'</span>'
+      : (item.tempo!==undefined
+          ? '<b>'+item.tempo+' BPM</b> · <b>'+item.key+' '+item.mode+'</b> · '+fmtTime(item.duration)+' · '+item.type.toUpperCase()
+          : 'analyzing…');
+    const canPreview = !item.error && item.tempo!==undefined;
+    const isLayer = !!item.layerTarget;
+    const numLabel = isLayer ? '↳' : (primaryIndexById[item.id]||'');
+    const lenVal = item.customLen>0 ? item.customLen : '';
+
+    let row2 = '';
+    if(canPreview){
+      const candidates = items.filter(o=> o.id!==item.id && !o.layerTarget && !o.error && o.tempo!==undefined);
+      let selectHtml = '<option value="">Sequential (own segment)</option>';
+      candidates.forEach(c=>{
+        selectHtml += `<option value="${c.id}" ${item.layerTarget===c.id?'selected':''}>Layer onto: ${escapeHtml(c.name)}</option>`;
+      });
+      const lenControl = isLayer
+        ? '<span class="hint" style="margin:0;flex:1;">plays for the length of its host clip</span>'
+        : `<input type="number" class="lenInput" min="1" step="1" placeholder="auto" value="${lenVal}" title="Length in seconds for this clip (blank = auto)">`;
+      row2 = `
+      <div class="chRow2">
+        ${lenControl}
+        <select class="layerSelect" title="Play simultaneously with another clip instead of its own segment">${selectHtml}</select>
+      </div>`;
+    }
+
+    row.innerHTML = `
+      <div class="chRow1">
+        <div class="num">${numLabel}</div>
+        <button class="iconbtn previewbtn" ${canPreview?'':'disabled'}title="Preview">▶</button>
+        <div class="meta">
+          <div class="name">${escapeHtml(item.name)}</div>
+          <div class="stats">${stats}</div>
+        </div>
+        <div class="ord">
+          <button class="iconbtn up" ${isLayer?'disabled':''}>▲</button>
+          <button class="iconbtn down" ${isLayer?'disabled':''}>▼</button>
+        </div>
+        <button class="iconbtn rmbtn">✕</button>
+      </div>
+      ${row2}
+    `;
+    row.querySelector('.up').onclick=()=>{ moveItem(idx,-1); };
+    row.querySelector('.down').onclick=()=>{ moveItem(idx,1); };
+    row.querySelector('.rmbtn').onclick=()=>{
+      if(previewItemId===item.id) stopPreview();
+      items.forEach(o=>{ if(o.layerTarget===item.id) o.layerTarget=undefined; });
+      items.splice(idx,1); renderChannels(); updateAfterAnalysis();
+    };
+    if(canPreview){
+      row.querySelector('.previewbtn').onclick=(e)=>togglePreview(item, e.currentTarget);
+      const lenInput = row.querySelector('.lenInput');
+      if(lenInput){
+        lenInput.addEventListener('input', (e)=>{
+          const v = Number(e.target.value);
+          item.customLen = v>0 ? v : undefined;
+          renderReel();
+        });
+      }
+      row.querySelector('.layerSelect').addEventListener('change', (e)=>{
+        const val = e.target.value;
+        item.layerTarget = val ? Number(val) : undefined;
+        if(item.layerTarget){
+          // this clip is no longer a valid host for others — anything that
+          // was layering onto it reverts to its own sequential segment
+          items.forEach(other=>{ if(other.layerTarget===item.id) other.layerTarget=undefined; });
+        }
+        renderChannels(); renderReel();
+      });
+    }
+    channelList.appendChild(row);
+  });
+  // resync the preview button's label if a preview is still playing after a re-render
+  if(previewItemId!=null){
+    const row = channelList.querySelector('[data-id="'+previewItemId+'"]');
+    const btn = row && row.querySelector('.previewbtn');
+    if(btn){ btn.textContent='⏸'; previewBtnEl = btn; }
+    else stopPreview();
+  }
+}
+
+function moveItem(idx, dir){
+  if(items[idx].layerTarget) return;
+  let j = idx+dir;
+  while(j>=0 && j<items.length && items[j].layerTarget) j+=dir;
+  if(j<0 || j>=items.length) return;
+  const tmp = items[idx]; items[idx]=items[j]; items[j]=tmp;
+  renderChannels(); renderReel();
+}
+
+/* ---------------------------------------------------------
+   SAMPLE PREVIEW (play / pause, one at a time)
+--------------------------------------------------------- */
+let previewSource = null;
+let previewItemId = null;
+let previewBtnEl = null;
+
+function stopPreview(){
+  if(previewSource){
+    try{ previewSource.onended=null; previewSource.stop(); }catch(e){}
+    try{ previewSource.disconnect(); }catch(e){}
+  }
+  previewSource = null;
+  previewItemId = null;
+  if(previewBtnEl) previewBtnEl.textContent='▶';
+  previewBtnEl = null;
+}
+
+async function togglePreview(item, btn){
+  if(previewItemId===item.id){ stopPreview(); return; }
+  stopPreview();
+  const ctx = ensureCtx();
+  const resumePromise = ctx.state==='suspended' ? ctx.resume().catch(()=>{}) : null;
+  let buffer;
+  if(item.type==='wav'){
+    buffer = item.buffer;
+  } else {
+    btn.textContent='…';
+    if(!item.previewBuffer){
+      const segLen = item.duration+0.3;
+      const notes = expandMidiNotesForSegment(item, 1, segLen);
+      item.previewBuffer = await renderMidiNotes(notes, 0, segLen, 44100);
+    }
+    buffer = item.previewBuffer;
+  }
+  if(resumePromise) await resumePromise;
+  const src = ctx.createBufferSource();
+  src.buffer = buffer;
+  src.connect(ctx.destination);
+  src.onended = ()=>{ if(previewSource===src) stopPreview(); };
+  previewSource = src;
+  previewItemId = item.id;
+  previewBtnEl = btn;
+  btn.textContent='⏸';
+  src.start();
+}
+
+function fmtTime(s){
+  s = Math.round(s||0);
+  return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+}
+function escapeHtml(s){
+  return s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* Bar-quantized timing: segment/crossfade lengths snap to the target tempo's
+   beat grid so transitions land on a downbeat rather than an arbitrary point. */
+function computeTimingPerItem(order, totalLengthRequested, crossfadeRequested, targetTempo){
+  const n = order.length;
+  const beatLen = 60/Math.max(20,targetTempo);
+  const barLen = beatLen*4;
+  const customs = order.map(it=> (it.customLen>0 ? it.customLen : null));
+  const customSum = customs.reduce((s,c)=> s+(c||0), 0);
+  const customCount = customs.filter(c=>c!=null).length;
+  const remaining = Math.max(barLen, totalLengthRequested - customSum);
+  const autoShare = customCount<n ? remaining/(n-customCount) : (totalLengthRequested/n);
+  const rawLens = customs.map(c => c!=null ? c : autoShare);
+  const segLens = rawLens.map(raw=>{
+    const bars = Math.max(1, Math.round(raw/barLen));
+    return bars*barLen;
+  });
+  const minSeg = Math.min(...segLens);
+  let crossfade = Math.min(crossfadeRequested, minSeg/2);
+  if(crossfade>0){
+    const beats = Math.max(1, Math.round(crossfade/beatLen));
+    crossfade = Math.min(beats*beatLen, minSeg/2);
+  }
+  const starts = [];
+  let cum = 0;
+  for(let i=0;i<n;i++){ starts.push(cum); cum += segLens[i]-crossfade; }
+  const totalLength = cum+crossfade;
+  return {segLens, starts, crossfade, totalLength, barLen, beatLen};
+}
+
+/* Autocorrelation tempo detection can lock onto a subdivision or syncopation
+   instead of the real beat (e.g. reporting 161 BPM for something that's
+   actually 120 BPM but has a strong dotted/triplet feel). A clip whose
+   tempo is way off from the rest of the group, but close to a simple ratio
+   of the group's tempo, is far more likely a misdetection than a genuinely
+   unrelated tempo — snap it, since leaving it wrong silently wrecks beat
+   alignment for anything layered against it. */
+function refineTempoOutliers(readyItems){
+  if(readyItems.length<2) return;
+  const sorted = readyItems.map(i=>i.tempo).sort((a,b)=>a-b);
+  const roughMedian = sorted[Math.floor(sorted.length/2)];
+  const ratios = [2/3, 3/4, 4/5, 1, 5/4, 4/3, 3/2, 2];
+  readyItems.forEach(item=>{
+    const r = item.tempo/roughMedian;
+    let best=null, bestDiff=0.06; // within 6% of a simple ratio
+    for(const cand of ratios){
+      const diff = Math.abs(r-cand)/cand;
+      if(diff<bestDiff){ bestDiff=diff; best=cand; }
+    }
+    if(best!==null && best!==1){
+      item.tempo = Math.round(roughMedian*best);
+    }
+  });
+}
+
+function updateAfterAnalysis(){
+  const ready = items.filter(i=>!i.error && i.tempo!==undefined);
+  if(ready.length===0){
+    settingsSection.classList.add('hidden');
+    buildSection.classList.add('hidden');
+    if(items.length===0) document.getElementById('resetBtn').classList.add('hidden');
+    renderReel();
+    return;
+  }
+  refineTempoOutliers(ready);
+  renderChannels();
+  // default order: ascending brightness (centroid) for a gentle arc
+  if(!window.__userReordered){
+    items.sort((a,b)=>{
+      if(a.error && !b.error) return 1;
+      if(b.error && !a.error) return -1;
+      return (a.centroid||0)-(b.centroid||0);
+    });
+    renderChannels();
+  }
+  // target tempo = median
+  const tempos = ready.map(i=>i.tempo).sort((a,b)=>a-b);
+  const medianTempo = tempos[Math.floor(tempos.length/2)];
+  if(!targetTempoInput.dataset.touched) targetTempoInput.value = medianTempo;
+
+  // target key = most frequent pitchClass-mode combo
+  const counts = {};
+  ready.forEach(i=>{ const k=i.pitchClass+'-'+i.mode; counts[k]=(counts[k]||0)+1; });
+  let bestKey = ready[0].pitchClass+'-'+ready[0].mode, bestCount=-1;
+  for(const k in counts){ if(counts[k]>bestCount){ bestCount=counts[k]; bestKey=k; } }
+  if(!targetKeySelect.dataset.touched) targetKeySelect.value = bestKey;
+
+  settingsSection.classList.remove('hidden');
+  buildSection.classList.remove('hidden');
+  document.getElementById('resetBtn').classList.remove('hidden');
+  renderReel();
+}
+
+targetTempoInput.addEventListener('input', ()=>{ targetTempoInput.dataset.touched='1'; renderReel(); });
+targetKeySelect.addEventListener('change', ()=>targetKeySelect.dataset.touched='1');
+
+/* track manual reorders so auto-sort doesn't fight the user after their first edit */
+channelList.addEventListener('click', (e)=>{
+  if(e.target.closest('.up') || e.target.closest('.down')) window.__userReordered = true;
+});
+
+document.getElementById('songLength').addEventListener('input', renderReel);
+document.getElementById('crossfade').addEventListener('input', renderReel);
+
+function parseLength(str){
+  str = (str||'').trim();
+  if(str.includes(':')){
+    const [m,s] = str.split(':').map(Number);
+    return (m||0)*60 + (s||0);
+  }
+  return Number(str)||90;
+}
+
+function renderReel(){
+  const ready = items.filter(i=>!i.error && i.tempo!==undefined);
+  const primaries = ready.filter(i=>!i.layerTarget);
+  const reelStatus = document.getElementById('reelStatus');
+  if(primaries.length===0){
+    reel.innerHTML = '<div class="empty">— no files loaded —</div>';
+    reelStatus.textContent='';
+    return;
+  }
+  const totalLengthRequested = parseLength(document.getElementById('songLength').value);
+  const crossfadeRequested = Number(document.getElementById('crossfade').value)||0;
+  const targetTempo = Number(targetTempoInput.value) || 120;
+  const n = primaries.length;
+  const {segLens, totalLength, crossfade} = computeTimingPerItem(primaries, totalLengthRequested, crossfadeRequested, targetTempo);
+  const palette = ['#e8a33d','#4fd1c5','#e2635a','#c792ea','#7fd88f','#f6c453'];
+  reel.innerHTML='';
+  primaries.forEach((item, i)=>{
+    const widthPct = (segLens[i]/totalLength)*100;
+    const layerCount = ready.filter(x=>x.layerTarget===item.id).length;
+    const seg = document.createElement('div');
+    seg.className='seg';
+    seg.style.flex = '0 0 '+widthPct.toFixed(3)+'%';
+    seg.style.background = palette[i%palette.length];
+    seg.textContent = (i+1)+' · '+fmtTime(segLens[i])+(layerCount?' (+'+layerCount+')':'');
+    if(i>0){ const f=document.createElement('div'); f.className='fade'; seg.appendChild(f); }
+    if(i<n-1){ const f=document.createElement('div'); f.className='fade right'; seg.appendChild(f); }
+    reel.appendChild(seg);
+  });
+  reelStatus.textContent = 'Actual length ~'+fmtTime(totalLength)+' (snapped to bars at '+targetTempo+' BPM) · '+crossfade.toFixed(2)+'s crossfades';
+}
+
+const resetBtn = document.getElementById('resetBtn');
+resetBtn.addEventListener('click', ()=>{
+  stopPreview();
+  items = [];
+  window.__userReordered = false;
+  delete targetTempoInput.dataset.touched;
+  delete targetKeySelect.dataset.touched;
+  fileInput.value = '';
+  channelList.innerHTML = '';
+  analyzeStatus.textContent = '';
+  analyzeStatus.classList.remove('err');
+  settingsSection.classList.add('hidden');
+  buildSection.classList.add('hidden');
+  resetBtn.classList.add('hidden');
+  buildStatus.textContent = '';
+  buildStatus.classList.remove('err');
+  if(player.src) URL.revokeObjectURL(player.src);
+  player.src = '';
+  player.classList.add('hidden');
+  dlLink.classList.add('hidden');
+  document.getElementById('dlMidiLink').classList.add('hidden');
+  document.getElementById('midiNote').classList.add('hidden');
+  renderReel();
+});
+
+/* ---------------------------------------------------------
+   ARRANGEMENT / RENDER ENGINE
+--------------------------------------------------------- */
+function semitoneDiff(fromPC, toPC){
+  let diff = toPC-fromPC;
+  diff = ((diff+6)%12+12)%12-6;
+  return diff;
+}
+
+/* Equal-power crossfade: sounds smoother and louder through the transition
+   than a linear ramp, which perceptually dips in the middle. */
+function applyCrossfadeGain(gainNode, startTime, segLen, fadeIn, fadeOut){
+  const steps = 32;
+  const eps = 0.0005;
+  if(fadeIn>0){
+    const curve = new Float32Array(steps);
+    for(let i=0;i<steps;i++){ const x=i/(steps-1); curve[i]=Math.sin(x*Math.PI/2); }
+    gainNode.gain.setValueCurveAtTime(curve, startTime, fadeIn);
+  } else {
+    gainNode.gain.setValueAtTime(1, startTime);
+  }
+  const sustainStart = startTime+fadeIn+(fadeIn>0?eps:0);
+  const fadeOutStart = Math.max(sustainStart, startTime+segLen-fadeOut);
+  gainNode.gain.setValueAtTime(1, sustainStart);
+  if(fadeOutStart>sustainStart) gainNode.gain.setValueAtTime(1, fadeOutStart);
+  if(fadeOut>0){
+    const curve2 = new Float32Array(steps);
+    for(let i=0;i<steps;i++){ const x=i/(steps-1); curve2[i]=Math.cos(x*Math.PI/2); }
+    gainNode.gain.setValueCurveAtTime(curve2, fadeOutStart+eps, Math.max(0.01,fadeOut-eps));
+  }
+}
+
+/* DJ-style filter sweep: instead of (or alongside) a flat volume crossfade,
+   roll a lowpass filter closed on the outgoing clip as it fades and open it
+   back up on the incoming clip as it arrives — the "filter knob" move DJs
+   use so a transition sounds like a deliberate blend rather than a hard cut
+   softened by volume alone. */
+function applyTransitionFilter(filterNode, startTime, segLen, fadeIn, fadeOut){
+  const OPEN = 19000, CLOSED = 350;
+  filterNode.type = 'lowpass';
+  filterNode.Q.value = 0.6;
+  const eps = 0.0005;
+  if(fadeIn>0){
+    filterNode.frequency.setValueAtTime(CLOSED, startTime);
+    filterNode.frequency.exponentialRampToValueAtTime(OPEN, startTime+fadeIn);
+  } else {
+    filterNode.frequency.setValueAtTime(OPEN, startTime);
+  }
+  const sustainStart = startTime+fadeIn+(fadeIn>0?eps:0);
+  const fadeOutStart = Math.max(sustainStart, startTime+segLen-fadeOut);
+  filterNode.frequency.setValueAtTime(OPEN, sustainStart);
+  if(fadeOutStart>sustainStart) filterNode.frequency.setValueAtTime(OPEN, fadeOutStart);
+  if(fadeOut>0){
+    filterNode.frequency.setValueAtTime(OPEN, fadeOutStart+eps);
+    filterNode.frequency.exponentialRampToValueAtTime(CLOSED, startTime+segLen);
+  }
+}
+
+/* A steady low pulse at the target tempo — a shared heartbeat that glues
+   otherwise-unrelated clips into one groove. */
+function addRhythmPulse(ctx, master, targetPC, targetTempo, totalLength){
+  const beatLen = 60/Math.max(20,targetTempo);
+  const freq = 440*Math.pow(2, (36+targetPC-69)/12);
+  let t=0, i=0;
+  while(t<totalLength){
+    const osc = ctx.createOscillator();
+    osc.type='sine';
+    osc.frequency.setValueAtTime(freq, t);
+    osc.frequency.exponentialRampToValueAtTime(Math.max(20,freq*0.6), Math.min(totalLength,t+0.12));
+    const g = ctx.createGain();
+    const accent = (i%4===0) ? 0.16 : 0.09;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(accent, Math.min(totalLength,t+0.004));
+    g.gain.exponentialRampToValueAtTime(0.0001, Math.min(totalLength,t+0.18));
+    osc.connect(g); g.connect(master);
+    osc.start(t); osc.stop(Math.min(totalLength,t+0.2)+0.02);
+    t+=beatLen; i++;
+  }
+}
+
+/* If a MIDI clip's note content is shorter than the segment it's been given,
+   repeat it (looping, like the WAV seamless-loop path) so it fills the whole
+   slot instead of finishing early and leaving silence before the next join. */
+function expandMidiNotesForSegment(item, rateScale, segLen){
+  const loopLen = Math.max(0.15, item.duration*rateScale);
+  const out = [];
+  for(let repOffset=0; repOffset<segLen; repOffset+=loopLen){
+    for(const note of item.noteEvents){
+      const t = note.start*rateScale + repOffset;
+      if(t>=segLen) continue;
+      const dur = Math.min(segLen-t, Math.max(0.05, note.duration*rateScale));
+      out.push({t, dur, pitch:note.pitch, velocity:note.velocity});
+    }
+  }
+  return out;
+}
+
+async function renderMidiNotes(notes, semis, segLen, sampleRate){
+  const OfflineCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  const octx = new OfflineCtx(2, Math.ceil(segLen*sampleRate)+sampleRate, sampleRate);
+  const master = octx.createGain(); master.connect(octx.destination);
+  for(const note of notes){
+    const t = note.t, dur = note.dur;
+    const freq = 440*Math.pow(2,(note.pitch+semis-69)/12);
+    const osc = octx.createOscillator();
+    osc.type='triangle';
+    osc.frequency.value=freq;
+    const osc2 = octx.createOscillator();
+    osc2.type='sine';
+    osc2.frequency.value=freq/2;
+    const g = octx.createGain();
+    const peak = 0.22*note.velocity;
+    const endT = Math.min(segLen, t+dur);
+    const releaseEnd = Math.min(segLen, endT+0.08);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(peak, Math.min(segLen, t+0.012));
+    g.gain.linearRampToValueAtTime(peak*0.55, Math.min(segLen, t+dur*0.6+0.001));
+    g.gain.linearRampToValueAtTime(0.0001, releaseEnd);
+    osc.connect(g); osc2.connect(g); g.connect(master);
+    osc.start(t); osc.stop(releaseEnd+0.02);
+    osc2.start(t); osc2.stop(releaseEnd+0.02);
+  }
+  return await octx.startRendering();
+}
+
+/* Schedules one clip (WAV or MIDI) into the mix at startTime for segLen
+   seconds, with its own crossfade envelope and optional DJ filter sweep.
+   Used for both the primary (sequential) clip in a slot and any clips
+   layered simultaneously on top of it. gainScale lets layered clips sit
+   a little under the primary so stacking clips doesn't clip/overpower. */
+async function scheduleClip(ctx, master, item, startTime, segLen, fadeIn, fadeOut, targetTempo, targetPC, targetBarLen, opts, sampleRate, midiExportEvents, secToTick, gainScale){
+  let semis = semitoneDiff(item.pitchClass, targetPC);
+  const cap = Number.isFinite(opts.maxShift) ? opts.maxShift : 3;
+  semis = Math.max(-cap, Math.min(cap, semis));
+  let segBuffer, playbackRate=1, detuneCents=0;
+
+  if(item.type==='wav'){
+    // Beat-matching: rather than trusting the detected BPM directly (rounding
+    // error there would drift over repeated loops), work out how many bars
+    // this clip most likely represents, then compute the exact stretch ratio
+    // that makes it fill precisely that many target-tempo bars. That locks
+    // every loop repeat to the beat grid with zero cumulative drift. Uses
+    // the onset-trimmed loop length (what's actually being looped), not the
+    // raw file length, since lead-in before the first beat would otherwise
+    // throw the bar-count estimate off.
+    const loopDur = item.loopDuration || item.duration;
+    const sourceBarLen = 4*(60/item.tempo);
+    const estBars = Math.max(1, Math.round(loopDur/sourceBarLen));
+    playbackRate = loopDur/(estBars*targetBarLen);
+    playbackRate = Math.max(0.5, Math.min(2, playbackRate));
+    const rateCents = 1200*Math.log2(playbackRate);
+    detuneCents = semis*100 - rateCents;
+    segBuffer = item.loopBuffer || item.buffer;
+  } else {
+    const rateScale = item.tempo/targetTempo;
+    const expandedNotes = expandMidiNotesForSegment(item, rateScale, segLen);
+    segBuffer = await renderMidiNotes(expandedNotes, semis, segLen, sampleRate);
+    for(const note of expandedNotes){
+      const pitch = note.pitch+semis;
+      const onTick = secToTick(startTime+note.t);
+      const offTick = secToTick(startTime+note.t+note.dur);
+      midiExportEvents.push({tick:onTick, type:'on', pitch, velocity:note.velocity});
+      midiExportEvents.push({tick:offTick, type:'off', pitch, velocity:note.velocity});
+    }
+  }
+
+  const gainNode = ctx.createGain();
+  applyCrossfadeGain(gainNode, startTime, segLen, fadeIn, fadeOut);
+  if(gainScale!==1){
+    // scale the whole envelope down for a layered clip by riding a second
+    // gain stage, so its fade shape stays identical to the primary's
+    const scaleNode = ctx.createGain();
+    scaleNode.gain.value = gainScale;
+    gainNode.connect(scaleNode);
+    scaleNode.connect(master);
+  } else {
+    gainNode.connect(master);
+  }
+
+  let chainInput = gainNode;
+  if(opts.djFilter){
+    const filterNode = ctx.createBiquadFilter();
+    applyTransitionFilter(filterNode, startTime, segLen, fadeIn, fadeOut);
+    filterNode.connect(gainNode);
+    chainInput = filterNode;
+  }
+  if(gainScale!==1){
+    // Stacking multiple full loops piles up low end fast (multiple
+    // basslines/kicks in the same range reads as "muddy"). Only the
+    // primary clip keeps its full low end; layered clips get a gentle
+    // permanent high-pass so they sit around it instead of fighting it.
+    const carveNode = ctx.createBiquadFilter();
+    carveNode.type = 'highpass';
+    carveNode.frequency.value = 160;
+    carveNode.Q.value = 0.5;
+    carveNode.connect(chainInput);
+    chainInput = carveNode;
+  }
+
+  const src = ctx.createBufferSource();
+  src.buffer = segBuffer;
+  src.connect(chainInput);
+  if(item.type==='wav'){
+    src.playbackRate.value = playbackRate;
+    src.detune.value = detuneCents;
+    src.loop = segBuffer.duration < segLen*playbackRate;
+    if(src.loop){ src.loopStart=0; src.loopEnd=segBuffer.duration; }
+    src.start(startTime, 0, segLen*playbackRate);
+  } else {
+    src.start(startTime, 0, Math.min(segLen, segBuffer.duration));
+  }
+}
+
+async function buildSong(order, allReady, targetTempo, targetPC, totalLengthRequested, crossfadeRequested, opts, onProgress){
+  const sampleRate = 44100;
+  const n = order.length;
+  const {segLens, starts, crossfade, totalLength} = computeTimingPerItem(order, totalLengthRequested, crossfadeRequested, targetTempo);
+  const OfflineCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  const ctx = new OfflineCtx(2, Math.ceil(totalLength*sampleRate)+sampleRate, sampleRate);
+  const master = ctx.createGain();
+  master.gain.value = 0.9;
+  master.connect(ctx.destination);
+
+  const midiExportEvents = []; // {tick,type,pitch,velocity} in target-tempo ticks (480 ppq)
+  const PPQ = 480;
+  const secToTick = (s)=> s*(targetTempo/60)*PPQ;
+
+  const targetBeatLen = 60/targetTempo;
+  const targetBarLen = targetBeatLen*4;
+
+  for(let i=0;i<n;i++){
+    const item = order[i];
+    const startTime = starts[i];
+    const segLen = segLens[i];
+    // Every segment gets a real fade, even the very first/last of the whole
+    // song — an instant 0-to-1 jump can still click if the source's first
+    // sample isn't at zero-crossing.
+    const edgeFade = Math.min(0.02, segLen*0.05);
+    const fadeIn = i===0 ? edgeFade : crossfade;
+    const fadeOut = i===n-1 ? edgeFade : crossfade;
+
+    await scheduleClip(ctx, master, item, startTime, segLen, fadeIn, fadeOut, targetTempo, targetPC, targetBarLen, opts, sampleRate, midiExportEvents, secToTick, 1);
+
+    const layers = allReady.filter(x=>x.layerTarget===item.id);
+    for(const layerItem of layers){
+      await scheduleClip(ctx, master, layerItem, startTime, segLen, fadeIn, fadeOut, targetTempo, targetPC, targetBarLen, opts, sampleRate, midiExportEvents, secToTick, 0.75);
+    }
+    if(onProgress) onProgress((i+1)/(n+2));
+  }
+
+  if(opts.rhythmPulse) addRhythmPulse(ctx, master, targetPC, targetTempo, totalLength);
+  if(onProgress) onProgress((n+1)/(n+2));
+
+  const rendered = await ctx.startRendering();
+  if(onProgress) onProgress(1);
+  return {rendered, midiExportEvents, ppq:PPQ, actualLength:totalLength};
+}
+
+function writeVarLen(value){
+  const bytes=[value & 0x7f];
+  value >>=7;
+  while(value>0){ bytes.push((value&0x7f)|0x80); value>>=7; }
+  return bytes.reverse();
+}
+
+function buildMidiFile(events, targetTempo, ticksPerQuarter){
+  const sorted = events.slice().sort((a,b)=> a.tick-b.tick || (a.type==='off'?-1:1));
+  const trackBytes = [];
+  const usPerQuarter = Math.round(60000000/targetTempo);
+  trackBytes.push(...writeVarLen(0), 0xFF,0x51,0x03,(usPerQuarter>>16)&0xff,(usPerQuarter>>8)&0xff,usPerQuarter&0xff);
+  let lastTick=0;
+  for(const ev of sorted){
+    const delta = Math.max(0, Math.round(ev.tick-lastTick));
+    trackBytes.push(...writeVarLen(delta));
+    lastTick += delta;
+    if(ev.type==='on'){ trackBytes.push(0x90, ev.pitch & 0x7f, Math.max(1,Math.round(ev.velocity*127)) & 0x7f); }
+    else { trackBytes.push(0x80, ev.pitch & 0x7f, 0); }
+  }
+  trackBytes.push(...writeVarLen(0), 0xFF,0x2F,0x00);
+  const trackLen = trackBytes.length;
+  const header = [0x4d,0x54,0x68,0x64, 0,0,0,6, 0,0, 0,1, (ticksPerQuarter>>8)&0xff, ticksPerQuarter&0xff];
+  const trackHeader = [0x4d,0x54,0x72,0x6b, (trackLen>>24)&0xff,(trackLen>>16)&0xff,(trackLen>>8)&0xff, trackLen&0xff];
+  const all = new Uint8Array(header.length+trackHeader.length+trackLen);
+  all.set(header,0);
+  all.set(trackHeader, header.length);
+  all.set(trackBytes, header.length+trackHeader.length);
+  return new Blob([all], {type:'audio/midi'});
+}
+
+function bufferToWav(buffer){
+  const numCh = buffer.numberOfChannels;
+  const len = buffer.length*numCh*2+44;
+  const arrBuf = new ArrayBuffer(len);
+  const view = new DataView(arrBuf);
+  const sr = buffer.sampleRate;
+  function writeStr(off,str){ for(let i=0;i<str.length;i++) view.setUint8(off+i, str.charCodeAt(i)); }
+  writeStr(0,'RIFF'); view.setUint32(4, len-8, true); writeStr(8,'WAVE');
+  writeStr(12,'fmt '); view.setUint32(16,16,true); view.setUint16(20,1,true);
+  view.setUint16(22,numCh,true); view.setUint32(24,sr,true);
+  view.setUint32(28, sr*numCh*2, true); view.setUint16(32, numCh*2, true); view.setUint16(34,16,true);
+  writeStr(36,'data'); view.setUint32(40, len-44, true);
+  let offset=44;
+  const chans=[]; for(let c=0;c<numCh;c++) chans.push(buffer.getChannelData(c));
+  for(let i=0;i<buffer.length;i++){
+    for(let c=0;c<numCh;c++){
+      let s = Math.max(-1, Math.min(1, chans[c][i]));
+      view.setInt16(offset, s<0 ? s*0x8000 : s*0x7FFF, true);
+      offset+=2;
+    }
+  }
+  return new Blob([arrBuf], {type:'audio/wav'});
+}
+
+/* ---------------------------------------------------------
+   BUILD BUTTON
+--------------------------------------------------------- */
+const buildBtn = document.getElementById('buildBtn');
+const buildProgress = document.getElementById('buildProgress');
+const buildBar = document.getElementById('buildBar');
+const buildStatus = document.getElementById('buildStatus');
+const player = document.getElementById('player');
+const dlLink = document.getElementById('dlLink');
+const dlMidiLink = document.getElementById('dlMidiLink');
+const midiNote = document.getElementById('midiNote');
+
+buildBtn.addEventListener('click', async ()=>{
+  const stillAnalyzing = items.filter(i=>!i.error && i.tempo===undefined);
+  if(stillAnalyzing.length>0){
+    buildStatus.classList.add('err');
+    buildStatus.textContent = 'Still analyzing '+stillAnalyzing.length+' file(s) ('+stillAnalyzing.map(i=>i.name).join(', ')+') — wait for analysis to finish before building, or those files will be left out.';
+    return;
+  }
+  const ready = items.filter(i=>!i.error && i.tempo!==undefined);
+  const primaries = ready.filter(i=>!i.layerTarget);
+  if(primaries.length===0){
+    buildStatus.classList.add('err');
+    buildStatus.textContent = ready.length===0
+      ? 'No analyzed files to build from yet.'
+      : 'Every loaded clip is set to layer onto another — at least one clip needs to be "Sequential" to anchor the song.';
+    return;
+  }
+  const excluded = items.filter(i=>i.error);
+  if(excluded.length>0){
+    buildStatus.classList.add('err');
+    buildStatus.textContent = 'Note: '+excluded.length+' file(s) failed to analyze and are excluded from this build — '+excluded.map(i=>i.name+' ('+i.error+')').join('; ')+'.';
+  } else {
+    buildStatus.classList.remove('err');
+  }
+  stopPreview();
+  ensureCtx();
+  buildBtn.disabled = true;
+  buildProgress.style.display='block';
+  buildBar.style.width='4%';
+  player.classList.add('hidden');
+  dlLink.classList.add('hidden');
+  dlMidiLink.classList.add('hidden');
+  midiNote.classList.add('hidden');
+
+  try{
+    const totalLengthRequested = Math.max(5, parseLength(document.getElementById('songLength').value));
+    const crossfadeRequested = Number(document.getElementById('crossfade').value)||0;
+    const targetTempo = Number(targetTempoInput.value)||120;
+    const [pcStr, mode] = targetKeySelect.value.split('-');
+    const targetPC = Number(pcStr);
+    const opts = {
+      rhythmPulse: document.getElementById('rhythmPulse').checked,
+      djFilter: document.getElementById('djFilter').checked,
+      maxShift: Number(document.getElementById('maxShift').value)
+    };
+
+    const {rendered, midiExportEvents, ppq, actualLength} = await buildSong(
+      primaries, ready, targetTempo, targetPC, totalLengthRequested, crossfadeRequested, opts,
+      (p)=>{ buildBar.style.width = Math.round(p*100)+'%'; }
+    );
+    const blob = bufferToWav(rendered);
+    const url = URL.createObjectURL(blob);
+    player.src = url;
+    player.classList.remove('hidden');
+    dlLink.href = url;
+    dlLink.classList.remove('hidden');
+
+    const hasMidiSource = ready.some(i=>i.type==='midi');
+    const hasWavSource = ready.some(i=>i.type==='wav');
+    if(hasMidiSource && midiExportEvents.length){
+      const midiBlob = buildMidiFile(midiExportEvents, targetTempo, ppq);
+      const midiUrl = URL.createObjectURL(midiBlob);
+      dlMidiLink.href = midiUrl;
+      dlMidiLink.classList.remove('hidden');
+      if(hasWavSource){
+        midiNote.textContent = 'Only the MIDI-sourced clips are included — WAV clips are audio, not note data, so they can\'t be represented in a MIDI file.';
+        midiNote.classList.remove('hidden');
+      }
+    } else {
+      dlMidiLink.classList.add('hidden');
+      midiNote.textContent = 'No MIDI download this time: this arrangement is built entirely from WAV files, which are audio (not note data), so there\'s nothing to write into a MIDI file. Load a .mid/.midi file to get a MIDI export alongside the WAV.';
+      midiNote.classList.remove('hidden');
+    }
+
+    const exclusionNote = excluded.length ? ' Excluded ('+excluded.length+'): '+excluded.map(i=>i.name).join(', ')+'.' : '';
+    buildStatus.textContent = 'Done — '+fmtTime(actualLength)+' @ '+targetTempo+' BPM, '+KEY_NAMES[targetPC]+' '+mode+'.'+exclusionNote;
+    if(excluded.length) buildStatus.classList.add('err'); else buildStatus.classList.remove('err');
+  } catch(err){
+    console.error(err);
+    buildStatus.textContent = 'Build failed: '+(err.message||err);
+    buildStatus.classList.add('err');
+  } finally {
+    buildBtn.disabled = false;
+    buildProgress.style.display='none';
+  }
+});
+</script>
+</body>
+</html>

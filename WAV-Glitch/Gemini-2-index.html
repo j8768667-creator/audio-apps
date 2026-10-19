@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Responsive App Layout</title>
+  <style>
+    /* Base resets & styles */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: #f2f2f7;
+      color: #1c1c1e;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    /* Main Container Layout */
+    .app-container {
+      width: 100%;
+      max-width: 1200px;
+      display: flex;
+      gap: 24px;
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      transition: all 0.3s ease;
+    }
+
+    /* Sidebar / Controls Panel */
+    .controls-panel {
+      flex: 1;
+      max-width: 360px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .panel-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+    }
+
+    /* Enhanced Sliders */
+    .slider-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: #f9f9fb;
+      padding: 12px 16px;
+      border-radius: 10px;
+      border: 1px solid #e5e5ea;
+    }
+
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: #3a3a3c;
+    }
+
+    .slider-value {
+      font-family: monospace;
+      font-weight: 600;
+      color: #007aff;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      background: #e5e5ea;
+      border-radius: 3px;
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #007aff;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0, 122, 255, 0.3);
+      transition: transform 0.1s ease;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:active {
+      transform: scale(1.15);
+    }
+
+    /* Main View Area */
+    .canvas-panel {
+      flex: 2;
+      background: #eef2f5;
+      border-radius: 12px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 400px;
+      overflow: hidden;
+    }
+
+    .preview-box {
+      width: 200px;
+      height: 200px;
+      background: #007aff;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+      transition: filter 0.1s ease, opacity 0.1s ease, transform 0.1s ease;
+    }
+
+    /* -------------------------------------------------------------
+       OPTIMIZATION FOR iPad 10.9" (Air 4/5, 10th Gen) LANDSCAPE
+       Viewport width is typically 1180px in landscape orientation
+       ------------------------------------------------------------- */
+    @media only screen 
+      and (min-width: 1024px) 
+      and (max-width: 1180px) 
+      and (orientation: landscape) {
+
+      body {
+        padding: 12px;
+      }
+
+      .app-container {
+        padding: 16px;
+        gap: 16px;
+        max-height: 90vh;
+      }
+
+      .controls-panel {
+        max-width: 300px; /* Scale down panel width */
+        gap: 12px;
+      }
+
+      .slider-group {
+        padding: 10px 12px;
+      }
+
+      .canvas-panel {
+        min-height: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-container">
+    <div class="controls-panel">
+      <h2 class="panel-title">Effects</h2>
+
+      <div class="slider-group">
+        <div class="slider-header">
+          <label for="blur-slider">Blur</label>
+          <span id="blur-val" class="slider-value">0px</span>
+        </div>
+        <input type="range" id="blur-slider" min="0" max="20" value="0" step="0.5">
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-header">
+          <label for="opacity-slider">Opacity</label>
+          <span id="opacity-val" class="slider-value">100%</span>
+        </div>
+        <input type="range" id="opacity-slider" min="0" max="100" value="100">
+      </div>
+
+      <div class="slider-group">
+        <div class="slider-header">
+          <label for="scale-slider">Scale</label>
+          <span id="scale-val" class="slider-value">1.0x</span>
+        </div>
+        <input type="range" id="scale-slider" min="0.5" max="1.5" value="1" step="0.05">
+      </div>
+    </div>
+
+    <div class="canvas-panel">
+      <div id="preview-target" class="preview-box"></div>
+    </div>
+  </div>
+
+  <script>
+    // Elements
+    const blurSlider = document.getElementById('blur-slider');
+    const opacitySlider = document.getElementById('opacity-slider');
+    const scaleSlider = document.getElementById('scale-slider');
+
+    const blurVal = document.getElementById('blur-val');
+    const opacityVal = document.getElementById('opacity-val');
+    const scaleVal = document.getElementById('scale-val');
+
+    const previewTarget = document.getElementById('preview-target');
+
+    // Interactive Updates
+    function updateEffects() {
+      const blur = blurSlider.value;
+      const opacity = opacitySlider.value;
+      const scale = scaleSlider.value;
+
+      blurVal.textContent = `${blur}px`;
+      opacityVal.textContent = `${opacity}%`;
+      scaleVal.textContent = `${parseFloat(scale).toFixed(2)}x`;
+
+      previewTarget.style.filter = `blur(${blur}px)`;
+      previewTarget.style.opacity = opacity / 100;
+      previewTarget.style.transform = `scale(${scale})`;
+    }
+
+    blurSlider.addEventListener('input', updateEffects);
+    opacitySlider.addEventListener('input', updateEffects);
+    scaleSlider.addEventListener('input', updateEffects);
+  </script>
+</body>
+</html>

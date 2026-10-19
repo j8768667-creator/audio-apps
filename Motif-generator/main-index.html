@@ -1,0 +1,322 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>MIDI Motif Generator Lite v0.4</title>
+<style>
+:root{
+  --bg:#f4f6fb;--card:#fff;--line:#d9dce5;--text:#111827;--muted:#5f6675;
+  --accent:#4a57dd;--accent-dark:#3946c7;--output:#111827;--output-text:#dbe7ff;
+  --error:#b42318;--success:#167647;
+}
+*{box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);margin:0}
+.wrap{max-width:940px;margin:auto;padding:20px}
+h1{font-size:clamp(28px,5vw,42px);margin:0 0 8px}
+.subtitle{color:var(--muted);margin:0 0 22px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:18px}
+p{line-height:1.5}
+textarea,select,input,button{font:inherit}
+textarea{width:100%;min-height:100px;resize:vertical;border:1px solid var(--line);border-radius:9px;padding:12px;margin-bottom:12px}
+select,input{border:1px solid var(--line);border-radius:9px;padding:9px 10px;background:#fff}
+input[type=number]{width:90px}
+button{min-height:48px;padding:10px 18px;border:0;border-radius:10px;background:var(--accent);color:#fff;cursor:pointer;font-weight:700;touch-action:manipulation}
+button:hover{background:var(--accent-dark)}
+button.secondary{background:#eef0ff;color:var(--accent)}
+button.secondary:hover{background:#e0e4ff}
+button.stop{background:#eceef3;color:#343a4d}
+button:disabled{opacity:.45;cursor:not-allowed}
+pre{background:var(--output);color:var(--output-text);padding:14px;border-radius:9px;overflow:auto;white-space:pre-wrap;min-height:70px;margin:0}
+.row{display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin-bottom:12px}
+label{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.help{color:var(--muted);font-size:14px}
+#error{color:var(--error);min-height:22px;margin-top:8px}
+#status{color:var(--success);min-height:22px;margin-top:8px}
+.actions{display:flex;gap:10px;flex-wrap:wrap}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}
+.stat{border:1px solid var(--line);border-radius:10px;padding:10px;background:#fafbfe}
+.stat b{display:block;font-size:19px}.stat span{font-size:12px;color:var(--muted)}
+@media(max-width:650px){
+  .wrap{padding:14px}.card{padding:14px}.row{align-items:stretch}
+  label{width:100%;justify-content:space-between}select{flex:1}
+  button{width:100%}.actions{display:grid}.stats{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>MIDI Motif Generator Lite</h1>
+<p class="subtitle">Generate, hear and download transformed motifs as a Standard MIDI File.</p>
+
+<div class="card">
+<p>Enter note names or chord symbols separated by spaces, commas or new lines. Examples: <b>C4 D4 E4 G4</b> or <b>C Am F G7</b>.</p>
+<textarea id="motif" spellcheck="false">C Am F G7</textarea>
+
+<div class="row">
+<label for="mode">Transformation
+<select id="mode">
+<option>Original</option><option>Sequence Up</option><option>Sequence Down</option>
+<option>Retrograde</option><option>Inversion</option><option>Retrograde Inversion</option>
+<option>Rhythm Double</option><option>Rhythm Half</option><option>Octave Up</option><option>Octave Down</option>
+</select></label>
+
+<label for="amount">Semitones
+<input id="amount" type="number" value="2" min="-24" max="24" inputmode="numeric">
+</label>
+</div>
+
+<div class="row">
+<label for="tempo">Tempo
+<input id="tempo" type="number" value="110" min="30" max="300" inputmode="numeric"> BPM
+</label>
+
+<label for="duration">Step length
+<select id="duration">
+<option value="0.25">Sixteenth note</option>
+<option value="0.5">Eighth note</option>
+<option value="1" selected>Quarter note</option>
+<option value="2">Half note</option>
+<option value="4">Whole note</option>
+</select></label>
+
+<label for="gate">Note length
+<select id="gate">
+<option value="0.55">Short</option>
+<option value="0.82">Normal</option>
+<option value="0.95" selected>Legato</option>
+</select></label>
+
+<label for="velocity">Velocity
+<input id="velocity" type="number" value="88" min="1" max="127" inputmode="numeric">
+</label>
+</div>
+
+<div class="actions">
+<button id="go" type="button">Generate</button>
+<button id="preview" type="button" class="secondary" disabled>Preview Generated</button>
+<button id="stop" type="button" class="stop" disabled>Stop</button>
+<button id="download" type="button" disabled>Download MIDI</button>
+</div>
+<div id="error" role="alert"></div>
+<div id="status" role="status"></div>
+<p class="help">Chords are played simultaneously. Each typed note or chord occupies one step. Downloaded files use MIDI channel 1 and PPQ 480.</p>
+</div>
+
+<div class="card">
+<h3>Generated Motif</h3>
+<pre id="out" aria-live="polite"></pre>
+<div class="stats">
+<div class="stat"><b id="stepsStat">—</b><span>Steps</span></div>
+<div class="stat"><b id="notesStat">—</b><span>Notes</span></div>
+<div class="stat"><b id="tempoStat">—</b><span>Tempo</span></div>
+<div class="stat"><b id="lengthStat">—</b><span>Length</span></div>
+</div>
+</div>
+</div>
+
+<script>
+"use strict";
+
+const noteNames=["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+const pitchClasses={C:0,"C#":1,DB:1,D:2,"D#":3,EB:3,E:4,F:5,"F#":6,GB:6,G:7,"G#":8,AB:8,A:9,"A#":10,BB:10,B:11};
+const chordIntervals={
+  "":[0,4,7],M:[0,4,7],MAJ:[0,4,7],MIN:[0,3,7],M7:[0,3,7,10],
+  MIN7:[0,3,7,10],"7":[0,4,7,10],MAJ7:[0,4,7,11],DIM:[0,3,6],
+  DIM7:[0,3,6,9],AUG:[0,4,8],"+":[0,4,8],SUS2:[0,2,7],SUS4:[0,5,7],SUS:[0,5,7]
+};
+
+const el=id=>document.getElementById(id);
+const motifEl=el("motif"),modeEl=el("mode"),amountEl=el("amount"),tempoEl=el("tempo"),
+ durationEl=el("duration"),gateEl=el("gate"),velocityEl=el("velocity"),goEl=el("go"),
+ previewEl=el("preview"),stopEl=el("stop"),downloadEl=el("download"),outEl=el("out"),
+ errorEl=el("error"),statusEl=el("status");
+
+let generated=null,audioContext=null,activeOscillators=[],finishTimer=null;
+
+function clamp(v,min,max){return Math.max(min,Math.min(max,v))}
+function parseNote(token){
+  const cleaned=token.trim().replace(/♯/g,"#").replace(/♭/g,"b");
+  const match=cleaned.match(/^([A-Ga-g])([#b]?)(-1|[0-9])$/);
+  if(!match)return null;
+  const name=(match[1]+match[2]).toUpperCase(),octave=Number(match[3]),pc=pitchClasses[name];
+  if(pc===undefined)return null;
+  const midi=pc+(octave+1)*12;
+  return midi>=0&&midi<=127?midi:null;
+}
+function parseChord(token){
+  const cleaned=token.trim().replace(/♯/g,"#").replace(/♭/g,"b");
+  const match=cleaned.match(/^([A-Ga-g])([#b]?)(maj7|min7|m7|dim7|dim|aug|sus2|sus4|sus|maj|min|m|7|\+)?(?:\/([A-Ga-g])([#b]?))?$/i);
+  if(!match)return null;
+  const rootName=(match[1]+match[2]).toUpperCase(),rootPc=pitchClasses[rootName];
+  if(rootPc===undefined)return null;
+  const raw=match[3]||"";
+  let q=raw.toUpperCase();
+  if(raw==="m")q="MIN";
+  else if(raw==="m7")q="MIN7";
+  else if(/^min$/i.test(raw))q="MIN";
+  else if(/^min7$/i.test(raw))q="MIN7";
+  else if(/^maj$/i.test(raw))q="MAJ";
+  else if(/^maj7$/i.test(raw))q="MAJ7";
+  const intervals=chordIntervals[q];
+  if(!intervals)return null;
+  let notes=intervals.map(i=>60+rootPc+i);
+  if(match[4]){
+    const bassPc=pitchClasses[(match[4]+(match[5]||"")).toUpperCase()];
+    if(bassPc===undefined)return null;
+    let bass=48+bassPc;
+    while(bass>=notes[0])bass-=12;
+    notes=[bass,...notes];
+  }
+  return notes;
+}
+function formatNote(midi){
+  return noteNames[((midi%12)+12)%12]+(Math.floor(midi/12)-1);
+}
+function readItems(){
+  return motifEl.value.trim().split(/[\s,;|]+/).filter(Boolean).map(token=>{
+    const note=parseNote(token);
+    if(note!==null)return{token,notes:[note],type:"note"};
+    const chord=parseChord(token);
+    if(chord!==null)return{token,notes:chord,type:"chord"};
+    return{token,notes:null,type:"invalid"};
+  });
+}
+function transformItems(items,mode,amount){
+  const flat=items.flatMap(x=>x.notes);
+  const pivot=flat[0];
+  const mapPitch=n=>{
+    switch(mode){
+      case"Sequence Up":return n+amount;
+      case"Sequence Down":return n-amount;
+      case"Inversion":return pivot-(n-pivot);
+      case"Retrograde Inversion":return pivot-(n-pivot);
+      case"Octave Up":return n+12;
+      case"Octave Down":return n-12;
+      default:return n;
+    }
+  };
+  let result=items.map(x=>({...x,notes:x.notes.map(mapPitch)}));
+  if(mode==="Retrograde"||mode==="Retrograde Inversion")result.reverse();
+  return result;
+}
+function generate(){
+  stopPlayback();
+  errorEl.textContent="";statusEl.textContent="";
+  const parsed=readItems(),invalid=parsed.filter(x=>!x.notes).map(x=>x.token),valid=parsed.filter(x=>x.notes);
+  if(!valid.length){
+    generated=null;outEl.textContent="No valid notes.";errorEl.textContent=invalid.length?"Invalid entry: "+invalid.join(", "):"Enter at least one note or chord.";
+    previewEl.disabled=downloadEl.disabled=true;return;
+  }
+  const tempo=clamp(Number(tempoEl.value)||110,30,300);
+  const velocity=clamp(Number(velocityEl.value)||88,1,127);
+  const mode=modeEl.value,amount=Number(amountEl.value)||0,gate=Number(gateEl.value);
+  let stepBeats=Number(durationEl.value);
+  if(mode==="Rhythm Double")stepBeats*=2;
+  if(mode==="Rhythm Half")stepBeats*=0.5;
+  let items=transformItems(valid,mode,amount);
+  let clipped=0;
+  items=items.map(x=>({...x,notes:x.notes.map(n=>{if(n<0||n>127)clipped++;return clamp(n,0,127)})}));
+  if(invalid.length)errorEl.textContent="Ignored invalid entries: "+invalid.join(", ");
+  if(clipped)errorEl.textContent+=(errorEl.textContent?" ":"")+"Some notes were clamped to the MIDI range.";
+  const events=[];
+  items.forEach((item,index)=>{
+    const startBeat=index*stepBeats;
+    item.notes.forEach(note=>events.push({note,startBeat,durationBeats:stepBeats*gate,velocity}));
+  });
+  generated={items,events,tempo,stepBeats,velocity,totalBeats:items.length*stepBeats};
+  outEl.textContent=
+    "Transformation: "+mode+"\n\n"+
+    items.map((item,i)=>(i+1)+". "+item.notes.map(formatNote).join(" ")).join("\n")+
+    "\n\nDownload creates a valid .mid file using these exact notes and timings.";
+  el("stepsStat").textContent=items.length;
+  el("notesStat").textContent=events.length;
+  el("tempoStat").textContent=tempo+" BPM";
+  el("lengthStat").textContent=formatTime(generated.totalBeats*60/tempo);
+  previewEl.disabled=downloadEl.disabled=false;
+  statusEl.textContent="Generated motif is ready to preview or download.";
+}
+function formatTime(seconds){
+  const m=Math.floor(seconds/60),s=Math.round(seconds%60);
+  return m+":"+String(s).padStart(2,"0");
+}
+async function preview(){
+  if(!generated)return;
+  stopPlayback();
+  audioContext=audioContext||new(window.AudioContext||window.webkitAudioContext)();
+  await audioContext.resume();
+  const base=audioContext.currentTime+0.07,secondsPerBeat=60/generated.tempo;
+  generated.events.forEach(ev=>{
+    const start=base+ev.startBeat*secondsPerBeat,duration=Math.max(0.05,ev.durationBeats*secondsPerBeat);
+    const osc=audioContext.createOscillator(),gain=audioContext.createGain();
+    osc.type="triangle";
+    osc.frequency.value=440*Math.pow(2,(ev.note-69)/12);
+    const volume=Math.max(0.008,(ev.velocity/127)*0.075/Math.sqrt(Math.max(1,generated.events.length/generated.items.length)));
+    gain.gain.setValueAtTime(0.0001,start);
+    gain.gain.exponentialRampToValueAtTime(volume,start+0.012);
+    gain.gain.setValueAtTime(volume,start+Math.max(0.02,duration-0.035));
+    gain.gain.exponentialRampToValueAtTime(0.0001,start+duration);
+    osc.connect(gain).connect(audioContext.destination);
+    osc.start(start);osc.stop(start+duration+0.03);activeOscillators.push(osc);
+  });
+  stopEl.disabled=false;statusEl.textContent="Previewing generated motif…";
+  finishTimer=setTimeout(()=>{stopPlayback();statusEl.textContent="Preview finished.";},generated.totalBeats*secondsPerBeat*1000+180);
+}
+function stopPlayback(){
+  if(finishTimer){clearTimeout(finishTimer);finishTimer=null}
+  activeOscillators.forEach(x=>{try{x.stop()}catch{}});activeOscillators=[];
+  stopEl.disabled=true;
+}
+function writeVLQ(value){
+  value=Math.max(0,Math.round(value));
+  let buffer=value&0x7f,out=[];
+  while((value>>=7)){buffer<<=8;buffer|=(value&0x7f)|0x80}
+  while(true){out.push(buffer&255);if(buffer&0x80)buffer>>=8;else break}
+  return out;
+}
+function buildMidi(){
+  const ppq=480,track=[],tempoMicros=Math.round(60000000/generated.tempo);
+  track.push(0,0xff,0x51,3,(tempoMicros>>16)&255,(tempoMicros>>8)&255,tempoMicros&255);
+  track.push(0,0xff,0x58,4,4,2,24,8);
+  const midiEvents=[];
+  generated.events.forEach(ev=>{
+    const on=Math.round(ev.startBeat*ppq),off=Math.round((ev.startBeat+ev.durationBeats)*ppq);
+    midiEvents.push({tick:on,kind:1,note:ev.note,velocity:ev.velocity});
+    midiEvents.push({tick:off,kind:0,note:ev.note,velocity:0});
+  });
+  midiEvents.sort((a,b)=>a.tick-b.tick||a.kind-b.kind||a.note-b.note);
+  let lastTick=0;
+  midiEvents.forEach(ev=>{
+    track.push(...writeVLQ(ev.tick-lastTick),ev.kind?0x90:0x80,ev.note,ev.velocity);
+    lastTick=ev.tick;
+  });
+  const endTick=Math.round(generated.totalBeats*ppq);
+  track.push(...writeVLQ(Math.max(0,endTick-lastTick)),0xff,0x2f,0);
+  const bytes=[];
+  const text=s=>[...s].forEach(c=>bytes.push(c.charCodeAt(0)));
+  const u16=v=>bytes.push((v>>8)&255,v&255);
+  const u32=v=>bytes.push((v>>>24)&255,(v>>>16)&255,(v>>>8)&255,v&255);
+  text("MThd");u32(6);u16(0);u16(1);u16(ppq);
+  text("MTrk");u32(track.length);bytes.push(...track);
+  return new Uint8Array(bytes);
+}
+function downloadMidi(){
+  if(!generated)return;
+  const blob=new Blob([buildMidi()],{type:"audio/midi"});
+  const link=document.createElement("a");
+  link.href=URL.createObjectURL(blob);
+  link.download="generated_motif.mid";
+  document.body.appendChild(link);link.click();link.remove();
+  setTimeout(()=>URL.revokeObjectURL(link.href),1500);
+  statusEl.textContent="MIDI file downloaded.";
+}
+
+goEl.addEventListener("click",generate);
+previewEl.addEventListener("click",preview);
+stopEl.addEventListener("click",()=>{stopPlayback();statusEl.textContent="Preview stopped.";});
+downloadEl.addEventListener("click",downloadMidi);
+motifEl.addEventListener("keydown",e=>{if((e.metaKey||e.ctrlKey)&&e.key==="Enter")generate()});
+generate();
+</script>
+</body>
+</html>
